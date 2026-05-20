@@ -1,7 +1,3 @@
-<<<<<<< Updated upstream
-readme
-readme lepsi
-=======
 🧮 Team Calculator
 A simple calculator implemented in pseudocode by the team.
 Each team member implements one or more functions.
@@ -15,7 +11,9 @@ function add(a, b):
 
 
 SUBTRACT
-function subtract(a, b):
+function subtract (a, b) :
+// TODO: implement
+function add(a, b):
     // TODO: implement
 
 
@@ -24,5 +22,4 @@ function subtract(a, b):
 <!-- Other team members: add your functions below this line -->
 divide
 function divide(a,b)
-return (a/b) (())
->>>>>>> Stashed changes
+return (a/b)
