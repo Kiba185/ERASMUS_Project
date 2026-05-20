@@ -1,0 +1,6 @@
+@ErasmusProject_HostAddress = http://localhost:5186
+
+GET {{ErasmusProject_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###
