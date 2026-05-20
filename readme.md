@@ -12,9 +12,12 @@ function add(a, b):
 
 SUBTRACT
 function subtract(a, b):
-    return a-b;
+    // TODO: implement
 
 
 ---
 
 <!-- Other team members: add your functions below this line -->
+divide
+function divide(a,b)
+return (a/b)
