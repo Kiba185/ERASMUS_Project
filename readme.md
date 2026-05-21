@@ -22,3 +22,5 @@ function subtract(a, b):
 ---
 
 <!-- Other team members: add your functions below this line -->
+function multiply(a, b):
+    return a*b;
