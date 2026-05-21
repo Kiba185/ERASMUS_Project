@@ -7,10 +7,12 @@ Each team member implements one or more functions.
 Functions
 ADD
 function add(a, b):
-    return a+b;
-    
-function multiply(a, b):
-    return a*b;
+    return (a+b);
 
+MULTIPLY
+function multiply(a, b):
+    return (a*b);
+
+DIVIDE
 function divide(a, b):
-    return a/b;
+    return (a/b);
