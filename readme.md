@@ -19,5 +19,5 @@ function subtract(a, b):
 
 <!-- Other team members: add your functions below this line -->
 random
-function random(a, B)
+function random(a, b)
     //TODO: implement
