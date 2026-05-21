@@ -1,7 +1,7 @@
 function Header() {
     return (
-        <header>
-            <h1>skjjb</h1>
+        <header className="bg-slate-900 text-white p-4 margin-top-0">
+            <h1 className="text-2xl font-bold">ENGINEERS-HEADER</h1>
         </header>
     );
 }
