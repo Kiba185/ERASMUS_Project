@@ -16,5 +16,8 @@ function subtract(a, b):
 
 
 ---
-piča
+
 <!-- Other team members: add your functions below this line -->
+random
+function random(a, B)
+    //TODO: implement
