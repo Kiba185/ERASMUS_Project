@@ -1,4 +1,4 @@
-🧮 Team Calculator
+eam Calculator
 A simple calculator implemented in pseudocode by the team.
 Each team member implements one or more functions.
 
@@ -12,7 +12,7 @@ function add(a, b):
 
 SUBTRACT
 function subtract(a, b):
-    return a-b;
+    // TODO: implement
 
 
 
