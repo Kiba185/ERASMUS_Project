@@ -1,4 +1,4 @@
-🧮 Team Calculator
+eam Calculator
 A simple calculator implemented in pseudocode by the team.
 Each team member implements one or more functions.
 
