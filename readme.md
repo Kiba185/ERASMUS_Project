@@ -11,9 +11,7 @@ function add(a, b):
 
 
 SUBTRACT
-function subtract (a, b) :
-// TODO: implement
-function add(a, b):
+function subtract(a, b):
     // TODO: implement
 
 
@@ -21,5 +19,5 @@ function add(a, b):
 
 <!-- Other team members: add your functions below this line -->
 divide
-function divide(a,b)
-return (a/b)
+function substract(a,b):
+return (a-b);
