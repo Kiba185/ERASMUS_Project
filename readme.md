@@ -7,7 +7,7 @@ Each team member implements one or more functions.
 Functions
 ADD
 function add(a, b):
-    // TODO: implement
+    return a+b;
 
 
 SUBTRACT
