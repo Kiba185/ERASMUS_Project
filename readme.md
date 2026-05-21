@@ -5,20 +5,8 @@ Each team member implements one or more functions.
 ---
 
 Functions
-ADD
-function add(a, b):
-    // TODO: implement
-
-
-SUBTRACT
-function subtract(a, b):
-    // TODO: implement
-
-
-
----
-
-<!-- Other team members: add your functions below this line -->
+function multiply(a, b):
+    return a*b;
 
 function divide(a, b):
     return a/b;
