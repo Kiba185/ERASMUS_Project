@@ -19,3 +19,7 @@ return (a/b);
 MULTIPLICATION
 function multiplication(a, b):
 return(a*b);
+
+SUBTRACT
+function subtract (a, b):
+return(a-b);
