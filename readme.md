@@ -1,21 +1,20 @@
-🧮 Team Calculator
+eam Calculator
 A simple calculator implemented in pseudocode by the team.
 Each team member implements one or more functions.
 
-Functions
+---
 
+Functions
 ADD
 function add(a, b):
-return(a+b);
+    // TODO: implement
+
 
 SUBTRACT
-function subtract (a, b):
-return(a-b);
+function subtract(a, b):
+    // TODO: implement
 
-DIVIDE
-function divide(a, b):
-return (a/b);
 
-MULTIPLICATION
-function multiplication(a, b):
-return(a*b);
+---
+
+<!-- Other team members: add your functions below this line -->
