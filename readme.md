@@ -8,13 +8,9 @@ Functions
 ADD
 function add(a, b):
     return a+b;
+    
+function multiply(a, b):
+    return a*b;
 
-
-SUBTRACT
-function subtract(a, b):
-    // TODO: implement
-
-
----
-
-<!-- Other team members: add your functions below this line -->
+function divide(a, b):
+    return a/b;
