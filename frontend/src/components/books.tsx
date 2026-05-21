@@ -1,22 +1,20 @@
-import { exp } from "firebase/firestore/pipelines";
-import { useState } from "react"; 
+import { useState } from "react";
 const mockBooks = [
-    { id: 1, title: "Buy groceries", price: 10.78 },
-    { id: 2, title: "Walk the dog", price: 5.99 },
-    { id: 3, title: "Read a book", price: 15.99 },
-    { id: 4, title: "Write a blog post", price: 20.00 }
+  { id: 1, title: "Buy groceries", price: 1000 },
+  { id: 2, title: "Walk the dog", price: 1000},
+  { id: 3, title: "Read a book", price: 1000 },
+  {id: 4, title: "Jo", price: 10000}
 ];
-function Books() {
-    const [books, setBooks] = useState(mockBooks);
-    return(
-        <div>
-            {books.map((book) =>(
-                <div key={book.id}>
-                    <h2>{book.title}</h2>
-                    <p>Price: ${book.price}</p>
-                </div>
-            ))}
-        </div>
-    );
+
+function Books(){
+    const [books, setBooks] = useState(mockBooks)
+    return <div>
+        <ul>
+        {books.map(book => (
+          <li key={book.id}>{book.title}: {book.price}</li>
+        ))}
+      </ul>
+
+    </div>
 }
-export default Books
+export default Books;
