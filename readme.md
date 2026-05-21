@@ -20,5 +20,4 @@ function subtract(a, b):
 <!-- Other team members: add your functions below this line -->
 ADD
 function add(a, b)
-    //TODO: implement
     return (a+b)
