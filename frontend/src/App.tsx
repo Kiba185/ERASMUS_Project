@@ -1,24 +1,35 @@
-import { useState } from "react";
-import Header from "./components/header";
-import Books from "./components/books";
+import React from 'react';
+import { createBrowserRouter, RouterProvider, Navigate } from 'react-router-dom';
+import MainLayout from './layouts/MainLayout';
+import AuthLayout from './layouts/AuthLayout';
+import LoginPage from './features/auth/pages/LoginPage';
+import StudentDashboard from './features/student/pages/StudentDashboard';
+import TeacherDashboard from './features/teacher/pages/TeacherDashboard';
+import AdminDashboard from './features/admin/pages/AdminDashboard';
 
-function App() {
-  const [value, setValue] = useState(0);
-  function handleClick()
+const router = createBrowserRouter([
   {
-    setValue(value + 1);
-    console.log(value);
+    path: '/auth',
+    element: <AuthLayout />,
+    children: [
+      { path: 'login', element: <LoginPage /> },
+      { path: '', element: <Navigate to="/auth/login" replace /> }
+    ]
+  },
+  {
+    path: '/',
+    element: <MainLayout />,
+    children: [
+      { path: 'student', element: <StudentDashboard /> },
+      { path: 'teacher', element: <TeacherDashboard /> },
+      { path: 'admin', element: <AdminDashboard /> },
+      { path: '', element: <Navigate to="/student" replace /> }
+    ]
   }
-  return (
-    <div className="flex items-center justify-center min-h-screen bg-slate-900 text-white">
-      <Header/>
-      <h1 className="text-3xl font-bold text-amber-500">ENGINEERS{value}</h1>
-      <h2 className="text-3xl font-bold text-amber-500">Coming soon...</h2>
-      <button onClick={handleClick}>+1</button>
-      <Books />
+]);
 
-    </div>
-  )
-}
+const App: React.FC = () => {
+  return <RouterProvider router={router} />;
+};
 
 export default App;
