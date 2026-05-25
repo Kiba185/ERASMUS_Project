@@ -1,7 +1,13 @@
 import React from 'react';
+import Books from '../../../components/books';
 
 const StudentDashboard: React.FC = () => {
-  return <h1>Student Area</h1>;
+  return (
+    <div>
+      <h1>Student Area</h1>
+      <Books />
+    </div>
+  );
 };
 
 export default StudentDashboard;
