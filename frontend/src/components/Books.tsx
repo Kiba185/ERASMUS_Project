@@ -1,11 +1,10 @@
-import { useState } from "react";
+import { useState } from "react"; 
 const mockBooks = [
-  { id: 1, title: "Buy groceries", price: 10.99 },
-  { id: 2, title: "Walk the dog", price: 5.99 },
-  { id: 3, title: "Read a book", price: 15.99 },
-  { id: 4, title: "Go to the gym", price: 20.00 },
+    { id: 1, title: "Buy groceries", price: 10.78 },
+    { id: 2, title: "Walk the dog", price: 5.99 },
+    { id: 3, title: "Read a book", price: 15.99 },
+    { id: 4, title: "Write a blog post", price: 20.00 }
 ];
-
 function Books() {
     const [books, setBooks] = useState(mockBooks);
     const [inputValue, setInputValue] = useState("");
@@ -39,5 +38,6 @@ function Books() {
         </div>
 
     );
+    
 }
 export default Books;
