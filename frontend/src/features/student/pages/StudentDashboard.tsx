@@ -1,13 +1,14 @@
 import React from 'react';
-import Books from '../../../components/books.tsx';
+import Books from "../../../components/books";
+import Header from "../../../components/header";
+
+
 
 const StudentDashboard: React.FC = () => {
-  return (
-    <div>
-      <h1>Student Area</h1>
-      <Books />
-    </div>
-  );
+  return <div>
+    <Header />
+    <Books />
+  </div>;
 };
 
 export default StudentDashboard;
