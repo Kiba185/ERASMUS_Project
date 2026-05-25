@@ -13,6 +13,11 @@ const PORT = 3000;
 app.use(cors());
 app.use(express.json());
 
+app.get('/api/user', async (req, res) => {
+  const users = await  prisma.user.findMany()();
+  res.json(users);
+})
+
 // GET /api/todos — get all todos
 app.get('/api/todos', async (req, res) => {
   const todos = await prisma.todo.findMany();
