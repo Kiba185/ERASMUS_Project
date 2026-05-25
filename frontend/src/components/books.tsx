@@ -12,38 +12,32 @@ function Books() {
     const addBook = () => {
         if (inputValue.trim() === "") return;
         const newBook = {
-        id: Date.now(),
-        title: inputValue,
-        price: 0,
+            id: Date.now(),
+            title: inputValue,
+            price: 0,
         };
-        
         setBooks([...books, newBook]);
         setInputValue("");
     };
 
-    return(
+    return (
+
         <div>
-            {books.map((book) =>(
-                <div key={book.id}>
-                    <h2>{book.title}</h2>
-                    <p>Price: ${book.price}</p>
-                    <h1>Todo List</h1>
-                    <input
-                        value={inputValue}
-                        onChange={(e) => setInputValue(e.target.value)}
-                        placeholder="New todo..."
-                    />
-                    <button onClick={addBook}>Add</button>
-                    <ul>
-                        {books.map(book => (
-                        <li key={book.id}>{book.title}</li>
-                        ))}
-                    </ul>
-                </div>
-            ))}
+            <h1>books list</h1>
+            <input
+                value={inputValue}
+                onChange={(e) => setInputValue(e.target.value)}
+                placeholder="New book..."
+            />
+            <button onClick={addBook}>Add</button>
+            <ul>
+                {books.map(book => (
+                <li key={book.id}>{book.title}</li>
+                ))}
+            </ul>
         </div>
+
     );
-};
-
-
-export default Books
+    
+}
+export default Books;
