@@ -8,6 +8,25 @@ const mockBooks = [
 
 function Books() {
     const [books, setBooks] = useState(mockBooks);
+    
+
+    const [inputValue, setInputValue] = useState("");
+
+    const addBook = () => {
+    if (inputValue.trim() === "") return;
+    const newBook = {
+    id: Date.now(),
+    title: inputValue,
+    price: 0,
+    };
+    setBooks([...books, newBook]);
+    setInputValue("");
+    };
+}
+
+    
+    
+
     return (
 
         <div className="flex items-center justify-center min-h-screen bg-slate-900 text-white">
@@ -17,7 +36,23 @@ function Books() {
                     <p className="text-lg font-semibold">${book.price}</p>
                 </div>
             ))}
+            <div>
+      <h1>Todo List</h1>
+      <input
+        value={inputValue}
+        onChange={(e) => setInputValue(e.target.value)}
+        placeholder="New todo..."
+      />
+      <button onClick={addTodo}>Add</button>
+      <ul>
+        {todos.map(todo => (
+          <li key={todo.id}>{todo.title}</li>
+        ))}
+      </ul>
+    </div>
+
         </div>
     );
+    
 }
 export default Books;
