@@ -19,3 +19,34 @@ model Todo {
   isCompleted Boolean  @default(false)
   createdAt   DateTime @default(now())
 }
+
+model User
+{
+  id        int       @id @default(autoincrement())
+  role
+  lastName  string
+  firstName string
+  birthday  DateTime 
+  createdAt DateTime  @default(now())
+}
+
+model Subject
+{
+   id        int       @id @default(autoincrement())
+   name      string
+   userId    int
+   user      User      @relation(fields: [userId], references: [id])
+}
+
+model Grade
+{
+  id         int  @id @default(autoincrement())
+  subjectId  int
+  userId     int
+  grade      int
+  weight     int
+  date       DateTime  
+  subject    Subject   @relation(fields: [subjectId], references: [id])
+  user       User      @relation(fields: [userId], references: [id])
+
+}
