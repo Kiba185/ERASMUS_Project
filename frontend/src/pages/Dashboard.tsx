@@ -1,6 +1,9 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import ScheduleWidget from '../components/widgets/Schedulewidget';
+import GradesWidget from '../components/widgets/GradesWidget';
+
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
@@ -16,33 +19,11 @@ const Dashboard: React.FC = () => {
         
         {/* Zobrazení widgetů podle role */}
         {(user.role === 'student' || user.role === 'parent') && (
-          <div 
-            onClick={() => navigate(user.role === 'student' ? '/dashboard/schedule' : '/dashboard/children-schedule')}
-            className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition cursor-pointer"
-          >
-            <h2 className="text-xl font-bold text-blue-700 mb-4">Rozvrh - Dnes</h2>
-            <ul className="space-y-2 text-gray-600">
-              <li className="flex justify-between border-b pb-1"><span>08:00 - 08:45</span> <strong>Matematika</strong></li>
-              <li className="flex justify-between border-b pb-1"><span>08:55 - 09:40</span> <strong>Český jazyk</strong></li>
-              <li className="flex justify-between pb-1"><span>10:00 - 10:45</span> <strong>Anglický jazyk</strong></li>
-            </ul>
-            <div className="mt-4 text-sm text-blue-600 font-semibold">Zobrazit celý rozvrh &rarr;</div>
-          </div>
+          <ScheduleWidget />
         )}
 
         {(user.role === 'student' || user.role === 'parent') && (
-          <div 
-            onClick={() => navigate(user.role === 'student' ? '/dashboard/grades' : '/dashboard/children-grades')}
-            className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition cursor-pointer"
-          >
-            <h2 className="text-xl font-bold text-green-700 mb-4">Poslední známky</h2>
-            <ul className="space-y-2 text-gray-600">
-              <li className="flex justify-between border-b pb-1"><span>Matematika</span> <strong className="text-green-600">1</strong></li>
-              <li className="flex justify-between border-b pb-1"><span>Fyzika</span> <strong className="text-yellow-600">2</strong></li>
-              <li className="flex justify-between pb-1"><span>Dějepis</span> <strong className="text-green-600">1</strong></li>
-            </ul>
-            <div className="mt-4 text-sm text-green-600 font-semibold">Zobrazit všechny známky &rarr;</div>
-          </div>
+          <GradesWidget />
         )}
 
         {user.role === 'teacher' && (
