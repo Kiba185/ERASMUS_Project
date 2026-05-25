@@ -29,6 +29,7 @@ model User {
   createdAt DateTime  @default(now())
   subjects  Subject[]
   grades    Grade[]
+  password  String
 }
 
 model Subject {

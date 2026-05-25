@@ -3,6 +3,13 @@ import cors from 'cors';
 import 'dotenv/config';
 import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
+import session from 'express-session';
+
+declare module 'express-session' {
+  interface SessionData {
+    userId?: number;
+  }
+}
 
 const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
@@ -12,12 +19,52 @@ const PORT = 3000;
 
 app.use(cors());
 app.use(express.json());
+app.use(session({
+  secret: 'cisco', // put this in a .env file!
+  resave: false,
+  saveUninitialized: false,
+  cookie: { secure: false } // set to true if using HTTPS
+}));
 
 ////////////////////////////////////
 
 
+//AUTH
+function requireAuth(req, res, next) {
+  if (!req.session.userId) {
+    return res.status(401).json({ error: 'Not logged in' });
+  }
+  next(); // ✅ they're logged in, let them through
+}
+
+
+//LOGIN
+app.post('/api/login', async (req, res) => {
+  const { id, password } = req.body;
+  const user = await prisma.user.findUnique({ where: { id } });
+  if (user && user.password === password) {
+    req.session.userId = user.id; // store user ID in session
+    res.json({ success: true, user });
+  } else {
+    res.status(401).json({ success: false, message: 'Invalid credentials' });
+  }
+})
+
+//REGISTER
+app.post('/api/register', async (req, res) => {
+  const { role, password, firstName, lastName, birthday } = req.body;
+  const newUser = await prisma.user.create({
+      data: { password, role, firstName, lastName, birthday }
+    });
+    res.status(201).json({ success: true, user: newUser });
+})
+
+
+//////////////
+
+
 //GET
-app.get('/api/user', async (req, res) => {
+app.get('/api/user', requireAuth, async (req, res) => {
   const users = await  prisma.user.findMany();
   res.json(users);
 })
@@ -29,14 +76,14 @@ app.get('/api/user/:id', async (req, res) => {
   res.json(user);
 });
 
-//POST
-app.post('/api/user', async (req, res) => {
-  const { role, name, surname, birthDate } = req.body;
-  const user = await prisma.user.create({
-    data: { role, lastName: surname, firstName: name, birthday: birthDate }
-  });
-  res.status(201).json(user);
-})
+//POST - User Creation Old
+//app.post('/api/user', async (req, res) => {
+//  const { role, name, surname, birthDate } = req.body;
+//  const user = await prisma.user.create({
+//    data: { role, lastName: surname, firstName: name, birthday: birthDate }
+//  });
+//  res.status(201).json(user);
+//})
 
 
 ////////////////////////////////////
