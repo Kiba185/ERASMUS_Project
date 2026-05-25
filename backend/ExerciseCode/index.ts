@@ -14,7 +14,7 @@ app.use(cors());
 app.use(express.json());
 
 app.get('/api/user', async (req, res) => {
-  const users = await  prisma.user.findMany()();
+  const users = await  prisma.user.findMany();
   res.json(users);
 })
 
