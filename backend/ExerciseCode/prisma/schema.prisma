@@ -23,7 +23,7 @@ model Todo {
 model User
 {
   id        int       @id @default(autoincrement())
-  role
+  role      string
   lastName  string
   firstName string
   birthday  DateTime 
