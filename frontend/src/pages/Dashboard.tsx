@@ -1,7 +1,7 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
-import ScheduleWidget from '../components/widgets/Schedulewidget';
+import ScheduleWidget from '../components/widgets/ScheduleWidget';
 import GradesWidget from '../components/widgets/GradesWidget';
 
 
