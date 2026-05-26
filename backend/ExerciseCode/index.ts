@@ -68,7 +68,7 @@ async function login(req: express.Request, res: express.Response, next: express.
   const user = await prisma.user.findFirst({ where: { username } });  
   if (user && user.password === password) {
     req.session.userId = user.id; // store user ID in session
-    res.json({ success: true, user });
+    res.json({ success: true, role: user.role });
   } else {
     res.status(401).json({ success: false, message: 'Invalid credentials' });
     // Timeout to prevent brute-force attacks
@@ -80,11 +80,30 @@ app.post('/api/login', async (req, res) => {
 })
 
 
+//ADMINSETUSER - a temp system for admin to set a user an an admin via POST request, not secure, only for testing purposes
+async function adminsetuser(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const { username, newrole } = req.body;
+  const user = await prisma.user.findFirst({ where: { username } });
+  if (user) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { role: newrole }
+    });
+    res.json({ success: true, message: `${username} role updated to ${newrole}` });
+  } else {
+    res.status(404).json({ success: false, message: 'User not found' });
+  }
+}
+app.post('/api/adminsetuser', async (req, res) => {
+  await adminsetuser(req, res, next);
+})
+
+
 //REGISTER
 async function register(req: express.Request, res: express.Response, next: express.NextFunction) {
   const { firstName, lastName, birthday, username, password, email, phone, adress } = req.body;
   const newUser = await prisma.user.create({
-      data: { password, firstName, lastName, birthday, username, email, phone, adress, role: 'USER' }
+      data: { password, firstName, lastName, birthday, username, email, phone, adress, role: 'student' }
     });
 
   if (!newUser) { return res.status(400).json({ success: false, message: 'User creation failed' }); }
