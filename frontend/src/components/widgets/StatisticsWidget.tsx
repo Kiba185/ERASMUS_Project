@@ -1,11 +1,11 @@
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-const EventsWidget = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
+const GradesWidget = () => {
+    const navigate = useNavigate();
+    const { user } = useAuth();
 
-  if (!user) return null;
+    if (!user) return null;
 
   return (
     <div 
@@ -22,4 +22,5 @@ const EventsWidget = () => {
   );
 };
 
-export default EventsWidget;
+export default GradesWidget;
+

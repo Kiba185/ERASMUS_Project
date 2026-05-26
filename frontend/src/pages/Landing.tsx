@@ -1,21 +1,13 @@
 import React from 'react';
-import { useNavigate } from 'react-router-dom';
+import Header from "../components/layout/Header";
+
 
 const Landing: React.FC = () => {
-  const navigate = useNavigate();
 
   return (
     <div className="min-h-screen bg-palette-sage/15 flex flex-col">
-      {/* Jednoduchá hlavička */}
-      <header className="bg-palette-pine shadow-sm h-16 flex items-center justify-between px-8">
-        <div className="text-2xl font-bold text-palette-mist">ENGINEERS</div>
-        <button 
-          onClick={() => navigate('/login')}
-          className="px-6 py-2 bg-palette-meadow text-palette-pine rounded-md hover:bg-palette-grass hover:text-palette-mist transition font-medium"
-        >
-          Přihlásit se
-        </button>
-      </header>
+      
+      <Header />
 
       {/* Hlavní obsah - Novinky a aktuality */}
       <main className="flex-1 max-w-4xl mx-auto w-full p-8">
