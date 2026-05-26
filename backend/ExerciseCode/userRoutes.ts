@@ -13,18 +13,17 @@ const PORT = 3000;
 
 
 router.get('/grades', async (req, res) =>
-    {   
+    {
     const currentUserId = req.session.userId;
     const userGrades = await prisma.grade.findMany({
         select:{grade: true
-            
+
         },
             where: {
                 userId: currentUserId
-                
             }
-        
 
-    
+
+    })
 
     })
