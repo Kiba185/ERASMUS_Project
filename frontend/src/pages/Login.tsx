@@ -15,7 +15,7 @@ const Login: React.FC = () => {
   // Nový stav pro zobrazení/skrytí hesla
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); // Zabráníme znovunačtení stránky
     setError('');       // Vyresetujeme případnou předchozí chybu
 
@@ -26,7 +26,7 @@ const Login: React.FC = () => {
       login(formattedUsername as User['role']);
       navigate('/dashboard');
     } else {
-      setError('Nesprávné přihlašovací údaje. Zkuste zadat roli jako jméno i heslo (např. teacher).');
+      setError('Invalid login credentials. Please try entering the role name as both username and password (e.g., teacher).');
     }
   };
 

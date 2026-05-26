@@ -6,7 +6,7 @@ const SemesterPage: React.FC = () => {
 
     return (
         <div className="p-8">
-            <h1 className="text-2xl font-bold">Pololetí (Detail)</h1>
+            <h1 className="text-2xl font-bold">Semester (Detail)</h1>
         </div>
     );
 };
