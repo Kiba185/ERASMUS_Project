@@ -27,8 +27,8 @@ const Login: React.FC = () => {
 
       const data = await response.json();
 
-      if (data?.result === true) {
-        login(formattedUsername as unknown as User['role']);
+      if (data?.success === true) {
+        login(formattedUsername, data.user);
         navigate('/dashboard');
       } else {
         setError('Nesprávné přihlašovací údaje. Zkuste zadat roli jako jméno i heslo (např. teacher).');
