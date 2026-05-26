@@ -26,7 +26,7 @@ model User
   role      string
   lastName  string
   firstName string
-  birthday  DateTime 
+  birthday  DateTime
   createdAt DateTime  @default(now())
   username  String
   password  String

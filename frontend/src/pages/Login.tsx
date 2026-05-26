@@ -12,22 +12,29 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); // Zabráníme znovunačtení stránky
     setError('');       // Vyresetujeme případnou předchozí chybu
 
-    // Převedeme vstup na malá písmena pro snazší porovnání (pokud by uživatel napsal "Admin")
     const formattedUsername = username.toLowerCase().trim();
-    
-    // Povolené role v našem testovacím systému
-    const validRoles: User['role'][] = ['student', 'teacher', 'parent', 'admin'];
 
-    // Validace: jméno musí být jedna z rolí a heslo se musí shodovat se jménem
-    if (validRoles.includes(formattedUsername as User['role']) && formattedUsername === password) {
-      login(formattedUsername as User['role']);
-      navigate('/dashboard');
-    } else {
-      setError('Nesprávné přihlašovací údaje. Zkuste zadat roli jako jméno i heslo (např. teacher).');
+    try {
+      const response = await fetch("http://localhost:3000/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: formattedUsername, password })
+      });
+
+      const data = await response.json();
+
+      if (data?.result === true) {
+        login(formattedUsername as unknown as User['role']);
+        navigate('/dashboard');
+      } else {
+        setError('Nesprávné přihlašovací údaje. Zkuste zadat roli jako jméno i heslo (např. teacher).');
+      }
+    } catch (err) {
+      setError('Chyba připojení k serveru.');
     }
   };
 

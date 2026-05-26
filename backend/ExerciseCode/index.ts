@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import session from 'express-session';
 
+
 declare module 'express-session' {
   interface SessionData {
     userId?: number;
@@ -36,19 +37,19 @@ app.use(session({
 
 
 //AUTH
-function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction, permissionLevel: number) {
+async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction, permissionLevel: number) {
 
   if (!req.session.userId) {
     return res.status(401).json({ error: 'Not logged in' });
   }
 
   // Fetch user role from database
-  const user = prisma.user.findUnique({ where: { id: req.session.userId } });
+  const user = await prisma.user.findUnique({ where: { id: req.session.userId } });
   if (!user) {
     return res.status(401).json({ error: 'User not found' });
   }
 
-  const userRole = user.role as keyof typeof privileges;
+  const userRole = (user.role || 'user') as keyof typeof privileges;
   if (roleAuthority(userRole) < permissionLevel) {
     return res.status(403).json({ error: 'Insufficient permissions' });
   }
@@ -63,8 +64,8 @@ function roleAuthority(requiredRole: keyof typeof privileges) {
 
 //LOGIN
 async function login(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const { id, password } = req.body;
-  const user = await prisma.user.findUnique({ where: { id } });
+  const { username, password } = req.body;
+  const user = await prisma.user.findFirst({ where: { username } });  
   if (user && user.password === password) {
     req.session.userId = user.id; // store user ID in session
     res.json({ success: true, user });
@@ -75,7 +76,7 @@ async function login(req: express.Request, res: express.Response, next: express.
   }
 }
 app.post('/api/login', async (req, res) => {
-  await login(req, res, next());
+  await login(req, res, next);
 })
 
 
@@ -88,10 +89,10 @@ async function register(req: express.Request, res: express.Response, next: expre
 
   if (!newUser) { return res.status(400).json({ success: false, message: 'User creation failed' }); }
   res.status(201).json({ success: true, user: newUser });
-  await login(req, res, next);
+  //await login(req, res, next);
 }
 app.post('/api/register', async (req, res) => {
-  await register(req, res, next());
+  await register(req, res, next);
 })
 
 
@@ -102,11 +103,11 @@ async function logout(req: express.Request, res: express.Response, next: express
     if (err) {
       return res.status(500).json({ success: false, message: 'Failed to logout' });
     }
-    res.json({ success: true, message: 'Logged out successfully' });
+    //res.json({ success: true, message: 'Logged out successfully' });
   });
 }
 app.post('/api/logout', async (req, res) => {
-  await logout(req, res, next());
+  await logout(req, res, next);
 });
 
 
