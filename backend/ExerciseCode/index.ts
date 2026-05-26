@@ -59,9 +59,7 @@ app.post('/api/register', async (req, res) => {
     res.status(201).json({ success: true, user: newUser });
 })
 
-
 //////////////
-
 
 //GET
 app.get('/api/user', requireAuth, async (req, res) => {
