@@ -1,6 +1,5 @@
 import React from 'react';
 import { useAuth } from '../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
 import ScheduleWidget from '../components/widgets/ScheduleWidget';
 import GradesWidget from '../components/widgets/GradesWidget';
 import ClassesWidget from '../components/widgets/ClassesWidget';
@@ -15,7 +14,7 @@ const Dashboard: React.FC = () => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-palette-pine mb-6">Přehled - {user.role.toUpperCase()}</h1>
+      <h1 className="text-3xl font-bold text-palette-pine mb-6">Dashboard - {user.role.toUpperCase()}</h1>
       
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         
