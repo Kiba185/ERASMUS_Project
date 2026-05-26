@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import Logo from './Logo';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -13,9 +14,8 @@ const Header: React.FC = () => {
 
   return (
     <header className="h-16 bg-palette-mist border-b border-palette-lichen/45 flex items-center justify-between px-6 lg:px-8">
-      <div className="flex items-center">
-        {/* Mobile menu button could go here */}
-        <h1 className="text-xl font-bold text-palette-leaf">ENGINEERS</h1>
+      <div className="w-32 flex items-left space-x-2 cursor-pointer" onClick={() => navigate('/dashboard')}>
+        <Logo/>
       </div>
       
       {user && (
@@ -33,6 +33,14 @@ const Header: React.FC = () => {
             Odhlásit
           </button>
         </div>
+      )}
+      {!user && (
+        <button 
+          onClick={() => navigate('/login')}
+          className="text-sm px-3 py-1 bg-palette-pine text-palette-mist hover:bg-palette-fern rounded-md transition"
+        >
+          Přihlásit se
+        </button>
       )}
     </header>
   );
