@@ -1,6 +1,7 @@
 import React from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import Logo from './Logo';
 
 const Header: React.FC = () => {
   const { user, logout } = useAuth();
@@ -12,27 +13,34 @@ const Header: React.FC = () => {
   };
 
   return (
-    <header className="h-16 bg-white border-b border-gray-200 flex items-center justify-between px-6 lg:px-8">
-      <div className="flex items-center">
-        {/* Mobile menu button could go here */}
-        <h1 className="text-xl font-bold text-blue-600">ErasmusApp</h1>
+    <header className="h-16 bg-palette-mist border-b border-palette-lichen/45 flex items-center justify-between px-6 lg:px-8">
+      <div className="w-32 flex items-left space-x-2 cursor-pointer" onClick={() => navigate('/dashboard')}>
+        <Logo/>
       </div>
       
       {user && (
         <div className="flex items-center space-x-4">
-          <span className="text-sm text-gray-600 hidden sm:inline-block">
-            Přihlášen jako: <strong>{user.role}</strong>
+          <span className="text-sm text-palette-moss hidden sm:inline-block">
+            Signed as: <strong>{user.role}</strong>
           </span>
-          <div className="h-8 w-8 rounded-full bg-blue-100 flex items-center justify-center text-blue-700 font-bold cursor-pointer hover:bg-blue-200 transition" title="Nastavení profilu">
+          <div className="h-8 w-8 rounded-full bg-palette-lichen/35 flex items-center justify-center text-palette-pine font-bold cursor-pointer hover:bg-palette-sage/45 transition" title="Nastavení profilu">
             {user.role.charAt(0).toUpperCase()}
           </div>
           <button 
             onClick={handleLogout}
-            className="text-sm px-3 py-1 bg-red-50 text-red-600 hover:bg-red-100 rounded-md transition"
+            className="text-sm px-3 py-1 bg-palette-pine text-palette-mist hover:bg-palette-fern rounded-md transition"
           >
-            Odhlásit
+            Sign out
           </button>
         </div>
+      )}
+      {!user && (
+        <button 
+          onClick={() => navigate('/login')}
+          className="text-sm px-3 py-1 bg-palette-pine text-palette-mist hover:bg-palette-fern rounded-md transition"
+        >
+          Sign in
+        </button>
       )}
     </header>
   );
