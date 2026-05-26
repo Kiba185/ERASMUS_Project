@@ -6,9 +6,9 @@ interface ErrorAlertProps {
 
 export const ErrorAlert: React.FC<ErrorAlertProps> = ({ message }) => {
   return (
-    <div className="bg-red-50 border-l-4 border-red-500 p-4 rounded-r-md my-4">
+    <div className="bg-palette-mist border-l-4 border-palette-fern p-4 rounded-r-md my-4">
       <div className="flex items-center">
-        <div className="ml-3 text-sm text-red-700 font-medium">
+        <div className="ml-3 text-sm text-palette-pine font-medium">
           {message}
         </div>
       </div>
