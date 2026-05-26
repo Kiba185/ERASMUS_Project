@@ -11,7 +11,7 @@ interface SidebarLink {
 
 const SIDEBAR_LINKS: SidebarLink[] = [
   // Společné
-  { label: 'Přehled (Dashboard)', path: '/dashboard', roles: ['admin', 'teacher', 'student', 'parent'] },
+  { label: 'Dashboard', path: '/dashboard', roles: ['admin', 'teacher', 'student', 'parent'] },
   
   // Admin
   { label: 'Správa uživatelů', path: '/users', roles: ['admin'] },

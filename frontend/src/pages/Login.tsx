@@ -26,7 +26,7 @@ const Login: React.FC = () => {
       login(formattedUsername as User['role']);
       navigate('/dashboard');
     } else {
-      setError('Nesprávné přihlašovací údaje. Zkuste zadat roli jako jméno i heslo (např. teacher).');
+      setError('Invalid login credentials. Please try entering the role name as both username and password (e.g., teacher).');
     }
   };
 
@@ -36,17 +36,17 @@ const Login: React.FC = () => {
       <div className="bg-white p-8 rounded-xl shadow-lg border-t-4 border-t-green-500 w-full max-w-md">
         
         <h1 className="text-3xl font-bold text-center mb-2 text-green-800">
-          Přihlášení do systému
+          School System Login
         </h1>
         <p className="text-gray-500 mb-8 text-center text-sm">
-          Pro testovací přihlášení zadejte název role jako uživatelské jméno i heslo (student, teacher, parent, admin).
+          For testing purposes, enter the role name as both username and password (student, teacher, parent, admin).
         </p>
         
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Uživatelské jméno */}
           <div>
             <label className="block text-sm font-semibold text-green-800 mb-1" htmlFor="username">
-              Uživatelské jméno
+              Username
             </label>
             <input 
               id="username"
@@ -54,7 +54,7 @@ const Login: React.FC = () => {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               className="w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition shadow-sm"
-              placeholder="např. teacher"
+              placeholder="e.g., teacher"
               required
             />
           </div>
@@ -62,7 +62,7 @@ const Login: React.FC = () => {
           {/* Heslo s očičkem */}
           <div>
             <label className="block text-sm font-semibold text-green-800 mb-1" htmlFor="password">
-              Heslo
+              Password
             </label>
             {/* Obalový div s relativním pozicováním */}
             <div className="relative flex items-center">
@@ -74,7 +74,7 @@ const Login: React.FC = () => {
                 onChange={(e) => setPassword(e.target.value)}
                 // pr-12 zajistí, že text nenarazí do ikony oka
                 className="w-full p-3 pr-12 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-green-500 outline-none transition shadow-sm"
-                placeholder="Zadejte heslo"
+                placeholder="Enter password"
                 required
               />
               
@@ -83,7 +83,7 @@ const Login: React.FC = () => {
                 type="button"
                 onClick={() => setShowPassword(!showPassword)}
                 className="absolute right-3 p-1 rounded-md focus:outline-none focus:ring-2 focus:ring-green-400 transition-colors"
-                title={showPassword ? "Skrýt heslo" : "Zobrazit heslo"}
+                title={showPassword ? "Hide password" : "Show password"}
               >
                 {showPassword ? (
                   /* Ikona OTEVŘENÉHO oka - svítí zeleně */
@@ -113,7 +113,7 @@ const Login: React.FC = () => {
             type="submit"
             className="w-full py-3 px-4 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition shadow-md mt-2"
           >
-            Přihlásit se
+            Sign In
           </button>
         </form>
 
