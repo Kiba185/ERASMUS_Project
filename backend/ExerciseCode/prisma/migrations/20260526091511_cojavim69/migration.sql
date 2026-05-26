@@ -1,19 +1,32 @@
 -- CreateTable
+CREATE TABLE "Todo" (
+    "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
+    "title" TEXT NOT NULL,
+    "urgency" INTEGER NOT NULL,
+    "isCompleted" BOOLEAN NOT NULL DEFAULT false,
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+-- CreateTable
 CREATE TABLE "User" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "role" TEXT NOT NULL,
     "lastName" TEXT NOT NULL,
     "firstName" TEXT NOT NULL,
     "birthday" DATETIME NOT NULL,
-    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP
+    "createdAt" DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    "username" TEXT NOT NULL,
+    "password" TEXT NOT NULL,
+    "email" TEXT NOT NULL,
+    "phone" TEXT NOT NULL,
+    "adress" TEXT NOT NULL
 );
 
 -- CreateTable
 CREATE TABLE "Subject" (
     "id" INTEGER NOT NULL PRIMARY KEY AUTOINCREMENT,
     "name" TEXT NOT NULL,
-    "userId" INTEGER NOT NULL,
-    CONSTRAINT "Subject_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "userId" INTEGER NOT NULL
 );
 
 -- CreateTable
@@ -23,7 +36,5 @@ CREATE TABLE "Grade" (
     "userId" INTEGER NOT NULL,
     "grade" INTEGER NOT NULL,
     "weight" INTEGER NOT NULL,
-    "date" DATETIME NOT NULL,
-    CONSTRAINT "Grade_subjectId_fkey" FOREIGN KEY ("subjectId") REFERENCES "Subject" ("id") ON DELETE RESTRICT ON UPDATE CASCADE,
-    CONSTRAINT "Grade_userId_fkey" FOREIGN KEY ("userId") REFERENCES "User" ("id") ON DELETE RESTRICT ON UPDATE CASCADE
+    "date" DATETIME NOT NULL
 );
