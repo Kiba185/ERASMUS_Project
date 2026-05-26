@@ -28,17 +28,17 @@ model User
   firstName string
   birthday  DateTime 
   createdAt DateTime  @default(now())
-  subjects  Subject[]
-  grades    Grade[]
+  username  String
   password  String
+  email     String
+  phone     String
+  adress    String
 }
 
 model Subject {
   id     Int     @id @default(autoincrement())
   name   String
   userId Int
-  user   User    @relation(fields: [userId], references: [id])
-  grades Grade[]
 }
 
 model Grade {
@@ -48,6 +48,4 @@ model Grade {
   grade     Int
   weight    Int
   date      DateTime
-  subject   Subject  @relation(fields: [subjectId], references: [id])
-  user      User     @relation(fields: [userId], references: [id])
 }
