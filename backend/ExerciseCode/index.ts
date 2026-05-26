@@ -32,9 +32,6 @@ app.use(session({
   cookie: { secure: false } // set to true if using HTTPS
 }));
 
-////////////////////////////////////
-
-
 //AUTH
 function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction, permissionLevel: number) {
 
@@ -109,9 +106,10 @@ app.post('/api/logout', async (req, res) => {
   await logout(req, res, next());
 });
 
+    res.status(201).json({ success: true, user: newUser });
+})
 
 //////////////
-
 
 //GET
 app.get('/api/users', async (req, res) => {

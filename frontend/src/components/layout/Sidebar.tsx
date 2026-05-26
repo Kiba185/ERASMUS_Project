@@ -14,19 +14,19 @@ const SIDEBAR_LINKS: SidebarLink[] = [
   { label: 'Dashboard', path: '/dashboard', roles: ['admin', 'teacher', 'student', 'parent'] },
   
   // Admin
-  { label: 'User Management', path: '/dashboard/users', roles: ['admin'] },
+  { label: 'Správa uživatelů', path: '/users', roles: ['admin'] },
   
   // Teacher
-  { label: 'My Classes', path: '/dashboard/classes', roles: ['teacher'] },
-  { label: 'Grade Entry', path: '/dashboard/grades-edit', roles: ['teacher'] },
+  { label: 'Moje třídy', path: '/classes', roles: ['teacher'] },
+  { label: 'Zadávání známek', path: '/grades-edit', roles: ['teacher', 'admin'] },
+  
 
   // Student
-  { label: 'My Schedule', path: '/dashboard/schedule', roles: ['student'] },
-  { label: 'My Grades', path: '/dashboard/grades', roles: ['student'] },
+  { label: 'Můj rozvrh', path: '/schedule', roles: ['student', 'admin', 'parent', 'teacher'] },
+  { label: 'Moje známky', path: '/grades', roles: ['student'] },
 
   // Parent
-  { label: 'Children\'s Schedule', path: '/dashboard/children-schedule', roles: ['parent'] },
-  { label: 'Children\'s Grades', path: '/dashboard/children-grades', roles: ['parent'] },
+  { label: 'Semester', path: '/semester', roles: ['parent', 'admin', 'student'] },
 ];
 
 const Sidebar: React.FC = () => {
