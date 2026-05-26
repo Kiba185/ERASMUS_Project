@@ -1,42 +1,46 @@
-import React from 'react';
-import { createBrowserRouter, Navigate } from 'react-router-dom';
+import { createBrowserRouter } from 'react-router-dom';
 
-// Layouts & Routing components
-import MainLayout from '../layouts/MainLayout';
-import AuthLayout from '../layouts/AuthLayout';
+import MainLayout from '../components/layout/MainLayout';
+import AuthLayout from '../components/layout/AuthLayout';
 import ProtectedRoute from './ProtectedRoute';
 
-// Feature Page Stubs
-import LoginPage from '../features/auth/pages/LoginPage';
-import StudentDashboard from '../features/student/pages/StudentDashboard';
-import TeacherDashboard from '../features/teacher/pages/TeacherDashboard';
-import AdminDashboard from '../features/admin/pages/AdminDashboard';
+import Landing from '../pages/Landing';
+import Login from '../pages/Login';
+import Dashboard from '../pages/Dashboard';
 
 export const appRouter = createBrowserRouter([
+  {
+    path: '/',
+    element: <Landing />, // Úvodní stránka s informacemi
+  },
   {
     path: '/login',
     element: <AuthLayout />,
     children: [
-      { index: true, element: <LoginPage /> },
+      { index: true, element: <Login /> },
     ],
   },
   {
-    path: '/',
+    path: '/dashboard',
     element: (
       <ProtectedRoute>
         <MainLayout />
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Navigate to="/student" replace /> },
-      { path: 'student', element: <StudentDashboard /> },
-      { path: 'teacher', element: <TeacherDashboard /> },
-      { path: 'admin', element: <AdminDashboard /> },
+      { index: true, element: <Dashboard /> }, // Zobrazí widgety
+      // Placeholders for other pages:
+      { path: 'schedule', element: <div className="p-8"><h1 className="text-2xl font-bold">Můj rozvrh (Detail)</h1></div> },
+      { path: 'grades', element: <div className="p-8"><h1 className="text-2xl font-bold">Moje známky (Detail)</h1></div> },
+      { path: 'classes', element: <div className="p-8"><h1 className="text-2xl font-bold">Moje třídy (Detail)</h1></div> },
+      { path: 'grades-edit', element: <div className="p-8"><h1 className="text-2xl font-bold">Zadávání známek (Detail)</h1></div> },
+      { path: 'users', element: <div className="p-8"><h1 className="text-2xl font-bold">Správa uživatelů (Detail)</h1></div> },
+      { path: 'children-schedule', element: <div className="p-8"><h1 className="text-2xl font-bold">Rozvrh dětí (Detail)</h1></div> },
+      { path: 'children-grades', element: <div className="p-8"><h1 className="text-2xl font-bold">Známky dětí (Detail)</h1></div> },
     ],
   },
   {
-    // Catch-all route
     path: '*',
-    element: <Navigate to="/login" replace />
+    element: <Landing />
   }
 ]);
