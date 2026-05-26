@@ -37,7 +37,7 @@ const Sidebar: React.FC = () => {
   );
 
   return (
-    <aside className="w-64 bg-slate-900 text-white hidden md:flex flex-col">
+    <aside className="w-64 bg-palette-pine text-palette-mist hidden md:flex flex-col">
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
         {visibleLinks.map((link) => (
           <NavLink
@@ -47,8 +47,8 @@ const Sidebar: React.FC = () => {
             className={({ isActive }) =>
               `block px-3 py-2 rounded-md cursor-pointer transition-colors ${
                 isActive
-                  ? 'bg-blue-600 text-white'
-                  : 'text-slate-300 hover:bg-slate-800 hover:text-white'
+                  ? 'bg-palette-leaf text-palette-mist'
+                  : 'text-palette-lichen hover:bg-palette-fern hover:text-palette-mist'
               }`
             }
           >
