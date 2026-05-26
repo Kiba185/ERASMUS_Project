@@ -1,7 +1,7 @@
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
 
-const GradesWidget = () => {
+const StatisticsWidget = () => {
     const navigate = useNavigate();
     const { user } = useAuth();
 
@@ -22,5 +22,5 @@ const GradesWidget = () => {
   );
 };
 
-export default GradesWidget;
+export default StatisticsWidget;
 
