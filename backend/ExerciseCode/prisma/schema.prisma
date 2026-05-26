@@ -20,12 +20,13 @@ model Todo {
   createdAt   DateTime @default(now())
 }
 
-model User {
-  id        Int       @id @default(autoincrement())
-  role      String
-  lastName  String
-  firstName String
-  birthday  DateTime
+model User
+{
+  id        int       @id @default(autoincrement())
+  role      string
+  lastName  string
+  firstName string
+  birthday  DateTime 
   createdAt DateTime  @default(now())
   subjects  Subject[]
   grades    Grade[]
