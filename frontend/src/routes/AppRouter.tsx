@@ -7,6 +7,10 @@ import ProtectedRoute from './ProtectedRoute';
 import Landing from '../pages/Landing';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
+import SchedulePage from '../pages/SchedulePage';
+import GradesPage from '../pages/GradesPage';
+import GradesEditPage from '../pages/GradesEditPage';
+import SemesterPage from '../pages/SemesterPage';
 
 export const appRouter = createBrowserRouter([
   {
