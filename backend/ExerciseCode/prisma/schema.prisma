@@ -15,7 +15,37 @@ datasource db {
 model Todo {
   id          Int      @id @default(autoincrement())
   title       String
-  urgency     Int   
+  urgency     Int
   isCompleted Boolean  @default(false)
   createdAt   DateTime @default(now())
+}
+
+model User {
+  id        Int       @id @default(autoincrement())
+  role      String
+  lastName  String
+  firstName String
+  birthday  DateTime
+  createdAt DateTime  @default(now())
+  subjects  Subject[]
+  grades    Grade[]
+}
+
+model Subject {
+  id     Int     @id @default(autoincrement())
+  name   String
+  userId Int
+  user   User    @relation(fields: [userId], references: [id])
+  grades Grade[]
+}
+
+model Grade {
+  id        Int      @id @default(autoincrement())
+  subjectId Int
+  userId    Int
+  grade     Int
+  weight    Int
+  date      DateTime
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  user      User     @relation(fields: [userId], references: [id])
 }
