@@ -11,22 +11,22 @@ interface SidebarLink {
 
 const SIDEBAR_LINKS: SidebarLink[] = [
   // Společné
-  { label: 'Přehled (Dashboard)', path: '/dashboard', roles: ['admin', 'teacher', 'student', 'parent'] },
+  { label: 'Dashboard', path: '/dashboard', roles: ['admin', 'teacher', 'student', 'parent'] },
   
   // Admin
-  { label: 'Správa uživatelů', path: '/dashboard/users', roles: ['admin'] },
+  { label: 'Správa uživatelů', path: '/users', roles: ['admin'] },
   
   // Teacher
-  { label: 'Moje třídy', path: '/dashboard/classes', roles: ['teacher'] },
-  { label: 'Zadávání známek', path: '/dashboard/grades-edit', roles: ['teacher'] },
+  { label: 'Moje třídy', path: '/classes', roles: ['teacher'] },
+  { label: 'Zadávání známek', path: '/grades-edit', roles: ['teacher', 'admin'] },
+  
 
   // Student
-  { label: 'Můj rozvrh', path: '/dashboard/schedule', roles: ['student'] },
-  { label: 'Moje známky', path: '/dashboard/grades', roles: ['student'] },
+  { label: 'Můj rozvrh', path: '/schedule', roles: ['student', 'admin', 'parent', 'teacher'] },
+  { label: 'Moje známky', path: '/grades', roles: ['student'] },
 
   // Parent
-  { label: 'Rozvrh dětí', path: '/dashboard/children-schedule', roles: ['parent'] },
-  { label: 'Známky dětí', path: '/dashboard/children-grades', roles: ['parent'] },
+  { label: 'Semester', path: '/semester', roles: ['parent', 'admin', 'student'] },
 ];
 
 const Sidebar: React.FC = () => {

@@ -7,6 +7,10 @@ import ProtectedRoute from './ProtectedRoute';
 import Landing from '../pages/Landing';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
+import SchedulePage from '../pages/SchedulePage';
+import GradesPage from '../pages/GradesPage';
+import GradesEditPage from '../pages/GradesEditPage';
+import SemesterPage from '../pages/SemesterPage';
 
 export const appRouter = createBrowserRouter([
   {
@@ -21,23 +25,20 @@ export const appRouter = createBrowserRouter([
     ],
   },
   {
-    path: '/dashboard',
     element: (
       <ProtectedRoute>
         <MainLayout />
       </ProtectedRoute>
     ),
     children: [
-      { index: true, element: <Dashboard /> }, // Zobrazí widgety
-      // Placeholders for other pages:
-      { path: 'schedule', element: <div className="p-8"><h1 className="text-2xl font-bold">Můj rozvrh (Detail)</h1></div> },
-      { path: 'grades', element: <div className="p-8"><h1 className="text-2xl font-bold">Moje známky (Detail)</h1></div> },
-      { path: 'classes', element: <div className="p-8"><h1 className="text-2xl font-bold">Moje třídy (Detail)</h1></div> },
-      { path: 'grades-edit', element: <div className="p-8"><h1 className="text-2xl font-bold">Zadávání známek (Detail)</h1></div> },
-      { path: 'users', element: <div className="p-8"><h1 className="text-2xl font-bold">Správa uživatelů (Detail)</h1></div> },
-      { path: 'children-schedule', element: <div className="p-8"><h1 className="text-2xl font-bold">Rozvrh dětí (Detail)</h1></div> },
-      { path: 'children-grades', element: <div className="p-8"><h1 className="text-2xl font-bold">Známky dětí (Detail)</h1></div> },
-    ],
+      { path: '/dashboard', element: <Dashboard /> },
+      { path: '/schedule', element: <SchedulePage /> },
+      { path: '/grades', element: <GradesPage /> },
+      { path: '/classes', element: <div className="p-8"><h1 className="text-2xl font-bold">Moje třídy (Detail)</h1></div> },
+      { path: '/grades-edit', element: <GradesEditPage /> },
+      { path: '/users', element: <div className="p-8"><h1 className="text-2xl font-bold">Správa uživatelů (Detail)</h1></div> },
+      { path: '/semester', element: <SemesterPage /> },
+    ]
   },
   {
     path: '*',
