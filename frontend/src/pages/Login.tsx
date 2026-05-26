@@ -15,7 +15,7 @@ const Login: React.FC = () => {
   // Nový stav pro zobrazení/skrytí hesla
   const [showPassword, setShowPassword] = useState(false);
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault(); // Zabráníme znovunačtení stránky
     setError('');       // Vyresetujeme případnou předchozí chybu
 

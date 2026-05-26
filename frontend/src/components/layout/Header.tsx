@@ -24,7 +24,7 @@ const Header: React.FC = () => {
             Signed as: <strong>{user.role}</strong>
           </span>
           <div className="h-8 w-8 rounded-full bg-palette-lichen/35 flex items-center justify-center text-palette-pine font-bold cursor-pointer hover:bg-palette-sage/45 transition" title="Nastavení profilu">
-            {user.role.charAt(0).toUpperCase()}
+            {user.id.charAt(0).toUpperCase()}
           </div>
           <button 
             onClick={handleLogout}
