@@ -122,7 +122,7 @@ async function login(req: express.Request, res: express.Response, next: express.
     const user = await prisma.user.findFirst({ where: { username } });
     if (user && await bcrypt.compare(password, user.password)) {
         req.session.userId = user.id; // store user ID in session
-        res.json({ success: true, user: user.role });
+        res.json({ success: true, user });
     } else {
         res.status(401).json({ success: false, message: 'Invalid credentials' });
         // Timeout to prevent brute-force attacks
