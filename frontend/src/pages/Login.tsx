@@ -22,11 +22,23 @@ const Login: React.FC = () => {
     const formattedUsername = username.toLowerCase().trim();
     const validRoles: User['role'][] = ['student', 'teacher', 'parent', 'admin'];
 
-    if (validRoles.includes(formattedUsername as User['role']) && formattedUsername === password) {
-      login(formattedUsername as User['role']);
-      navigate('/dashboard');
-    } else {
-      setError('Invalid login credentials. Please try entering the role name as both username and password (e.g., teacher).');
+    try {
+      const response = await fetch("http://localhost:3000/api/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username: formattedUsername, password })
+      });
+
+      const data = await response.json();
+
+      if (data?.success === true) {
+        login(formattedUsername, data.user);
+        navigate('/dashboard');
+      } else {
+        setError('Nesprávné přihlašovací údaje. Zkuste zadat roli jako jméno i heslo (např. teacher).');
+      }
+    } catch (err) {
+      setError('Chyba připojení k serveru.');
     }
   };
 

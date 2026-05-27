@@ -4,7 +4,7 @@ import type { User } from '../types';
 
 interface AuthContextType {
   user: User | null;
-  login: (name: string, role: User['role']) => void;
+  login: (id: User['id'], role: User['role']) => void;
   logout: () => void;
 }
 
@@ -13,8 +13,8 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
-  const login = (name: string, role: User['role']) => {
-    setUser({ id: name, role });
+  const login = (id: User['id'], role: User['role']) => {
+    setUser({ id, role });
   };
 
   const logout = () => {
