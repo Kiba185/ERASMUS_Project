@@ -14,16 +14,16 @@ const SIDEBAR_LINKS: SidebarLink[] = [
   { label: 'Dashboard', path: '/dashboard', roles: ['admin', 'teacher', 'student', 'parent'] },
   
   // Admin
-  { label: 'Správa uživatelů', path: '/users', roles: ['admin'] },
+  { label: 'Users', path: '/users', roles: ['admin'] },
   
   // Teacher
-  { label: 'Moje třídy', path: '/classes', roles: ['teacher'] },
-  { label: 'Zadávání známek', path: '/grades-edit', roles: ['teacher', 'admin'] },
+  { label: 'My Classes', path: '/classes', roles: ['teacher'] },
+  { label: 'Grade Entry', path: '/grades-edit', roles: ['teacher', 'admin'] },
   
 
   // Student
-  { label: 'Můj rozvrh', path: '/schedule', roles: ['student', 'admin', 'parent', 'teacher'] },
-  { label: 'Moje známky', path: '/grades', roles: ['student'] },
+  { label: 'My Schedule', path: '/schedule', roles: ['student', 'admin', 'parent', 'teacher'] },
+  { label: 'My Grades', path: '/grades', roles: ['student'] },
 
   // Parent
   { label: 'Semester', path: '/semester', roles: ['parent', 'admin', 'student'] },
