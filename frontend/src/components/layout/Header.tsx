@@ -27,7 +27,7 @@ const Header: React.FC = () => {
             className="h-8 w-8 rounded-full bg-palette-lichen/35 flex items-center justify-center text-palette-pine font-bold cursor-pointer hover:bg-palette-sage/45 transition select-none" 
             title="Nastavení profilu"
           >
-            {user?.id ? user.id.charAt(0).toUpperCase() : 'U'}
+            {user?.firstName ? user.firstName.charAt(0).toUpperCase() : 'U'}
           </div>
           <UserPopup 
             isOpen={isPopupOpen} 

@@ -33,8 +33,8 @@ const UserPopup: React.FC<UserPopupProps> = ({ isOpen, onClose }) => {
 
   // V reálné aplikaci by jméno a příjmení bylo součástí `user` objektu.
   // Zde generujeme mock hodnoty pro ukázku
-  const mockFirstName = user?.id ? user.id.charAt(0).toUpperCase() + user.id.slice(1) : 'Uživatel';
-  const mockLastName = 'Novák'; 
+  const mockFirstName = user?.firstName ? user.firstName.charAt(0).toUpperCase() + user.firstName.slice(1) : 'Uživatel';
+  const mockLastName = user?.lastName ? user.lastName.charAt(0).toUpperCase() + user.lastName.slice(1) : 'Novák';
   const displayRole = user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Host';
 
   return (
