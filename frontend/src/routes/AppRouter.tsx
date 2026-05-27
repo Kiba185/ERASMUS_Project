@@ -9,7 +9,7 @@ import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import SchedulePage from '../pages/SchedulePage';
 import GradesPage from '../pages/GradesPage';
-import GradesEditPage from "../pages/GradesEditPage"
+import GradesEditPage from '../pages/GradesEditPage';
 import SemesterPage from '../pages/SemesterPage';
 import AttendancePage from '../pages/AttendancePage';
 import ClassesPage from '../pages/ClassesPage';
@@ -40,6 +40,7 @@ export const appRouter = createBrowserRouter([
       { path: '/dashboard', element: <Dashboard /> },
       { path: '/schedule', element: <SchedulePage /> },
       { path: '/grades', element: <GradesPage /> },
+      { path: '/grades-edit', element: <GradesEditPage /> },
       { path: '/classes', element: <ClassesPage /> },
       { path: '/users', element: <div className="p-8"><h1 className="text-2xl font-bold">Správa uživatelů (Detail)</h1></div> },
       { path: '/semester', element: <SemesterPage /> },
