@@ -8,7 +8,7 @@ const ScheduleWidget = () => {
     if (!user) return null;
 
   return (
-    <div onClick={() => navigate(user.role === 'student' ? '/dashboard/schedule' : '/dashboard/children-schedule')}
+    <div onClick={() => navigate('/schedule')}
         className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition cursor-pointer">
         <h2 className="text-xl font-bold text-blue-700 mb-4">Schedule - Today</h2>
         <ul className="space-y-2 text-gray-600">
