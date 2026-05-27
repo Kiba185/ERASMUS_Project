@@ -9,7 +9,7 @@ import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import SchedulePage from '../pages/SchedulePage';
 import GradesPage from '../pages/GradesPage';
-
+import GradesEditPage from "../pages/GradesEditPage"
 import SemesterPage from '../pages/SemesterPage';
 import AttendancePage from '../pages/AttendancePage';
 import ClassesPage from '../pages/ClassesPage';
