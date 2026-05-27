@@ -8,11 +8,11 @@ import session from 'express-session';
 
 const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
-const router = express.Router();
+const app = express();
 const PORT = 3000;
 
 ///GETTING GRADES, ONLY LOGGED IN USERS CAN SEE THEIR GRADES, CHECKING IF USER IS LOGGED IN OR NOT
-router.get('/grades', async (req, res) =>
+app.get('/grades', async (req, res) =>
     {
     const currentUserId = req.session.userId;
     if(!currentUserId) {
@@ -32,7 +32,7 @@ router.get('/grades', async (req, res) =>
 
 
     ///POSTING GRADES, ONLY TEACHERS CAN POST GRADES, CHECKING IF USER IS TEACHER OR NOT
-router.post('/grades', async (req, res) =>{
+app.post('api/grades', async (req, res) =>{
     const currentUserId = req.session.userId;
     if(!currentUserId) {
         return res.status(404).json({ error: 'User not authenticated' });
@@ -49,8 +49,15 @@ router.post('/grades', async (req, res) =>{
     }
     else{
         const newGrade = await prisma.grade.create({
-            data: { userId: req.body, subjectId: req.body, grade: req.body, weight: req.body, date: req.body }
+            data: { userId: req.body, subjectId: req.body, grade: req.body(1,1.5,2,2.5,3,3.5,4,4.5,5), weight: req.body, date: req.body }
         });
     }
+app.get('api/subjects', async (req, res) => {
+      const subjects = await prisma.subject.findMany();
+      if(subjects.length === 0) { return res.status(404).json({ error: 'No subjects found' });}
+      res.json(subjects);
+});
 
+app.post("api/addsubject", async (req, res) => {
+    });
 })
