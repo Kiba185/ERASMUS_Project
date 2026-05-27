@@ -157,6 +157,7 @@ app.get('/api/users', async (req, res) => {
 
 });
 
+
 //GET SPECIFIC
 app.get('/api/user/:id', async (req, res) => {
   const id = parseInt(req.params.id);
