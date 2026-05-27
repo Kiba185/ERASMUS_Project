@@ -1,4 +1,3 @@
-<<<<<<< Updated upstream
 import React, { useState } from 'react';
 
 // --- TYPES ---
@@ -147,14 +146,6 @@ const TeacherSpreadsheet: React.FC = () => {
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Quick Grading</h1>
           <p className="text-gray-500">Enter and delete grades or columns rapidly</p>
-=======
-import React from 'react';
-
-const GradesEditPage: React.FC = () => {
-    return (
-        <div className="p-8">
-            <h1 className="text-2xl font-bold">Grades Editing (Detail)</h1>
->>>>>>> Stashed changes
         </div>
         
         <div className="flex gap-4">
@@ -307,9 +298,5 @@ const GradesEditPage: React.FC = () => {
     </div>
   );
 };
-<<<<<<< Updated upstream
 
 export default TeacherSpreadsheet;
-=======
-export default GradesEditPage;
->>>>>>> Stashed changes
