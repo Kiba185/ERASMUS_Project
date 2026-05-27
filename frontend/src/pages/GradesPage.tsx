@@ -1,3 +1,4 @@
+<<<<<<< Updated upstream
 import React, {useState} from 'react';
 
 
@@ -144,6 +145,14 @@ const GradesPage: React.FC = () => {
                     )}
                 </div>
             </div>
+=======
+import React from 'react';
+
+const GradesPage: React.FC = () => {
+    return (
+        <div className="p-8">
+            <h1 className="text-2xl font-bold">My Grades (Detail)</h1>
+>>>>>>> Stashed changes
         </div>
     );
 };

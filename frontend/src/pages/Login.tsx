@@ -1,7 +1,6 @@
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
-import type { User } from '../types';
 import ArrowBack from '../components/layout/ArrowBack';
 
 const Login: React.FC = () => {
@@ -21,7 +20,10 @@ const Login: React.FC = () => {
     setError('');       // Vyresetujeme případnou předchozí chybu
 
     const formattedUsername = username.toLowerCase().trim();
+<<<<<<< Updated upstream
 
+=======
+>>>>>>> Stashed changes
     try {
       const response = await fetch("http://localhost:3000/api/login", {
         method: "POST",
