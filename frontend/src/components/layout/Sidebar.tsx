@@ -6,7 +6,7 @@ import type { User } from '../../types';
 interface SidebarLink {
   label: string;
   path: string;
-  roles: User['role'][];
+  roles: User['user']; // Pole rolí, které mají přístup k této položce
 }
 
 const SIDEBAR_LINKS: SidebarLink[] = [
