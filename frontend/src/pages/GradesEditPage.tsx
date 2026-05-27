@@ -5,7 +5,7 @@ type Student = { id: string; name: string; className: string };
 type Assignment = { id: string; classId: string; subject: string; title: string; weight: number };
 type Grade = { studentId: string; assignmentId: string; value: string };
 
-const TeacherSpreadsheet: React.FC = () => {
+const GradesEditPage: React.FC = () => {
   // 1. MOCK DATABASE
   const [students] = useState<Student[]>([
     { id: 's1', name: 'Jan Novák', className: '4.A' },
@@ -299,4 +299,4 @@ const TeacherSpreadsheet: React.FC = () => {
   );
 };
 
-export default TeacherSpreadsheet;
+export default GradesEditPage;

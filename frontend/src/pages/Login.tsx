@@ -20,7 +20,6 @@ const Login: React.FC = () => {
     setError('');       // Vyresetujeme případnou předchozí chybu
 
     const formattedUsername = username.toLowerCase().trim();
-
     try {
       const response = await fetch("http://localhost:3000/api/login", {
         method: "POST",
