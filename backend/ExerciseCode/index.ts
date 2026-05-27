@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import session from 'express-session';
 
+
 declare module 'express-session' {
   interface SessionData {
     userId?: number;
@@ -17,9 +18,10 @@ const app = express();
 const PORT = 3000;
 
 const privileges = {
-  "USER": 1,
-  "TEACHER": 5,
-  "ADMIN": 10
+  "student": 1,
+  "parent": 2,
+  "teacher": 5,
+  "admin": 10
 };
 
 
@@ -33,24 +35,27 @@ app.use(session({
 }));
 
 //AUTH
-function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction, permissionLevel: number) {
+async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction, permissionLevel: number) {
 
   if (!req.session.userId) {
-    return res.status(401).json({ error: 'Not logged in' });
+    res.status(401).json({ error: 'Not logged in' });
+    return false;
   }
 
-  // Fetch user role from database
-  const user = prisma.user.findUnique({ where: { id: req.session.userId } });
+  const user = await prisma.user.findUnique({ where: { id: req.session.userId } });
   if (!user) {
-    return res.status(401).json({ error: 'User not found' });
+    res.status(401).json({ error: 'User not found' });
+    return false;
   }
 
-  const userRole = user.role as keyof typeof privileges;
+  const userRole = (user.role || 'user') as keyof typeof privileges;
   if (roleAuthority(userRole) < permissionLevel) {
-    return res.status(403).json({ error: 'Insufficient permissions' });
+    res.status(401).json({ error: 'Insufficient permissions' });
+    return false;
   }
 
-  next(); // ✅ they're logged in, let them through
+  return true;
+  //next(); // ✅ they're logged in, let them through
 
 }
 
@@ -60,11 +65,11 @@ function roleAuthority(requiredRole: keyof typeof privileges) {
 
 //LOGIN
 async function login(req: express.Request, res: express.Response, next: express.NextFunction) {
-  const { id, password } = req.body;
-  const user = await prisma.user.findUnique({ where: { id } });
+  const { username, password } = req.body;
+  const user = await prisma.user.findFirst({ where: { username } });  
   if (user && user.password === password) {
     req.session.userId = user.id; // store user ID in session
-    res.json({ success: true, user });
+    res.json({ success: true, user: user.role });
   } else {
     res.status(401).json({ success: false, message: 'Invalid credentials' });
     // Timeout to prevent brute-force attacks
@@ -72,7 +77,26 @@ async function login(req: express.Request, res: express.Response, next: express.
   }
 }
 app.post('/api/login', async (req, res) => {
-  await login(req, res, next());
+  await login(req, res, next);
+})
+
+
+//ADMINSETUSER - a temp system for admin to set a user an an admin via POST request, not secure, only for testing purposes
+async function adminsetuser(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const { username, newrole } = req.body;
+  const user = await prisma.user.findFirst({ where: { username } });
+  if (user) {
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { role: newrole }
+    });
+    res.json({ success: true, message: `${username} role updated to ${newrole}` });
+  } else {
+    res.status(404).json({ success: false, message: 'User not found' });
+  }
+}
+app.post('/api/adminsetuser', async (req, res) => {
+  await adminsetuser(req, res, next);
 })
 
 
@@ -80,15 +104,15 @@ app.post('/api/login', async (req, res) => {
 async function register(req: express.Request, res: express.Response, next: express.NextFunction) {
   const { firstName, lastName, birthday, username, password, email, phone, adress } = req.body;
   const newUser = await prisma.user.create({
-      data: { password, firstName, lastName, birthday, username, email, phone, adress, role: 'USER' }
+      data: { password, firstName, lastName, birthday, username, email, phone, adress, role: 'student' }
     });
 
   if (!newUser) { return res.status(400).json({ success: false, message: 'User creation failed' }); }
   res.status(201).json({ success: true, user: newUser });
-  await login(req, res, next);
+  //await login(req, res, next);
 }
 app.post('/api/register', async (req, res) => {
-  await register(req, res, next());
+  await register(req, res, next);
 })
 
 
@@ -99,24 +123,39 @@ async function logout(req: express.Request, res: express.Response, next: express
     if (err) {
       return res.status(500).json({ success: false, message: 'Failed to logout' });
     }
-    res.json({ success: true, message: 'Logged out successfully' });
+    //res.json({ success: true, message: 'Logged out successfully' });
   });
 }
 app.post('/api/logout', async (req, res) => {
-  await logout(req, res, next());
+  await logout(req, res, next);
 });
 
-    res.status(201).json({ success: true, user: newUser });
-})
+//SET USER ROLE - temp
+async function setUserRole(req: express.Request, res: express.Response, next: express.NextFunction) {
+  const { userId, newRole } = req.body;
+  const updatedUser = await prisma.user.update({
+    where: { id: userId },
+    data: { role: newRole }
+  });
+  res.json({ success: true, user: updatedUser });
+}
+app.post('/api/setUserRole', async (req, res) => {
+  await setUserRole(req, res, next);
+});
+
 
 //////////////
 
 //GET
 app.get('/api/users', async (req, res) => {
-  requireAuth(req, res, next(), 10);
-  const users = await  prisma.user.findMany();
+
+  if (await requireAuth(req, res, next, 10) !== true) { return; }
+  /////
+
+  const users = await prisma.user.findMany();
   res.json(users);
-})
+
+});
 
 //GET SPECIFIC
 app.get('/api/user/:id', async (req, res) => {
