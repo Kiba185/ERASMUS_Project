@@ -20,7 +20,6 @@ const Login: React.FC = () => {
     setError('');       // Vyresetujeme případnou předchozí chybu
 
     const formattedUsername = username.toLowerCase().trim();
-    const validRoles: User['role'][] = ['student', 'teacher', 'parent', 'admin'];
 
     try {
       const response = await fetch("http://localhost:3000/api/login", {
