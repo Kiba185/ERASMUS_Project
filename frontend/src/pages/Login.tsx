@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 import type { User } from '../types';
+import ArrowBack from '../components/layout/ArrowBack';
 
 const Login: React.FC = () => {
   const { login } = useAuth();
@@ -43,7 +44,10 @@ const Login: React.FC = () => {
   };
 
   return (
+    
+    
     <div className="flex flex-col items-center justify-center h-full p-4">
+      <ArrowBack onClick={() => navigate('/')} />
       {/* Hlavní box přihlášení s více zelenou paletou */}
       <div className="bg-white p-8 rounded-xl shadow-lg border-t-4 border-t-green-500 w-full max-w-md">
         
