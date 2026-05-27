@@ -12,6 +12,8 @@ interface SidebarLink {
 const SIDEBAR_LINKS: SidebarLink[] = [
   // Společné
   { label: 'Dashboard', path: '/dashboard', roles: ['admin', 'teacher', 'student', 'parent'] },
+  { label: 'Events', path: '/events', roles: ['admin', 'teacher', 'student', 'parent'] },
+  { label: 'Messages', path: '/messages', roles: ['admin', 'teacher', 'student', 'parent'] },
   
   // Admin
   { label: 'User management', path: '/users', roles: ['admin'] },
@@ -27,6 +29,7 @@ const SIDEBAR_LINKS: SidebarLink[] = [
 
   // Parent
   { label: 'Semester', path: '/semester', roles: ['parent', 'admin', 'student', 'teacher'] },
+  { label: 'Absence notes', path: '/absence-notes', roles: ['parent', 'admin', 'teacher'] },
 ];
 
 const Sidebar: React.FC = () => {
