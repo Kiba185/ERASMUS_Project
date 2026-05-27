@@ -1,6 +1,6 @@
-import express from 'express';
-import cors from 'cors';
-import 'dotenv/config';
+import express from 'express'
+import cors from 'cors'
+import 'dotenv/config'
 import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import session from 'express-session';
