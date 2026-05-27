@@ -298,4 +298,5 @@ const GradesEditPage: React.FC = () => {
     </div>
   );
 };
+
 export default GradesEditPage;

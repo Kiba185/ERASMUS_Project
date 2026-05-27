@@ -43,6 +43,7 @@ export const appRouter = createBrowserRouter([
       { path: '/grades-edit', element: <GradesEditPage /> },
       { path: '/classes', element: <ClassesPage /> },
       { path: '/users', element: <div className="p-8"><h1 className="text-2xl font-bold">Správa uživatelů (Detail)</h1></div> },
+      { path: '/grades-edit', element: <GradesEditPage /> },
       { path: '/semester', element: <SemesterPage /> },
       { path: '/attendance', element: <AttendancePage /> },
       { path: '/events', element: <EventsPage /> },
