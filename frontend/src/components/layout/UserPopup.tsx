@@ -33,9 +33,9 @@ const UserPopup: React.FC<UserPopupProps> = ({ isOpen, onClose }) => {
 
   // V reálné aplikaci by jméno a příjmení bylo součástí `user` objektu.
   // Zde generujeme mock hodnoty pro ukázku
-  const mockFirstName = user?.firstName ? user.firstName.charAt(0).toUpperCase() + user.firstName.slice(1) : 'Uživatel';
-  const mockLastName = user?.lastName ? user.lastName.charAt(0).toUpperCase() + user.lastName.slice(1) : 'Novák';
-  const displayRole = user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Host';
+  const FirstName = user?.firstName ? user.firstName.charAt(0).toUpperCase() + user.firstName.slice(1) : 'Jméno';
+  const LastName = user?.lastName ? user.lastName.charAt(0).toUpperCase() + user.lastName.slice(1) : 'Příjmení';
+  const Role = user?.role ? user.role.charAt(0).toUpperCase() + user.role.slice(1) : 'Student';
 
   return (
     <>
@@ -64,14 +64,14 @@ const UserPopup: React.FC<UserPopupProps> = ({ isOpen, onClose }) => {
         {/* Informace o uživateli (Jméno, Příjmení, Role) */}
         <div className="flex items-center gap-3 mb-4">
           <div className="w-10 h-10 rounded-full bg-green-100 flex items-center justify-center text-green-700 font-bold text-lg">
-            {mockFirstName.charAt(0)}{mockLastName.charAt(0)}
+            {FirstName.charAt(0)}{LastName.charAt(0)}
           </div>
           <div>
             <div className="font-semibold text-gray-800">
-              {mockFirstName} {mockLastName}
+              {FirstName} {LastName}
             </div>
             <div className="text-xs text-green-600 font-medium">
-              Role: {displayRole}
+              Role: {Role}
             </div>
           </div>
         </div>
@@ -81,7 +81,7 @@ const UserPopup: React.FC<UserPopupProps> = ({ isOpen, onClose }) => {
         {/* Nápady: Další odkazy (např. Nastavení) */}
         <div className="flex flex-col space-y-1 mb-3">
           <button 
-            onClick={(e) => { e.stopPropagation(); navigate('/settings'); onClose(); }}
+            onClick={(e) => { e.stopPropagation(); navigate('/user'); onClose(); }}
             className="text-left text-sm text-gray-600 hover:text-palette-pine hover:bg-gray-50 px-2 py-1.5 rounded-md transition-colors flex items-center gap-2"
           >
              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">

@@ -1,17 +1,23 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import Logo from './Logo';
 import UserPopup from './UserPopup';
 
-const Header: React.FC = () => {
+const Header = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
+  const location = useLocation();
   
   const [isPopupOpen, setIsPopupOpen] = useState(false);
 
+  // Zkontrolujeme, že jsme na /user nebo /user/..., nikoliv na /users
+  const isUserRoute = location.pathname === '/user' || location.pathname.startsWith('/user/');
+
   const handleProfileClick = () => {
-    setIsPopupOpen(!isPopupOpen);
+    if (!isUserRoute) {
+      setIsPopupOpen(!isPopupOpen);
+    }
   };
 
   return (
@@ -24,13 +30,15 @@ const Header: React.FC = () => {
         <div className="relative flex items-center space-x-4">
           <div 
             onClick={handleProfileClick}
-            className="h-8 w-8 rounded-full bg-palette-lichen/35 flex items-center justify-center text-palette-pine font-bold cursor-pointer hover:bg-palette-sage/45 transition select-none" 
-            title="Nastavení profilu"
+            className={`h-8 w-8 rounded-full bg-palette-lichen/35 flex items-center justify-center text-palette-pine font-bold select-none transition ${
+              isUserRoute ? 'cursor-default opacity-80' : 'cursor-pointer hover:bg-palette-sage/45'
+            }`} 
+            title={isUserRoute ? 'Profil' : 'Nastavení profilu'}
           >
-            {user?.firstName ? user.firstName.charAt(0).toUpperCase() : 'U'}
+            {user?.firstName ? user.firstName.charAt(0).toUpperCase() : (user?.id ? user.id.charAt(0).toUpperCase() : 'U')}
           </div>
           <UserPopup 
-            isOpen={isPopupOpen} 
+            isOpen={isPopupOpen && !isUserRoute} 
             onClose={() => setIsPopupOpen(false)} 
           />
         </div>
