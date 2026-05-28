@@ -33,7 +33,6 @@ const SIDEBAR_LINKS: SidebarLink[] = [
 
   // User Profile
   { label: 'User info', path: '/user', roles: ['parent', 'admin', 'student', 'teacher'] },
-  { label: 'User settings', path: '/user/settings', roles: ['parent', 'admin', 'student', 'teacher'] },
 ];
 
 const Sidebar: React.FC = () => {
