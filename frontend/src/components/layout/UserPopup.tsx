@@ -81,7 +81,7 @@ const UserPopup: React.FC<UserPopupProps> = ({ isOpen, onClose }) => {
         {/* Nápady: Další odkazy (např. Nastavení) */}
         <div className="flex flex-col space-y-1 mb-3">
           <button 
-            onClick={(e) => { e.stopPropagation(); navigate('/settings'); onClose(); }}
+            onClick={(e) => { e.stopPropagation(); navigate('/user/settings'); onClose(); }}
             className="text-left text-sm text-gray-600 hover:text-palette-pine hover:bg-gray-50 px-2 py-1.5 rounded-md transition-colors flex items-center gap-2"
           >
              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-4 h-4">
