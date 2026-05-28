@@ -1,50 +1,160 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 
 // --- TYPES ---
-type Student = { id: string; name: string; className: string };
+type Student = { id: string; name: string; classes: string[] };
 type Assignment = { id: string; classId: string; subject: string; title: string; weight: number };
 type Grade = { studentId: string; assignmentId: string; value: string };
 
 const GradesEditPage: React.FC = () => {
-  // 1. MOCK DATABASE
-  const [students] = useState<Student[]>([
-    { id: 's1', name: 'Jan Novák', className: '4.A' },
-    { id: 's2', name: 'Eva Dvořáková', className: '4.A' },
-    { id: 's3', name: 'Petr Svoboda', className: '4.A' },
-    { id: 's4', name: 'Klára Zelená', className: '4.A' },
-    { id: 's5', name: 'Anna Kovářová', className: '3.B' },
-  ]);
+  // 1. DATABASE
 
-  const [assignments, setAssignments] = useState<Assignment[]>([
-    { id: 'a1', classId: '4.A', subject: 'Mathematics', title: 'Midterm Exam', weight: 10 },
-    { id: 'a2', classId: '4.A', subject: 'Mathematics', title: 'Pop Quiz', weight: 2 },
-  ]);
+  const [students, setStudents] = useState<Student[]>([]);
+  const [assignments, setAssignments] = useState<Assignment[]>([]);
+  const [grades, setGrades] = useState<Grade[]>([]);
+  const [classes, setClasses] = useState<string[]>([]);
 
-  const [grades, setGrades] = useState<Grade[]>([
-    { studentId: 's1', assignmentId: 'a1', value: '1' },
-    { studentId: 's2', assignmentId: 'a1', value: '2-' },
-    { studentId: 's1', assignmentId: 'a2', value: '3' },
-  ]);
+  useEffect(() => {
+    const loadStudents = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/api/users/student', {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to load students: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const mapped: Student[] = data.map((s: any) => ({
+          id: String(s.id),
+          name: `${s.firstName} ${s.lastName}`,
+          classes: s.classes.map((c: any) => c.name), // 👈 extract name strings
+        }));
+        setStudents(mapped);
+
+        // at the end of loadStudents, after setStudents(mapped):
+        const uniqueClasses = [...new Set(mapped.flatMap(s => s.classes))];
+        if (uniqueClasses.length > 0) setSelectedClass(uniqueClasses[0]);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const loadAssignments = async () => {        //  "grade columns" in DB, not individual grades
+      try {
+        const response = await fetch('http://localhost:3000/api/gradeColumns', {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to load assignments: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const mapped: Assignment[] = data.map((a: any) => ({
+          id: String(a.id),
+          //classId: a.classId,
+          subject: a.subject,
+          userId: a.userId,
+          //title: a.title,
+          weight: a.weight,
+          date: a.date
+        }));
+        setAssignments(mapped);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const loadGrades = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/api/grades', {
+          credentials: 'include',
+          headers: {
+            'Content-Type': 'application/json',
+          }
+        });
+        if (!response.ok) {
+          throw new Error(`Failed to load students: ${response.statusText}`);
+        }
+
+        const data = await response.json();
+        const mapped: Grade[] = data.map((g: any) => ({
+          id: String(g.id),
+          studentId: String(g.studentId),
+          assignmentId: String(g.assignmentId),
+          value: g.value
+        }));
+        setGrades(mapped);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    // inside your useEffect, add:
+    const loadSubjects = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/api/subjects', {
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) throw new Error('Failed to load subjects');
+
+        const data = await response.json();
+        setSubjects(data.map((s: any) => s.name)); // adjust field name to match your DB
+        if (data.length > 0) setSelectedSubject(data[0].name);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    const loadClasses = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/api/classes', {
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) throw new Error('Failed to load classes');
+
+        const data = await response.json();
+        const classNames = data.map((c: any) => c.name);
+        setClasses(classNames);
+
+        if (classNames.length > 0) setSelectedClass(classNames[0]); // default to first
+      } catch (error) {
+        console.error(error);
+      }
+    };
+
+    loadSubjects(); // don't forget to call it
+    loadStudents();
+    loadAssignments();
+    loadGrades();
+    loadClasses();
+  }, []);
 
   // 2. FILTER STATES
-  const [selectedClass, setSelectedClass] = useState<string>('4.A');
-  const [selectedSubject, setSelectedSubject] = useState<string>('Mathematics');
+  const [selectedClass, setSelectedClass] = useState<string>('');
+  const [selectedSubject, setSelectedSubject] = useState<string>('');
 
   // 3. NEW COLUMN STATES
   const [newColTitle, setNewColTitle] = useState('');
   const [newColWeight, setNewColWeight] = useState<number>(10);
 
-  const classes = Array.from(new Set(students.map(s => s.className)));
-  const subjects = ['Mathematics', 'Physics', 'Czech Language', 'English Language'];
+  const [subjects, setSubjects] = useState<string[]>([]);
 
-  const currentStudents = students.filter(s => s.className === selectedClass);
+  const currentStudents = students.filter(s => s.classes.includes(selectedClass));
   const currentAssignments = assignments.filter(a => a.classId === selectedClass && a.subject === selectedSubject);
 
   // --- ADD COLUMN LOGIC ---
   const handleAddColumn = (e: React.FormEvent) => {
     e.preventDefault();
     if (!newColTitle) return;
-    
+
     const newAssignment: Assignment = {
       id: `a${Date.now()}`,
       classId: selectedClass,
@@ -134,20 +244,20 @@ const GradesEditPage: React.FC = () => {
     if (targetCell) {
       e.preventDefault();
       targetCell.focus();
-      (targetCell as HTMLInputElement).select(); 
+      (targetCell as HTMLInputElement).select();
     }
   };
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
-      
+
       {/* 1. HEADER AND FILTERS */}
       <div className="bg-white p-6 rounded-xl shadow-sm border border-gray-200 flex flex-col md:flex-row justify-between items-center gap-4">
         <div>
           <h1 className="text-3xl font-bold text-gray-800">Quick Grading</h1>
           <p className="text-gray-500">Enter and delete grades or columns rapidly</p>
         </div>
-        
+
         <div className="flex gap-4">
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Class</label>
@@ -177,24 +287,24 @@ const GradesEditPage: React.FC = () => {
         <form onSubmit={handleAddColumn} className="flex items-end gap-4 w-full">
           <div className="flex-1">
             <label className="block text-sm font-semibold text-green-800 mb-1">New Column Title (e.g., Test)</label>
-            <input 
-              type="text" 
-              value={newColTitle} 
-              onChange={(e) => setNewColTitle(e.target.value)} 
-              placeholder="Enter topic/category..." 
+            <input
+              type="text"
+              value={newColTitle}
+              onChange={(e) => setNewColTitle(e.target.value)}
+              placeholder="Enter topic/category..."
               className="w-full p-2.5 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-              required 
+              required
             />
           </div>
           <div className="w-32">
             <label className="block text-sm font-semibold text-green-800 mb-1">Weight</label>
-            <input 
-              type="number" 
-              min="1" max="10" 
-              value={newColWeight} 
-              onChange={(e) => setNewColWeight(Number(e.target.value))} 
+            <input
+              type="number"
+              min="1" max="10"
+              value={newColWeight}
+              onChange={(e) => setNewColWeight(Number(e.target.value))}
               className="w-full p-2.5 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
-              required 
+              required
             />
           </div>
           <button type="submit" className="py-2.5 px-6 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition h-[46px]">
@@ -209,7 +319,7 @@ const GradesEditPage: React.FC = () => {
           <thead>
             <tr className="bg-gray-100 border-b-2 border-gray-300 text-sm font-bold text-gray-700">
               <th className="p-4 w-48 border-r border-gray-200">Student</th>
-              
+
               {/* Dynamic Column Headers */}
               {currentAssignments.map((assignment) => (
                 <th key={assignment.id} className="p-2 border-r border-gray-200 text-center min-w-[140px] group/header relative">
@@ -219,7 +329,7 @@ const GradesEditPage: React.FC = () => {
                   <div className="text-[10px] bg-white border border-gray-300 rounded px-2 py-0.5 inline-block mt-1 text-gray-600 mr-6">
                     W: {assignment.weight}
                   </div>
-                  
+
                   {/* Larger delete column button positioned near the right side */}
                   <button
                     onClick={() => handleDeleteColumn(assignment.id, assignment.title)}
@@ -230,18 +340,18 @@ const GradesEditPage: React.FC = () => {
                   </button>
                 </th>
               ))}
-              
+
               <th className="p-4 w-24 text-center bg-gray-200">Average</th>
             </tr>
           </thead>
-          
+
           <tbody className="text-sm">
             {currentStudents.length === 0 ? (
               <tr><td colSpan={currentAssignments.length + 2} className="p-8 text-center text-gray-500">No students found.</td></tr>
             ) : (
               currentStudents.map((student, rowIndex) => {
                 const avg = calculateAverage(student.id);
-                
+
                 return (
                   <tr key={student.id} className="border-b border-gray-100 hover:bg-blue-50 transition-colors">
                     <td className="p-4 font-semibold text-gray-900 border-r border-gray-200 bg-white">
@@ -251,7 +361,7 @@ const GradesEditPage: React.FC = () => {
                     {/* Grade Input Cells */}
                     {currentAssignments.map((assignment, colIndex) => {
                       const val = getGradeValue(student.id, assignment.id);
-                      
+
                       return (
                         <td key={assignment.id} className="p-0 border-r border-gray-200 relative group/cell">
                           <input
@@ -260,9 +370,8 @@ const GradesEditPage: React.FC = () => {
                             value={val}
                             onChange={(e) => handleGradeChange(student.id, assignment.id, e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
-                            className={`w-full h-12 text-center text-lg font-bold outline-none transition-all pr-6 focus:bg-green-100 focus:text-green-900 focus:ring-inset focus:ring-2 focus:ring-green-500 ${
-                              val ? 'text-gray-800' : 'text-transparent'
-                            }`}
+                            className={`w-full h-12 text-center text-lg font-bold outline-none transition-all pr-6 focus:bg-green-100 focus:text-green-900 focus:ring-inset focus:ring-2 focus:ring-green-500 ${val ? 'text-gray-800' : 'text-transparent'
+                              }`}
                             placeholder="-"
                           />
 
