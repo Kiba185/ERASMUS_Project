@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { createPortal } from 'react-dom';
 import { Filter, type FilterOption } from './Filter';
 
 const ABSENCE_STATUSES = ['Late', 'Unexcused absence', 'Excused absence'] as const;
@@ -97,12 +98,12 @@ const AttendancePopUp = ({
     return null;
   }
 
-  return (
-    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-palette-sage px-4">
-      <div className="absolute h-[520px] w-[620px] rounded-full bg-palette-pine/25 blur-3xl" />
+  return createPortal(
+    <div className="fixed inset-0 z-[9999] flex items-center justify-center overflow-hidden bg-palette-sage/45 px-4 backdrop-blur-[1px]">
+      <div className="absolute h-[360px] w-[460px] rounded-full bg-palette-pine/15 blur-3xl" />
       <form
         onSubmit={handleSubmit}
-        className="relative z-10 w-full max-w-md rounded-lg border border-palette-lichen/45 bg-palette-mist p-6 shadow-[0_0_90px_rgba(0,61,18,0.45)]"
+        className="relative z-10 w-full max-w-md rounded-lg border border-palette-lichen/45 bg-palette-mist p-6 shadow-[0_0_55px_rgba(0,61,18,0.28)]"
       >
         <h2 className="text-xl font-bold text-palette-pine">Confirm absence</h2>
         <p className="mt-3 text-sm text-palette-moss">
@@ -162,7 +163,8 @@ const AttendancePopUp = ({
           </button>
         </div>
       </form>
-    </div>
+    </div>,
+    document.body,
   );
 };
 
