@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink } from 'react-router-dom';
+import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { User } from '../../types';
 import { useLocation, useNavigate } from 'react-router-dom';
@@ -40,8 +40,8 @@ const Sidebar: React.FC = () => {
     : visibleLinks.filter((link) => !(link.path === '/user' || link.path.startsWith('/user/')));
 
   return (
-    <aside className="sticky top-0 h-screen w-64 bg-palette-pine text-palette-mist hidden md:flex flex-col">
-      <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
+    <aside className="hidden w-64 shrink-0 self-stretch bg-palette-pine text-palette-mist md:block">
+      <nav className="sticky top-0 h-[calc(100vh-4rem)] overflow-y-auto px-4 py-6 space-y-2">
         {isUserRoute && (
           <div className="mb-6">
             <button
@@ -60,7 +60,7 @@ const Sidebar: React.FC = () => {
             to={link.path}
             end={link.path === '/dashboard' || link.path === '/user'}
             className={({ isActive }) =>
-              `block px-3 py-2 rounded-md cursor-pointer transition-colors ${
+              `block w-full whitespace-nowrap px-3 py-2 rounded-md cursor-pointer transition-colors ${
                 isActive
                   ? 'bg-palette-leaf text-palette-mist'
                   : 'text-palette-lichen hover:bg-palette-fern hover:text-palette-mist'
