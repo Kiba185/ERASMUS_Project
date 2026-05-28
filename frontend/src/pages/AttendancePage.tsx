@@ -73,6 +73,18 @@ const STATUS_LABELS: Record<AttendanceStatus, string> = {
   absent: 'Absent',
 };
 
+const ABSENCE_STATUS_LABELS = {
+  Late: 'Late',
+  'Unexcused absence': 'Unexcused',
+  'Excused absence': 'Excused',
+} as const;
+
+const ABSENCE_STATUS_CLASS_NAMES: Record<keyof typeof ABSENCE_STATUS_LABELS, string> = {
+  Late: 'bg-orange-100 text-orange-700',
+  'Unexcused absence': 'bg-red-100 text-red-700',
+  'Excused absence': 'bg-blue-100 text-blue-700',
+};
+
 const CLASS_OPTIONS: FilterOption<ClassName>[] = CLASSES.map((className) => ({
   value: className,
   label: className,
@@ -95,13 +107,54 @@ const getLessonLabel = (className: ClassName, subject: Subject) => {
   return lessonIndex === -1 ? subject : `${lessonIndex + 1}. ${subject}`;
 };
 
-const getStatusClassName = (status: AttendanceStatus) =>
-  status === 'present' ? 'bg-palette-sage/25 text-palette-leaf' : 'bg-red-100 text-red-700';
+const getAbsenceStatus = (absenceReason?: string) => {
+  const possibleStatus = absenceReason?.split(': ')[0] ?? '';
+  return possibleStatus in ABSENCE_STATUS_LABELS ? (possibleStatus as keyof typeof ABSENCE_STATUS_LABELS) : null;
+};
 
-const getStatusButtonClassName = (buttonStatus: AttendanceStatus, currentStatus: AttendanceStatus) =>
+const getStatusMeta = (status: AttendanceStatus, absenceReason?: string) => {
+  if (status === 'present') {
+    return {
+      label: STATUS_LABELS.present,
+      className: 'bg-palette-sage/25 text-palette-leaf',
+      showWarningIcon: false,
+    };
+  }
+
+  const absenceStatus = getAbsenceStatus(absenceReason);
+
+  if (!absenceStatus) {
+    return {
+      label: STATUS_LABELS.absent,
+      className: 'bg-red-100 text-red-700',
+      showWarningIcon: false,
+    };
+  }
+
+  return {
+    label: ABSENCE_STATUS_LABELS[absenceStatus],
+    className: ABSENCE_STATUS_CLASS_NAMES[absenceStatus],
+    showWarningIcon: absenceStatus === 'Unexcused absence',
+  };
+};
+
+const getStatusButtonClassName = (
+  buttonStatus: AttendanceStatus,
+  currentStatus: AttendanceStatus,
+  absenceReason?: string,
+) =>
   buttonStatus === currentStatus
-    ? getStatusClassName(buttonStatus)
+    ? getStatusMeta(buttonStatus, absenceReason).className
     : 'bg-palette-mist text-palette-moss hover:bg-palette-sage/15';
+
+const WarningIcon = () => (
+  <span
+    aria-hidden="true"
+    className="flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white"
+  >
+    !
+  </span>
+);
 
 const getStableMockNumber = (seed: string) => {
   let hash = 0;
@@ -285,6 +338,7 @@ const AttendancePage = () => {
                   {subjectsToShow.map((subject) => {
                     const status = student.attendance[subject] ?? 'absent';
                     const absenceReason = absenceReasons[getAbsenceKey(student.id, subject)];
+                    const statusMeta = getStatusMeta(status, absenceReason);
                     const absentTitle =
                       status === 'absent'
                         ? absenceReason
@@ -296,25 +350,36 @@ const AttendancePage = () => {
                       <td key={subject} className="px-4 py-3">
                         {canEditAttendance ? (
                           <div className="inline-flex rounded-md border border-palette-lichen/60 bg-palette-mist p-1">
-                            {(['present', 'absent'] as const).map((option) => (
-                              <button
-                                key={option}
-                                type="button"
-                                onClick={() => handleAttendanceStatusClick(student, subject, option)}
-                                className={`min-w-20 rounded px-3 py-1 text-xs font-semibold transition ${getStatusButtonClassName(option, status)}`}
-                                title={option === 'absent' ? absentTitle : undefined}
-                                aria-label={`Mark ${student.name} as ${STATUS_LABELS[option]} for ${subject}`}
-                              >
-                                {STATUS_LABELS[option]}
-                              </button>
-                            ))}
+                            {(['present', 'absent'] as const).map((option) => {
+                              const optionMeta = getStatusMeta(option, option === 'absent' ? absenceReason : undefined);
+                              const isSelectedOption = option === status;
+
+                              return (
+                                <button
+                                  key={option}
+                                  type="button"
+                                  onClick={() => handleAttendanceStatusClick(student, subject, option)}
+                                  className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded px-3 py-1 text-xs font-semibold transition ${getStatusButtonClassName(
+                                    option,
+                                    status,
+                                    option === 'absent' ? absenceReason : undefined,
+                                  )}`}
+                                  title={option === 'absent' ? absentTitle : undefined}
+                                  aria-label={`Mark ${student.name} as ${STATUS_LABELS[option]} for ${subject}`}
+                                >
+                                  {isSelectedOption && optionMeta.showWarningIcon && <WarningIcon />}
+                                  <span>{isSelectedOption ? optionMeta.label : STATUS_LABELS[option]}</span>
+                                </button>
+                              );
+                            })}
                           </div>
                         ) : (
                           <span
                             title={absentTitle}
-                            className={`inline-flex min-w-20 justify-center rounded-md px-3 py-1 text-xs font-semibold ${getStatusClassName(status)}`}
+                            className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${statusMeta.className}`}
                           >
-                            {STATUS_LABELS[status]}
+                            {statusMeta.showWarningIcon && <WarningIcon />}
+                            <span>{statusMeta.label}</span>
                           </span>
                         )}
                       </td>
