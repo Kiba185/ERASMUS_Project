@@ -9,7 +9,7 @@ const StatisticsWidget = () => {
 
   return (
     <div 
-        onClick={() => navigate('/dashboard/users')}
+        onClick={() => navigate('/users')}
         className="bg-white p-6 rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition cursor-pointer"
         >
         <h2 className="text-xl font-bold text-red-700 mb-4">System Statistics</h2>

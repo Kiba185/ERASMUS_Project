@@ -1,4 +1,11 @@
 export interface User {
   id: string;
+  user: any;
   role: 'student' | 'teacher' | 'admin' | 'parent';
+  firstName: string;
+  lastName: string;
+  adress: string;
+  birthday: string;
+  email: string;
+  phone: string;
 }

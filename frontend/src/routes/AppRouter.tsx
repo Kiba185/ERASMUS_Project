@@ -13,6 +13,11 @@ import GradesEditPage from '../pages/GradesEditPage';
 import SemesterPage from '../pages/SemesterPage';
 import AttendancePage from '../pages/AttendancePage';
 import ClassesPage from '../pages/ClassesPage';
+import EventsPage from '../pages/EventsPage';
+import UserPage from '../pages/UserPage';
+import UserSettings from '../pages/UserSettings';
+import MessagesPage from '../pages/MessagesPage';
+import AbsenceNotesPage from '../pages/AbsenceNotesPage';
 
 export const appRouter = createBrowserRouter([
   {
@@ -36,11 +41,18 @@ export const appRouter = createBrowserRouter([
       { path: '/dashboard', element: <Dashboard /> },
       { path: '/schedule', element: <SchedulePage /> },
       { path: '/grades', element: <GradesPage /> },
-      { path: '/classes', element: <ClassesPage /> },
       { path: '/grades-edit', element: <GradesEditPage /> },
+      { path: '/classes', element: <ClassesPage /> },
       { path: '/users', element: <div className="p-8"><h1 className="text-2xl font-bold">Správa uživatelů (Detail)</h1></div> },
+      { path: '/grades-edit', element: <GradesEditPage /> },
       { path: '/semester', element: <SemesterPage /> },
       { path: '/attendance', element: <AttendancePage /> },
+      { path: '/events', element: <EventsPage /> },
+      { path: '/user', element: <UserPage /> },
+      { path: '/user/settings', element: <UserSettings /> },
+      { path: '/messages', element: <MessagesPage /> },
+      { path: '/absence-notes', element: <AbsenceNotesPage /> },
+
     ]
   },
   {
