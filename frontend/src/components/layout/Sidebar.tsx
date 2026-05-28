@@ -30,6 +30,9 @@ const SIDEBAR_LINKS: SidebarLink[] = [
   // Parent
   { label: 'Semester', path: '/semester', roles: ['parent', 'admin', 'student', 'teacher'] },
   { label: 'Absence notes', path: '/absence-notes', roles: ['parent', 'admin', 'teacher'] },
+
+  // User Profile
+  { label: 'User info', path: '/user', roles: ['parent', 'admin', 'student', 'teacher'] },
 ];
 
 const Sidebar: React.FC = () => {

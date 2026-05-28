@@ -1,10 +1,10 @@
-import React, { useState } from 'react';
+import { useState } from 'react';
 import { useAuth } from '../../context/AuthContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import Logo from './Logo';
 import UserPopup from './UserPopup';
 
-const Header: React.FC = () => {
+const Header = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();

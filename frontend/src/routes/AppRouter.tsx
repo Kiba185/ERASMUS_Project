@@ -15,7 +15,6 @@ import AttendancePage from '../pages/AttendancePage';
 import ClassesPage from '../pages/ClassesPage';
 import EventsPage from '../pages/EventsPage';
 import UserPage from '../pages/UserPage';
-import UserSettings from '../pages/UserSettings';
 import MessagesPage from '../pages/MessagesPage';
 import AbsenceNotesPage from '../pages/AbsenceNotesPage';
 
@@ -49,7 +48,6 @@ export const appRouter = createBrowserRouter([
       { path: '/attendance', element: <AttendancePage /> },
       { path: '/events', element: <EventsPage /> },
       { path: '/user', element: <UserPage /> },
-      { path: '/user/settings', element: <UserSettings /> },
       { path: '/messages', element: <MessagesPage /> },
       { path: '/absence-notes', element: <AbsenceNotesPage /> },
 
