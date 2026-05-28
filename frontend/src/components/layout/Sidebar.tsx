@@ -2,7 +2,6 @@ import React from 'react';
 import { NavLink, useLocation, useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { User } from '../../types';
-import { useLocation, useNavigate } from 'react-router-dom';
 
 
 interface SidebarLink {
