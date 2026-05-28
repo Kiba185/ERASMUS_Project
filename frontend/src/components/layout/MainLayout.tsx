@@ -6,12 +6,12 @@ import Footer from './Footer';
 
 const MainLayout: React.FC = () => {
   return (
-    <div className="flex flex-col min-h-screen bg-palette-sage/15 font-sans">
-      <div className="flex flex-1">
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-palette-sage/15 font-sans [scrollbar-gutter:stable]">
+      <div className="flex min-h-[calc(100vh-4rem)] flex-1">
         <Sidebar />
-        <div className="flex-1 flex flex-col">
+        <div className="flex min-w-0 flex-1 flex-col">
           <Header />
-          <main className="flex-1 p-6 lg:p-8">
+          <main className="flex-1 overflow-x-hidden p-6 lg:p-8">
             <Outlet />
           </main>
         </div>
