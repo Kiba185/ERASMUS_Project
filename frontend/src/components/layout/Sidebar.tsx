@@ -1,5 +1,5 @@
 import React from 'react';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
+import { NavLink } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
 import type { User } from '../../types';
 
@@ -13,6 +13,8 @@ const SIDEBAR_LINKS: SidebarLink[] = [
   { label: 'Dashboard', path: '/dashboard', roles: ['admin', 'teacher', 'student', 'parent'] },
   { label: 'Events', path: '/events', roles: ['admin', 'teacher', 'student', 'parent'] },
   { label: 'Messages', path: '/messages', roles: ['admin', 'teacher', 'student', 'parent'] },
+
+  // Admin
   { label: 'User management', path: '/users', roles: ['admin'] },
   { label: 'Grades editing', path: '/grades-edit', roles: ['teacher', 'admin'] },
   { label: 'Attendance', path: '/attendance', roles: ['teacher', 'admin'] },
@@ -36,7 +38,7 @@ const Sidebar: React.FC = () => {
     : visibleLinks.filter((link) => !(link.path === '/user' || link.path.startsWith('/user/')));
 
   return (
-    <aside className="w-64 bg-palette-pine text-palette-mist hidden md:flex flex-col">
+    <aside className="sticky top-0 h-screen w-64 bg-palette-pine text-palette-mist hidden md:flex flex-col">
       <nav className="flex-1 px-4 py-6 space-y-2 overflow-y-auto">
         {isUserRoute && (
           <div className="mb-6">
