@@ -59,7 +59,7 @@ async function userIdFromUsername(username: string) {
 //      --=== ADMIN STUFF ===--
 
 //DELETE ALL USERS
-app.get('/api/admin/users/deleteall', async (req, res) => {
+app.get('/api/admin/users/deleteall', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
@@ -184,7 +184,7 @@ app.post('/api/setUserRole', async (req, res, next) => {
 
 
 //GET ALL USERS - ADMIN ONLY
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
@@ -193,7 +193,7 @@ app.get('/api/users', async (req, res) => {
 });
 
 //GET ALL USERS OF ROLE - ADMIN ONLY
-app.get('/api/users/:role', async (req, res) => {
+app.get('/api/users/:role', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
@@ -209,7 +209,7 @@ app.get('/api/users/:role', async (req, res) => {
 });
 
 //GET SPECIFIC USER - ADMIN FOR FOREIGN, ALL FOR THEMSELVES
-app.get('/api/user/:username', async (req, res) => {
+app.get('/api/user/:username', async (req, res, next) => {
     try {
         const username = req.params.username;
         const user = await prisma.user.findFirst({ where: { username } });
@@ -224,7 +224,7 @@ app.get('/api/user/:username', async (req, res) => {
 });
 
 //GET CURRENT USER
-app.get('/api/user', async (req, res) => {
+app.get('/api/user', async (req, res, next) => {
     try {
         const id = req.session.userId;
         const user = await prisma.user.findUnique({ where: { id } });
@@ -244,7 +244,7 @@ app.get('/api/user', async (req, res) => {
 //      --=== GRADE STUFF ===--
 
 //GET ALL GRADE COLUMNS - ADMIN ONLY
-app.get('/api/gradeColumns', async (req, res) => {
+app.get('/api/gradeColumns', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
@@ -253,19 +253,24 @@ app.get('/api/gradeColumns', async (req, res) => {
 });
 
 //CREATE GRADE COLUMN - TEACHER ONLY
-app.post('/api/gradeColumns', async (req, res) => {
-    /// AUTH ///
+app.post('/api/gradeColumns', async (req, res, next) => { // 👈 add next
     if (await requireAuth(req, res, next, 5) !== true) { return; }
 
     const { name, subjectId, weight, date } = req.body;
     const newGradeColumn = await prisma.gradeColumn.create({
-        data: { name, subjectId, weight, date, TeacherId: req.session.userId! }
+        data: { 
+            name, 
+            subjectId: Number(subjectId), // 👈 make sure it's an Int
+            weight: Number(weight),
+            date: new Date(date),
+            TeacherId: req.session.userId! 
+        }
     });
     res.status(201).json(newGradeColumn);
 });
 
 //DELETE GRADE COLUMN - TEACHER ONLY
-app.delete('/api/gradeColumns/:id', async (req, res) => {
+app.delete('/api/gradeColumns/:id', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 5) !== true) { return; }
 
@@ -282,10 +287,31 @@ app.delete('/api/gradeColumns/:id', async (req, res) => {
     res.json({ success: true, message: 'Grade column deleted' });
 });
 
+//UPDATE GRADE COLUMN - TEACHER ONLY
+app.put('/api/gradeColumns/:id', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    const gradeColumnId = parseInt(req.params.id);
+    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });
+    if (!gradeColumn) {
+        return res.status(404).json({ success: false, message: 'Grade column not found' });
+    }
+    if (gradeColumn.TeacherId !== req.session.userId) {
+        return res.status(403).json({ success: false, message: 'You can only update your own grade columns' });
+    }
+
+    const { name, subjectId, weight, date } = req.body;
+    const updatedGradeColumn = await prisma.gradeColumn.update({
+        where: { id: gradeColumnId },
+        data: { name, subjectId, weight, date }
+    });
+    res.json(updatedGradeColumn);
+});
+
 
 
 //GET ALL GRADES - ADMIN ONLY
-app.get('/api/grades', async (req, res) => {
+app.get('/api/grades', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
@@ -309,7 +335,7 @@ async function getUserGrades(req: express.Request, res: express.Response, next: 
 }
 
 //GET SPECIFIC USER GRADES - ADMIN FOR FOREIGN, ALL FOR THEMSELVES
-app.get('/api/grades/:username', async (req, res) => {
+app.get('/api/grades/:username', async (req, res, next) => {
     try {
         const userId = await userIdFromUsername(req.params.username);
         res.json(await getUserGrades(req, res, next, userId));
@@ -319,7 +345,7 @@ app.get('/api/grades/:username', async (req, res) => {
 });
 
 //GET CURRENT USER GRADES
-app.get('/api/mygrades', async (req, res) => {
+app.get('/api/mygrades', async (req, res, next) => {
     try {
         res.json(await getUserGrades(req, res, next, req.session.userId));
     } catch (error) {
@@ -337,7 +363,7 @@ app.get('/api/mygrades', async (req, res) => {
 //      --=== CLASSES STUFF ===--
 
 //GET ALL CLASSES - ADMIN ONLY
-app.get('/api/classes', async (req, res) => {
+app.get('/api/classes', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
@@ -357,7 +383,7 @@ app.get('/api/classes', async (req, res) => {
 //      --=== SUBJECTS STUFF ===--
 
 //GET ALL SUBJECTS - ADMIN ONLY
-app.get('/api/subjects', async (req, res) => {
+app.get('/api/subjects', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
@@ -377,7 +403,7 @@ app.get('/api/subjects', async (req, res) => {
 //      --=== LESSONS STUFF ===--
 
 //GET ALL LESSONS - ADMIN ONLY
-app.get('/api/lessons', async (req, res) => {
+app.get('/api/lessons', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 

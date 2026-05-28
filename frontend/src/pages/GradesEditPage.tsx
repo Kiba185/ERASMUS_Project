@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 
 // --- TYPES ---
 type Student = { id: string; name: string; classes: string[] };
-type Assignment = { id: string; classId: string; subject: string; title: string; weight: number };
+type Assignment = { id: string; classId: string; subject: string; title: string; weight: number, date: string };
 type Grade = { studentId: string; assignmentId: string; value: string };
 
 const GradesEditPage: React.FC = () => {
@@ -105,8 +105,8 @@ const GradesEditPage: React.FC = () => {
         if (!response.ok) throw new Error('Failed to load subjects');
 
         const data = await response.json();
-        setSubjects(data.map((s: any) => s.name)); // adjust field name to match your DB
-        if (data.length > 0) setSelectedSubject(data[0].name);
+        setSubjects(data); // assuming API returns [{ id, name }]
+        if (data.length > 0) setSelectedSubjectId(data[0].id);
       } catch (error) {
         console.error(error);
       }
@@ -145,7 +145,8 @@ const GradesEditPage: React.FC = () => {
   const [newColTitle, setNewColTitle] = useState('');
   const [newColWeight, setNewColWeight] = useState<number>(10);
 
-  const [subjects, setSubjects] = useState<string[]>([]);
+  const [subjects, setSubjects] = useState<{ id: number; name: string }[]>([]);
+  const [selectedSubjectId, setSelectedSubjectId] = useState<number>(0);
 
   const currentStudents = students.filter(s => s.classes.includes(selectedClass));
   const currentAssignments = assignments.filter(a => a.classId === selectedClass && a.subject === selectedSubject);
@@ -161,9 +162,25 @@ const GradesEditPage: React.FC = () => {
       subject: selectedSubject,
       title: newColTitle,
       weight: newColWeight,
-    };
-    setAssignments([...assignments, newAssignment]);
-    setNewColTitle('');
+      date: new Date().toISOString()
+    };;
+
+    fetch('http://localhost:3000/api/gradeColumns', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        name: newColTitle,
+        subjectId: selectedSubjectId,
+        weight: newColWeight,
+        date: new Date().toISOString()
+      })
+    })
+      .then(res => res.json())
+      .then(updatedGradeColumn => {
+        setAssignments([...assignments, updatedGradeColumn]);
+        setNewColTitle('');
+      });
   };
 
   // --- DELETE COLUMN LOGIC ---
@@ -272,11 +289,11 @@ const GradesEditPage: React.FC = () => {
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Subject</label>
             <select
-              value={selectedSubject}
-              onChange={(e) => setSelectedSubject(e.target.value)}
+              value={selectedSubjectId}
+              onChange={(e) => setSelectedSubjectId(Number(e.target.value))}
               className="p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 font-bold focus:ring-2 focus:ring-green-500 outline-none"
             >
-              {subjects.map(s => <option key={s} value={s}>{s}</option>)}
+              {subjects.map(s => <option key={s.id} value={s.id}>{s.name}</option>)}
             </select>
           </div>
         </div>
