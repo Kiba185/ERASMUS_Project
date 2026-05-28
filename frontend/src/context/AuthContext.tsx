@@ -4,7 +4,7 @@ import type { User } from '../types';
 
 interface AuthContextType {
   user: User | null;
-  login: (id: User['id'], role: User['role']) => void;
+  login: (id: User['id'], user: User['user']) => void;
   logout: () => void;
 }
 
@@ -13,11 +13,19 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
 
-  const login = (id: User['id'], role: User['role']) => {
-    setUser({ id, role });
+  const login = (id: User['id'], user: User['user']) => {
+    setUser({ id, user, role: user.role, firstName: user.firstName, lastName: user.lastName, adress: user.adress, birthday: user.birthday, email: user.email, phone: user.phone }); // Uložíme i roli do stavu uživatele
   };
 
   const logout = () => {
+    try {
+      fetch("http://localhost:3000/api/logout", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({})
+      });
+    } catch (err) {
+    }
     setUser(null);
   };
 
