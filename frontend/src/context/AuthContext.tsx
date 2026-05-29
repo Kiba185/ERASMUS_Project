@@ -4,6 +4,8 @@ import type { User } from '../types';
 
 interface AuthContextType {
   user: User | null;
+  activeChildId: string | null;
+  setActiveChildId: (id: string) => void;
   login: (id: User['id'], user: User['user']) => void;
   logout: () => void;
 }
@@ -12,9 +14,28 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<User | null>(null);
+  const [activeChildId, setActiveChildId] = useState<string | null>(null);
 
   const login = (id: User['id'], user: User['user']) => {
-    setUser({ id, user, role: user.role, firstName: user.firstName, lastName: user.lastName, adress: user.adress, birthday: user.birthday, email: user.email, phone: user.phone }); // Uložíme i roli do stavu uživatele
+    setUser({ 
+        id, 
+        user, 
+        role: user.role, 
+        firstName: user.firstName, 
+        lastName: user.lastName, 
+        adress: user.adress, 
+        birthday: user.birthday, 
+        email: user.email, 
+        phone: user.phone,
+        children: user.children 
+    }); 
+
+    // Automatically set the first child as active if it's a parent with children
+    if (user.role === 'parent' && user.children && user.children.length > 0) {
+      setActiveChildId(user.children[0].id.toString());
+    } else {
+      setActiveChildId(null);
+    }
   };
 
   const logout = () => {
@@ -28,10 +49,11 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
     } catch (err) {
     }
     setUser(null);
+    setActiveChildId(null);
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, logout }}>
+    <AuthContext.Provider value={{ user, activeChildId, setActiveChildId, login, logout }}>
       {children}
     </AuthContext.Provider>
   );
