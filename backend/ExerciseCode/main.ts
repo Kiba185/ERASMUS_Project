@@ -549,11 +549,125 @@ app.get('/api/lessons', async (req, res, next) => {
 
 
 
+///////////////////////////////////////
+//      --=== EVENTS STUFF ===--
 
+//GET ALL EVENTS - ALL ROLES IF THEY ARE PARTICIPATING IN THEM, OTHERWISE ONLY ADMIN AND TEACHER
+app.get('/api/events', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 1) !== true) { return; }
 
+    const events = await prisma.event.findMany({
+        include: {
+            participantsIndividuals: true,
+            participantsClasses: {
+                include: {
+                    students: true
+                }
+            }
+        }
+    });
 
+    const currentUser = req.session.userId ? await prisma.user.findUnique({ where: { id: req.session.userId } }) : null;
+    const currentRole = currentUser?.role ?? '';
+    const currentPrivilege = privileges[currentRole as keyof typeof privileges] ?? 0;
 
+    // Filter events based on participation
+    const filteredEvents = events.filter(event => {
+        const isParticipant = event.participantsIndividuals.some(u => u.id === req.session.userId) ||
+            event.participantsClasses.some(c => c.students?.some(s => s.id === req.session.userId));
 
+        if (isParticipant) {
+            return true; // User is a participant, include the event
+        }
+
+        // If not a participant, only include if user is admin or teacher
+        return currentPrivilege >= 5;
+    });
+    res.json(filteredEvents);
+});
+
+//CREATE EVENT - TEACHER AND ADMIN ONLY
+app.post('/api/events', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    const { title, description, startDate, endDate, type, startTime, allDay, participantIndividualIds, participantClassIds } = req.body;
+
+    const newEvent = await prisma.event.create({
+        data: {
+            title,
+            description,
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
+            type,
+            startTime: new Date(startTime),
+            allDay,
+            participantsIndividuals: {
+                connect: participantIndividualIds.map((id: number) => ({ id }))
+            },
+            participantsClasses: {
+                connect: participantClassIds.map((id: number) => ({ id }))
+            }
+        },
+        include: {
+            participantsIndividuals: true,
+            participantsClasses: {
+                include: {
+                    students: true
+                }
+            }
+        }
+    });
+    res.status(201).json(newEvent);
+});
+
+//DELETE EVENT - TEACHER AND ADMIN ONLY
+app.delete('/api/events/:id', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+
+    const eventId = parseInt(req.params.id);
+    const deletedEvent = await prisma.event.delete({
+        where: { id: eventId }
+    });
+    res.json(deletedEvent);
+});
+
+//UPDATE EVENT - TEACHER AND ADMIN ONLY
+app.put('/api/events/:id', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    const eventId = parseInt(req.params.id);
+    const { title, description, startDate, endDate, type, startTime, allDay, participantIndividualIds, participantClassIds } = req.body;
+
+    const updatedEvent = await prisma.event.update({
+        where: { id: eventId },
+        data: {
+            title,
+            description,
+            startDate: new Date(startDate),
+            endDate: new Date(endDate),
+            type,
+            startTime: new Date(startTime),
+            allDay,
+            participantsIndividuals: {
+                set: participantIndividualIds.map((id: number) => ({ id }))
+            },
+            participantsClasses: {
+                set: participantClassIds.map((id: number) => ({ id }))
+            }
+        },
+        include: {
+            participantsIndividuals: true,
+            participantsClasses: {
+                include: {
+                    students: true
+                }
+            }
+        }
+    });
+    res.json(updatedEvent);
+});
 
 
 

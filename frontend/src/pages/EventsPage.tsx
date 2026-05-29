@@ -26,12 +26,11 @@ const EventsPage: React.FC = () => {
   const canManageEvents = isTeacher || isAdmin;
 
   // --- STAV PRO UDÁLOSTI ---
-  const [events, setEvents] = useState<SchoolEvent[]>([
-    { id: 'e1', title: 'Math Midterm Examination Block', startDate: '2026-05-13', endDate: '2026-05-13', time: '08:15', isAllDay: false, type: 'exam', className: '4.A', description: 'Covers algebra and geometry modules. Room 204.' },
-    { id: 'e2', title: 'Prague Castle Field Trip & History Lecture', startDate: '2026-05-20', endDate: '2026-05-20', time: '07:45', isAllDay: false, type: 'excursion', className: '4.A', description: 'History excursion focused on gothic architecture.' },
-    { id: 'e3', title: 'Regular Parent-Teacher Association Meeting', startDate: '2026-05-14', endDate: '2026-05-14', time: '17:00', isAllDay: false, type: 'meeting', description: 'Main school auditorium.' },
-    { id: 'e4', title: 'State Holiday - Liberation Day', startDate: '2026-05-01', endDate: '2026-05-03', time: '', isAllDay: true, type: 'holiday', description: 'School completely closed.' },
-  ]);
+  const [events, setEvents] = useState<SchoolEvent[]>([]);
+  //   { id: 'e1', title: 'Math Midterm Examination Block', startDate: '2026-05-13', endDate: '2026-05-13', time: '08:15', isAllDay: false, type: 'exam', className: '4.A', description: 'Covers algebra and geometry modules. Room 204.' },
+  //   { id: 'e2', title: 'Prague Castle Field Trip & History Lecture', startDate: '2026-05-20', endDate: '2026-05-20', time: '07:45', isAllDay: false, type: 'excursion', className: '4.A', description: 'History excursion focused on gothic architecture.' },
+  //   { id: 'e3', title: 'Regular Parent-Teacher Association Meeting', startDate: '2026-05-14', endDate: '2026-05-14', time: '17:00', isAllDay: false, type: 'meeting', description: 'Main school auditorium.' },
+  //   { id: 'e4', title: 'State Holiday - Liberation Day', startDate: '2026-05-01', endDate: '2026-05-03', time: '', isAllDay: true, type: 'holiday', description: 'School completely closed.' },
 
   const [navDate, setNavDate] = useState<Date>(new Date(2026, 4, 1));
   const [isModalOpen, setIsModalOpen] = useState(false);
