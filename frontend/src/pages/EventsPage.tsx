@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 
 type EventType = 'exam' | 'excursion' | 'meeting' | 'holiday' | string;
@@ -258,9 +259,9 @@ const EventsPage: React.FC = () => {
       </div>
 
       {/* --- MODÁLNÍ OKNO FIXNUTÉ PROTI MEZERÁM --- */}
-      {isModalOpen && (
+      {isModalOpen && createPortal(
         <div 
-          className="fixed inset-0 z-[99999] min-h-screen flex items-center justify-center bg-palette-sage/45 px-4 py-6 backdrop-blur-[1px]"
+          className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto bg-palette-sage/45 px-4 py-6 backdrop-blur-[1px]"
         >
           
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xl max-w-md w-full space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
@@ -421,7 +422,8 @@ const EventsPage: React.FC = () => {
               </form>
             )}
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
     
