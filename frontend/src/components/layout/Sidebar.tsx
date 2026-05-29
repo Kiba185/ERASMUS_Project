@@ -21,10 +21,11 @@ const SIDEBAR_LINKS: SidebarLink[] = [
   { label: 'Attendance', path: '/attendance', roles: ['teacher', 'admin'] },
   { label: 'Classes', path: '/classes', roles: ['teacher', 'admin'] },
   { label: 'Schedule', path: '/schedule', roles: ['student', 'admin', 'parent', 'teacher'] },
-  { label: 'Grades', path: '/grades', roles: ['student', 'admin'] },
+  { label: 'Grades', path: '/grades', roles: ['student', 'admin', 'parent', 'teacher'] },
   { label: 'Semester', path: '/semester', roles: ['parent', 'admin', 'student', 'teacher'] },
-  { label: 'Absence notes', path: '/absence-notes', roles: ['parent', 'admin', 'teacher'] },
+  { label: 'Absence notes', path: '/absence-notes', roles: ['parent', 'admin', 'teacher', 'student' ] },
   { label: 'User info', path: '/user', roles: ['parent', 'admin', 'student', 'teacher'] },
+  { label: 'Absence', path: '/absence', roles: ['admin', 'student',] },
 ];
 
 const Sidebar: React.FC = () => {
