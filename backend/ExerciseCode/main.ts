@@ -6,6 +6,8 @@ import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import session from 'express-session';
 import bcrypt from 'bcrypt';
 
+import { requireAuth } from './auth.ts';
+
 declare module 'express-session' {
     interface SessionData {
         userId?: number;
@@ -24,13 +26,18 @@ const privileges = {
     "admin": 10
 };
 
-app.use(cors());
+
+
+app.use(cors({
+  origin: 'http://localhost:5173', 
+  credentials: true               
+}));
 app.use(express.json());
 app.use(session({
-    secret: 'cisco', // put this in a .env file!
+    secret: 'cisco',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false } // set to true if using HTTPS
+    cookie: { secure: false }
 }));
 
 
@@ -52,7 +59,7 @@ async function userIdFromUsername(username: string) {
 //      --=== ADMIN STUFF ===--
 
 //DELETE ALL USERS
-app.get('/api/admin/users/deleteall', async (req, res) => {
+app.get('/api/admin/users/deleteall', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
@@ -74,7 +81,7 @@ async function adminsetuser(req: express.Request, res: express.Response, next: e
         res.status(404).json({ success: false, message: 'User not found' });
     }
 }
-app.post('/api/admin/setuser', async (req, res) => {
+app.post('/api/admin/setuser', async (req, res, next) => {
     await adminsetuser(req, res, next);
 })
 
@@ -83,53 +90,26 @@ app.post('/api/admin/setuser', async (req, res) => {
 
 
 
-///////////////////////////////////////////////
-//      --=== AUTH/PERMISSION STUFF ===--
-
-
-//AUTH
-async function requireAuth(req: express.Request, res: express.Response, next: express.NextFunction, permissionLevel: number) {
-
-    if (!req.session.userId) {
-        res.status(401).json({ error: 'Not logged in' });
-        return false;
-    }
-
-    const user = await prisma.user.findUnique({ where: { id: req.session.userId } });
-    if (!user) {
-        res.status(401).json({ error: 'User not found' });
-        return false;
-    }
-
-    const userRole = (user.role || 'user') as keyof typeof privileges;
-    if (roleAuthority(userRole) < permissionLevel) {
-        res.status(403).json({ error: 'Insufficient permissions' });
-        return false;
-    }
-
-    return true;
-    //next(); // ✅ they're logged in, let them through
-
-}
-
-function roleAuthority(requiredRole: keyof typeof privileges) {
-    return privileges[requiredRole] ?? 0; // default to 0 if role not found
-}
-
 //LOGIN
 async function login(req: express.Request, res: express.Response, next: express.NextFunction) {
     const { username, password } = req.body;
     const user = await prisma.user.findFirst({ where: { username } });
     if (user && await bcrypt.compare(password, user.password)) {
         req.session.userId = user.id; // store user ID in session
-        res.json({ success: true, user });
+        req.session.save((err) => {
+            if (err) return res.status(500).json({ success: false });
+
+            // Don't send the password back in the response
+            const { password: _, ...safeUser } = user;
+            res.json({ success: true, user: safeUser });
+        });
     } else {
         res.status(401).json({ success: false, message: 'Invalid credentials' });
         // Timeout to prevent brute-force attacks
         setTimeout(() => { logout(req, res, next); }, 1000);
     }
 }
-app.post('/api/login', async (req, res) => {
+app.post('/api/login', async (req, res, next) => {
     await login(req, res, next);
 })
 
@@ -148,7 +128,7 @@ async function register(req: express.Request, res: express.Response, next: expre
     res.status(201).json({ success: true, user: newUser });
     //await login(req, res, next);
 }
-app.post('/api/register', async (req, res) => {
+app.post('/api/register', async (req, res, next) => {
     await register(req, res, next);
 })
 
@@ -167,7 +147,7 @@ async function logout(req: express.Request, res: express.Response, next: express
         }
     });
 }
-app.post('/api/logout', async (req, res) => {
+app.post('/api/logout', async (req, res, next) => {
     await logout(req, res, next);
 });
 
@@ -187,7 +167,7 @@ async function setUserRole(req: express.Request, res: express.Response, next: ex
     });
     res.json({ success: true, user: updatedUser });
 }
-app.post('/api/setUserRole', async (req, res) => {
+app.post('/api/setUserRole', async (req, res, next) => {
     await setUserRole(req, res, next);
 });
 
@@ -204,7 +184,7 @@ app.post('/api/setUserRole', async (req, res) => {
 
 
 //GET ALL USERS - ADMIN ONLY
-app.get('/api/users', async (req, res) => {
+app.get('/api/users', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
@@ -212,8 +192,24 @@ app.get('/api/users', async (req, res) => {
     res.json(users);
 });
 
+//GET ALL USERS OF ROLE - ADMIN ONLY
+app.get('/api/users/:role', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const users = await prisma.user.findMany({ where: { role: req.params.role } });
+    const usersToClassesRelations = await prisma.user.findMany({ where: { role: req.params.role }, include: { classes: true } });
+    //const classes = usersToClassesRelations.find(uc => uc.id === u.id)?.classes || [];
+
+    const userInfoWithClasses = users.map(u => {
+        const classes = usersToClassesRelations.find(uc => uc.id === u.id)?.classes || [];
+        return { ...u, classes: classes.map(c => ({ id: c.id, name: c.name })) };
+    });
+    res.json(userInfoWithClasses);
+});
+
 //GET SPECIFIC USER - ADMIN FOR FOREIGN, ALL FOR THEMSELVES
-app.get('/api/user/:username', async (req, res) => {
+app.get('/api/user/:username', async (req, res, next) => {
     try {
         const username = req.params.username;
         const user = await prisma.user.findFirst({ where: { username } });
@@ -228,7 +224,7 @@ app.get('/api/user/:username', async (req, res) => {
 });
 
 //GET CURRENT USER
-app.get('/api/user', async (req, res) => {
+app.get('/api/user', async (req, res, next) => {
     try {
         const id = req.session.userId;
         const user = await prisma.user.findUnique({ where: { id } });
@@ -247,8 +243,75 @@ app.get('/api/user', async (req, res) => {
 ///////////////////////////////////////
 //      --=== GRADE STUFF ===--
 
+//GET ALL GRADE COLUMNS - ADMIN ONLY
+app.get('/api/gradeColumns', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const gradeColumns = await prisma.gradeColumn.findMany();
+    res.json(gradeColumns);
+});
+
+//CREATE GRADE COLUMN - TEACHER ONLY
+app.post('/api/gradeColumns', async (req, res, next) => { // 👈 add next
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+
+    const { name, subjectId, weight, date } = req.body;
+    const newGradeColumn = await prisma.gradeColumn.create({
+        data: { 
+            name, 
+            subjectId: Number(subjectId), // 👈 make sure it's an Int
+            weight: Number(weight),
+            date: new Date(date),
+            TeacherId: req.session.userId! 
+        }
+    });
+    res.status(201).json(newGradeColumn);
+});
+
+//DELETE GRADE COLUMN - TEACHER ONLY
+app.delete('/api/gradeColumns/:id', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+
+    const gradeColumnId = parseInt(req.params.id);
+    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });  
+    if (!gradeColumn) {
+        return res.status(404).json({ success: false, message: 'Grade column not found' });
+    }
+    if (gradeColumn.TeacherId !== req.session.userId) {
+        return res.status(403).json({ success: false, message: 'You can only delete your own grade columns' });
+    }
+
+    await prisma.gradeColumn.delete({ where: { id: gradeColumnId } });
+    res.json({ success: true, message: 'Grade column deleted' });
+});
+
+//UPDATE GRADE COLUMN - TEACHER ONLY
+app.put('/api/gradeColumns/:id', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    const gradeColumnId = parseInt(req.params.id);
+    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });
+    if (!gradeColumn) {
+        return res.status(404).json({ success: false, message: 'Grade column not found' });
+    }
+    if (gradeColumn.TeacherId !== req.session.userId) {
+        return res.status(403).json({ success: false, message: 'You can only update your own grade columns' });
+    }
+
+    const { name, subjectId, weight, date } = req.body;
+    const updatedGradeColumn = await prisma.gradeColumn.update({
+        where: { id: gradeColumnId },
+        data: { name, subjectId, weight, date }
+    });
+    res.json(updatedGradeColumn);
+});
+
+
+
 //GET ALL GRADES - ADMIN ONLY
-app.get('/api/grades', async (req, res) => {
+app.get('/api/grades', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
@@ -272,7 +335,7 @@ async function getUserGrades(req: express.Request, res: express.Response, next: 
 }
 
 //GET SPECIFIC USER GRADES - ADMIN FOR FOREIGN, ALL FOR THEMSELVES
-app.get('/api/grades/:username', async (req, res) => {
+app.get('/api/grades/:username', async (req, res, next) => {
     try {
         const userId = await userIdFromUsername(req.params.username);
         res.json(await getUserGrades(req, res, next, userId));
@@ -282,13 +345,86 @@ app.get('/api/grades/:username', async (req, res) => {
 });
 
 //GET CURRENT USER GRADES
-app.get('/api/mygrades', async (req, res) => {
+app.get('/api/mygrades', async (req, res, next) => {
     try {
         res.json(await getUserGrades(req, res, next, req.session.userId));
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch user grades' });
     }
 });
+
+
+
+
+
+
+
+///////////////////////////////////////
+//      --=== CLASSES STUFF ===--
+
+//GET ALL CLASSES - ADMIN ONLY
+app.get('/api/classes', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const classes = await prisma.class.findMany();
+    const classToUserRelagtions = await prisma.class.findMany({ include: { students: true } });
+
+    const classToUser = classToUserRelagtions.map(c => ({ id: c.id, name: c.name, students: c.students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })) }));
+    res.json(classToUser);
+});
+
+
+
+
+
+
+///////////////////////////////////////
+//      --=== SUBJECTS STUFF ===--
+
+//GET ALL SUBJECTS - ADMIN ONLY
+app.get('/api/subjects', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const subjects = await prisma.subject.findMany();
+    res.json(subjects);
+});
+
+
+
+
+
+
+
+
+
+///////////////////////////////////////
+//      --=== LESSONS STUFF ===--
+
+//GET ALL LESSONS - ADMIN ONLY
+app.get('/api/lessons', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const lessons = await prisma.lesson.findMany();
+    res.json(lessons);
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
 
