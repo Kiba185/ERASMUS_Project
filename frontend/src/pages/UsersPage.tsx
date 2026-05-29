@@ -36,7 +36,7 @@ const initialUsers: MockUser[] = [
   { id: 1, firstName: 'Jan', lastName: 'Novák', username: 'jnovak', email: 'jan.novak@example.com', phone: '+420123456789', adress: 'Praha', birthday: '2008-05-15', role: 'student', classId: 1 },
   { id: 2, firstName: 'Petr', lastName: 'Svoboda', username: 'psvoboda', email: 'petr.svoboda@example.com', phone: '+420987654321', adress: 'Brno', birthday: '2008-03-22', role: 'student', classId: 2 },
   { id: 3, firstName: 'Karel', lastName: 'Učitel', username: 'teacher', email: 'ucitel@school.com', phone: '+420111222333', adress: 'Ostrava', birthday: '1980-01-01', role: 'teacher', classId: 1 },
-  { id: 4, firstName: 'Eva', lastName: 'Nováková', username: 'parent', email: 'eva@example.com', phone: '+420444555666', adress: 'Praha', birthday: '1975-10-10', role: 'parent', childrenIds: [1] },
+  { id: 4, firstName: 'Eva', lastName: 'Nováková', username: 'parent', email: 'eva@example.com', phone: '+420444555666', adress: 'Praha', birthday: '1975-10-10', role: 'parent', childrenIds: [1, 2] },
   { id: 5, firstName: 'Admin', lastName: 'Admin', username: 'admin', email: 'admin@school.com', phone: '+420000000000', adress: 'Server', birthday: '1990-01-01', role: 'admin' },
 ];
 
@@ -132,6 +132,17 @@ const UsersPage: React.FC = () => {
       ...user,
       id: user.id.toString(),
     };
+
+    if (user.role === 'parent' && user.childrenIds) {
+      authUser.children = user.childrenIds.map(childId => {
+        const student = students.find(s => s.id === childId);
+        if (student) {
+          return { id: student.id.toString(), firstName: student.firstName, lastName: student.lastName };
+        }
+        return null;
+      }).filter(Boolean);
+    }
+
     login(authUser.id, authUser);
     navigate('/dashboard');
   };
