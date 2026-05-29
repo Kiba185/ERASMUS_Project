@@ -309,6 +309,23 @@ app.put('/api/gradeColumns/:id', async (req, res, next) => {
 });
 
 
+async function formatGradeResponse(grade: any) {
+    // Add a subjectId and String subjectName to the grade for easier frontend handling and also add a date, weight and column name for better frontend handling
+
+    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: grade.gColumnId } });
+    const subject = gradeColumn?.subjectId ? await prisma.subject.findUnique({ where: { id: gradeColumn.subjectId } }) : null;
+
+    return {
+        ...grade,
+        subjectId: subject?.id,
+        subjectName: subject?.name,
+        date: gradeColumn?.date,
+        weight: gradeColumn?.weight,
+        gColumnName: gradeColumn?.name
+    };
+}
+
+
 
 //GET ALL GRADES - ADMIN ONLY
 app.get('/api/grades', async (req, res, next) => {
@@ -317,6 +334,19 @@ app.get('/api/grades', async (req, res, next) => {
 
     const grades = await prisma.grade.findMany();
     res.json(grades);
+});
+
+//DELETE SPECIFIC GRADE BY ID - ADMIN ONLY
+app.delete('/api/grades/:id', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+    const gradeId = parseInt(req.params.id);
+    const grade = await prisma.grade.findUnique({ where: { id: gradeId } });
+    if (!grade) {
+        return res.status(404).json({ success: false, message: 'Grade not found' });
+    }
+    await prisma.grade.delete({ where: { id: gradeId } });
+    res.json({ success: true, message: 'Grade deleted' });
 });
 
 //GET GRADES FROM X USER FUNCTION
@@ -328,7 +358,13 @@ async function getUserGrades(req: express.Request, res: express.Response, next: 
         const allGrades = await prisma.grade.findMany();
         const userGrades = allGrades.filter(grade => grade.userId === userId);
 
-        return userGrades;
+        //format each grade with formatGradeResponse for easier frontend handling
+        const formattedGrades = [];
+        for (const grade of userGrades) {
+            formattedGrades.push(await formatGradeResponse(grade));
+        }
+
+        return formattedGrades;
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch user grades' });
     }
@@ -368,7 +404,8 @@ app.get('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
         /// AUTH ///
         if (req.session.userId !== Number(studentId)) { if (await requireAuth(req, res, next, 5) !== true) { return; } }
         
-        res.json(grade);
+        const formattedGrade = await formatGradeResponse(grade);
+        res.json(formattedGrade);
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch grade' });
     }
