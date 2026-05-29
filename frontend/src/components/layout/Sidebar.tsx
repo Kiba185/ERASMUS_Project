@@ -25,6 +25,7 @@ const SIDEBAR_LINKS: SidebarLink[] = [
   { label: 'Semester', path: '/semester', roles: ['parent', 'admin', 'student', 'teacher'] },
   { label: 'Absence notes', path: '/absence-notes', roles: ['parent', 'admin', 'teacher', 'student' ] },
   { label: 'User info', path: '/user', roles: ['parent', 'admin', 'student', 'teacher'] },
+  { label: 'Absence', path: '/absence', roles: ['admin', 'student',] },
 ];
 
 const Sidebar: React.FC = () => {
