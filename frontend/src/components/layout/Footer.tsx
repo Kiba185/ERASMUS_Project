@@ -13,8 +13,13 @@ const Footer: React.FC = () => {
                 <div className="text-gray-600 text-sm">
                     <p>© 2026 Engineers. All rights reserved (maybe not).</p>
                 </div>
-                <div>
-                    
+                <div>               
+                    <a href="https://ctrlv.cz/NMza">
+                        <i className="fa-brands fa-instagram text-2xl"></i>
+                    </a>
+                    <a href="https://ctrlv.cz/NMza">
+                        <i className="fa-brands fa-facebook text-[22px] -translate-y-0.5"></i>
+                    </a>
                 </div>
             </footer>
     );
