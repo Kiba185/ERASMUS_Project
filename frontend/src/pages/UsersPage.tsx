@@ -101,7 +101,7 @@ const UsersPage: React.FC = () => {
 
   const openAddModal = () => {
     setEditingUser({
-      id: Date.now(), // Mock ID
+      id: Date.now(),
       firstName: '',
       lastName: '',
       username: '',
@@ -139,10 +139,10 @@ const UsersPage: React.FC = () => {
   const getClassBadge = (user: MockUser) => {
     if (user.role === 'student' || user.role === 'teacher') {
       const c = classes.find(c => c.id === user.classId);
-      if (c) return <span className="px-2 py-1 text-xs font-semibold bg-blue-100 text-blue-800 rounded-full">{c.name}</span>;
+      if (c) return <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-fern rounded-full border border-palette-sage">{c.name}</span>;
     }
     if (user.role === 'parent' && user.childrenIds?.length) {
-      return <span className="px-2 py-1 text-xs font-semibold bg-purple-100 text-purple-800 rounded-full">{user.childrenIds.length} children</span>;
+      return <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-moss rounded-full border border-palette-sage">{user.childrenIds.length} children</span>;
     }
     return <span className="text-gray-400">-</span>;
   };
@@ -150,25 +150,26 @@ const UsersPage: React.FC = () => {
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-        <h1 className="text-3xl font-bold text-gray-800">User Management</h1>
-        <button onClick={openAddModal} className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-sm hover:bg-green-700 transition">
-          + Add New User
+        <h1 className="text-3xl font-bold text-palette-pine">User Management</h1>
+        <button onClick={openAddModal} className="px-5 py-2.5 bg-palette-fern text-white font-semibold rounded-xl shadow-soft hover:bg-palette-leaf hover:-translate-y-0.5 transition-all flex items-center gap-2">
+          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" /></svg>
+          Add New User
         </button>
       </div>
 
       {/* Filters */}
-      <div className="bg-white p-4 rounded-xl shadow-sm border border-gray-200 flex flex-wrap gap-4 items-center">
+      <div className="bg-white p-5 rounded-2xl shadow-soft border border-palette-mist flex flex-wrap gap-4 items-center">
         <div className="flex-1 min-w-[200px]">
           <input 
             type="text" 
             placeholder="Search by name, email..." 
             value={search}
             onChange={e => setSearch(e.target.value)}
-            className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none"
+            className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow focus:border-palette-meadow outline-none transition"
           />
         </div>
         <div>
-          <select value={roleFilter} onChange={e => setRoleFilter(e.target.value as any)} className="p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none">
+          <select value={roleFilter} onChange={e => setRoleFilter(e.target.value as any)} className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition text-palette-pine font-medium">
             <option value="all">All Roles</option>
             <option value="student">Student</option>
             <option value="teacher">Teacher</option>
@@ -177,7 +178,7 @@ const UsersPage: React.FC = () => {
           </select>
         </div>
         <div>
-          <select value={classFilter} onChange={e => setClassFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))} className="p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none">
+          <select value={classFilter} onChange={e => setClassFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))} className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition text-palette-pine font-medium">
             <option value="all">All Classes</option>
             {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
           </select>
@@ -185,35 +186,35 @@ const UsersPage: React.FC = () => {
       </div>
 
       {/* Table */}
-      <div className="bg-white rounded-xl shadow-sm border border-gray-200 overflow-hidden overflow-x-auto">
-        <table className="min-w-full divide-y divide-gray-200 text-sm">
-          <thead className="bg-gray-50">
+      <div className="bg-white rounded-2xl shadow-soft border border-palette-mist overflow-hidden overflow-x-auto">
+        <table className="min-w-full divide-y divide-gray-100 text-sm">
+          <thead className="bg-palette-mist">
             <tr>
-              <th className="px-6 py-3 text-left font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 transition" onClick={() => handleSort('lastName')}>
+              <th className="px-6 py-4 text-left font-bold text-palette-pine cursor-pointer hover:bg-palette-sage hover:text-white transition" onClick={() => handleSort('lastName')}>
                 Name {sortField === 'lastName' && (sortOrder === 'asc' ? '↑' : '↓')}
               </th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-600 cursor-pointer hover:bg-gray-100 transition" onClick={() => handleSort('role')}>
+              <th className="px-6 py-4 text-left font-bold text-palette-pine cursor-pointer hover:bg-palette-sage hover:text-white transition" onClick={() => handleSort('role')}>
                 Role {sortField === 'role' && (sortOrder === 'asc' ? '↑' : '↓')}
               </th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-600">Class / Assigned</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-600">Email</th>
-              <th className="px-6 py-3 text-left font-semibold text-gray-600">Phone</th>
-              <th className="px-6 py-3 text-right font-semibold text-gray-600">Actions</th>
+              <th className="px-6 py-4 text-left font-bold text-palette-pine">Class / Assigned</th>
+              <th className="px-6 py-4 text-left font-bold text-palette-pine">Email</th>
+              <th className="px-6 py-4 text-left font-bold text-palette-pine">Phone</th>
+              <th className="px-6 py-4 text-right font-bold text-palette-pine">Actions</th>
             </tr>
           </thead>
-          <tbody className="divide-y divide-gray-200">
+          <tbody className="divide-y divide-gray-100">
             {filteredAndSortedUsers.map(user => (
-              <tr key={user.id} className="hover:bg-gray-50 transition">
+              <tr key={user.id} className="hover:bg-palette-mist/50 transition">
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <div className="font-medium text-gray-900">{user.lastName} {user.firstName}</div>
-                  <div className="text-gray-500 text-xs">@{user.username}</div>
+                  <div className="font-bold text-palette-pine">{user.lastName} {user.firstName}</div>
+                  <div className="text-palette-moss text-xs mt-0.5">@{user.username}</div>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
-                  <span className={`px-2 py-1 text-xs font-semibold rounded-full capitalize 
-                    ${user.role === 'admin' ? 'bg-red-100 text-red-800' : ''}
-                    ${user.role === 'teacher' ? 'bg-green-100 text-green-800' : ''}
-                    ${user.role === 'parent' ? 'bg-purple-100 text-purple-800' : ''}
-                    ${user.role === 'student' ? 'bg-blue-100 text-blue-800' : ''}
+                  <span className={`px-3 py-1 text-xs font-bold rounded-full capitalize border
+                    ${user.role === 'admin' ? 'bg-red-50 text-red-700 border-red-200' : ''}
+                    ${user.role === 'teacher' ? 'bg-palette-mist text-palette-fern border-palette-sage' : ''}
+                    ${user.role === 'parent' ? 'bg-orange-50 text-orange-700 border-orange-200' : ''}
+                    ${user.role === 'student' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}
                   `}>
                     {user.role}
                   </span>
@@ -221,16 +222,16 @@ const UsersPage: React.FC = () => {
                 <td className="px-6 py-4 whitespace-nowrap">
                   {getClassBadge(user)}
                 </td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-600">{user.email}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-600">{user.phone}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">{user.email}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">{user.phone}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <button onClick={() => openEditModal(user)} className="text-green-600 hover:text-green-900 font-semibold">Edit</button>
+                  <button onClick={() => openEditModal(user)} className="text-palette-fern hover:text-palette-leaf font-bold">Edit</button>
                 </td>
               </tr>
             ))}
             {filteredAndSortedUsers.length === 0 && (
               <tr>
-                <td colSpan={6} className="px-6 py-8 text-center text-gray-500">No users found.</td>
+                <td colSpan={6} className="px-6 py-12 text-center text-palette-moss font-medium">No users found.</td>
               </tr>
             )}
           </tbody>
@@ -239,47 +240,47 @@ const UsersPage: React.FC = () => {
 
       {/* Modal */}
       {isModalOpen && editingUser && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
-          <div className="bg-white rounded-xl shadow-xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden">
-            <div className="p-6 border-b border-gray-200 flex justify-between items-center bg-gray-50">
-              <h2 className="text-xl font-bold text-gray-800">{editingUser.id < 1000000 ? 'Edit User' : 'Add New User'}</h2>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 text-2xl font-bold leading-none">&times;</button>
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-palette-mist">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-palette-mist/30">
+              <h2 className="text-2xl font-bold text-palette-pine">{editingUser.id < 1000000 ? 'Edit User' : 'Add New User'}</h2>
+              <button onClick={() => setIsModalOpen(false)} className="text-palette-moss hover:text-palette-pine text-3xl font-light leading-none">&times;</button>
             </div>
             
             <form onSubmit={handleSave} className="overflow-y-auto p-6 space-y-6">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">First Name</label>
-                  <input type="text" required value={editingUser.firstName} onChange={e => setEditingUser({...editingUser, firstName: e.target.value})} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none" />
+                  <label className="block text-sm font-bold text-palette-pine mb-1.5">First Name</label>
+                  <input type="text" required value={editingUser.firstName} onChange={e => setEditingUser({...editingUser, firstName: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Last Name</label>
-                  <input type="text" required value={editingUser.lastName} onChange={e => setEditingUser({...editingUser, lastName: e.target.value})} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none" />
+                  <label className="block text-sm font-bold text-palette-pine mb-1.5">Last Name</label>
+                  <input type="text" required value={editingUser.lastName} onChange={e => setEditingUser({...editingUser, lastName: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Username</label>
-                  <input type="text" required value={editingUser.username} onChange={e => setEditingUser({...editingUser, username: e.target.value})} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none" />
+                  <label className="block text-sm font-bold text-palette-pine mb-1.5">Username</label>
+                  <input type="text" required value={editingUser.username} onChange={e => setEditingUser({...editingUser, username: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Email</label>
-                  <input type="email" required value={editingUser.email} onChange={e => setEditingUser({...editingUser, email: e.target.value})} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none" />
+                  <label className="block text-sm font-bold text-palette-pine mb-1.5">Email</label>
+                  <input type="email" required value={editingUser.email} onChange={e => setEditingUser({...editingUser, email: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Phone</label>
-                  <input type="text" value={editingUser.phone} onChange={e => setEditingUser({...editingUser, phone: e.target.value})} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none" />
+                  <label className="block text-sm font-bold text-palette-pine mb-1.5">Phone</label>
+                  <input type="text" value={editingUser.phone} onChange={e => setEditingUser({...editingUser, phone: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div>
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Date of Birth</label>
-                  <input type="date" value={editingUser.birthday} onChange={e => setEditingUser({...editingUser, birthday: e.target.value})} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none" />
+                  <label className="block text-sm font-bold text-palette-pine mb-1.5">Date of Birth</label>
+                  <input type="date" value={editingUser.birthday} onChange={e => setEditingUser({...editingUser, birthday: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Address</label>
-                  <input type="text" value={editingUser.adress} onChange={e => setEditingUser({...editingUser, adress: e.target.value})} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none" />
+                  <label className="block text-sm font-bold text-palette-pine mb-1.5">Address</label>
+                  <input type="text" value={editingUser.adress} onChange={e => setEditingUser({...editingUser, adress: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 
-                <div className="md:col-span-2 pt-4 border-t border-gray-200">
-                  <label className="block text-sm font-semibold text-gray-700 mb-1">Role</label>
-                  <select value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as Role, classId: null, childrenIds: []})} className="w-full p-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-green-500 outline-none">
+                <div className="md:col-span-2 pt-4 border-t border-gray-100">
+                  <label className="block text-sm font-bold text-palette-pine mb-1.5">Role</label>
+                  <select value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as Role, classId: null, childrenIds: []})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition font-medium">
                     <option value="student">Student</option>
                     <option value="teacher">Teacher</option>
                     <option value="parent">Parent</option>
@@ -289,11 +290,11 @@ const UsersPage: React.FC = () => {
 
                 {/* Role Specific Fields */}
                 {(editingUser.role === 'student' || editingUser.role === 'teacher') && (
-                  <div className="md:col-span-2 bg-blue-50 p-4 rounded-lg border border-blue-100">
-                    <label className="block text-sm font-semibold text-blue-900 mb-1">
+                  <div className="md:col-span-2 bg-palette-mist/50 p-5 rounded-xl border border-palette-sage/30">
+                    <label className="block text-sm font-bold text-palette-pine mb-1.5">
                       {editingUser.role === 'student' ? 'Assign to Class' : 'Head Teacher of Class (Optional)'}
                     </label>
-                    <select value={editingUser.classId || ''} onChange={e => setEditingUser({...editingUser, classId: e.target.value ? Number(e.target.value) : null})} className="w-full p-2 border border-blue-300 rounded-md focus:ring-2 focus:ring-blue-500 outline-none bg-white">
+                    <select value={editingUser.classId || ''} onChange={e => setEditingUser({...editingUser, classId: e.target.value ? Number(e.target.value) : null})} className="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-palette-meadow outline-none transition">
                       <option value="">-- No class assigned --</option>
                       {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                     </select>
@@ -301,16 +302,16 @@ const UsersPage: React.FC = () => {
                 )}
 
                 {editingUser.role === 'parent' && (
-                  <div className="md:col-span-2 bg-purple-50 p-4 rounded-lg border border-purple-100">
-                    <label className="block text-sm font-semibold text-purple-900 mb-2">Assign Children (Students)</label>
-                    <div className="max-h-48 overflow-y-auto bg-white border border-purple-200 rounded-md p-2 space-y-1 shadow-inner">
+                  <div className="md:col-span-2 bg-palette-mist/50 p-5 rounded-xl border border-palette-sage/30">
+                    <label className="block text-sm font-bold text-palette-pine mb-2">Assign Children (Students)</label>
+                    <div className="max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 space-y-1 shadow-inner">
                       {students.length === 0 ? (
-                        <p className="text-sm text-gray-500 p-2">No students available.</p>
+                        <p className="text-sm text-palette-moss p-2 font-medium">No students available.</p>
                       ) : (
                         students.map(student => {
                           const isSelected = editingUser.childrenIds?.includes(student.id);
                           return (
-                            <label key={student.id} className="flex items-center space-x-3 p-2 hover:bg-purple-50 rounded cursor-pointer border border-transparent hover:border-purple-200 transition">
+                            <label key={student.id} className={`flex items-center space-x-3 p-2.5 rounded-md cursor-pointer border transition ${isSelected ? 'bg-palette-mist border-palette-sage' : 'border-transparent hover:bg-gray-50'}`}>
                               <input 
                                 type="checkbox" 
                                 checked={!!isSelected}
@@ -322,9 +323,9 @@ const UsersPage: React.FC = () => {
                                     setEditingUser({...editingUser, childrenIds: currentIds.filter(id => id !== student.id)});
                                   }
                                 }}
-                                className="w-4 h-4 text-purple-600 border-gray-300 rounded focus:ring-purple-500 cursor-pointer" 
+                                className="w-4 h-4 text-palette-fern border-gray-300 rounded focus:ring-palette-meadow cursor-pointer" 
                               />
-                              <span className="text-sm font-medium text-gray-800">{student.lastName} {student.firstName} <span className="text-gray-400">(@{student.username})</span></span>
+                              <span className="text-sm font-bold text-palette-pine">{student.lastName} {student.firstName} <span className="text-palette-moss font-medium">(@{student.username})</span></span>
                             </label>
                           );
                         })
@@ -334,11 +335,11 @@ const UsersPage: React.FC = () => {
                 )}
               </div>
               
-              <div className="pt-6 border-t border-gray-200 flex justify-end space-x-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-4 py-2 bg-white border border-gray-300 text-gray-700 font-semibold rounded-lg shadow-sm hover:bg-gray-50 transition">
+              <div className="pt-6 mt-4 border-t border-gray-100 flex justify-end space-x-3">
+                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition">
                   Cancel
                 </button>
-                <button type="submit" className="px-4 py-2 bg-green-600 text-white font-semibold rounded-lg shadow-sm hover:bg-green-700 transition">
+                <button type="submit" className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl shadow-soft hover:bg-palette-leaf hover:-translate-y-0.5 transition-all">
                   Save User
                 </button>
               </div>
