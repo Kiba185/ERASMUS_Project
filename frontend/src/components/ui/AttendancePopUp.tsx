@@ -3,10 +3,14 @@ import { createPortal } from 'react-dom';
 import { Filter, type FilterOption } from './Filter';
 
 const ABSENCE_STATUSES = ['Late', 'Unexcused absence', 'Excused absence'] as const;
-const ABSENCE_REASONS = ['Doctor', 'Sick Leave', 'Family reasons', 'Other'] as const;
+const ABSENCE_REASONS_BY_STATUS = {
+  Late: ['Overslept', 'Traffic', 'Public transport delay', 'Doctor appointment', 'Other'],
+  'Unexcused absence': [],
+  'Excused absence': ['Doctor', 'Sick Leave', 'Family reasons', 'School event', 'Other'],
+} as const;
 
 type AbsenceStatus = (typeof ABSENCE_STATUSES)[number];
-type AbsenceReason = (typeof ABSENCE_REASONS)[number];
+type AbsenceReason = (typeof ABSENCE_REASONS_BY_STATUS)[AbsenceStatus][number];
 
 interface AttendancePopUpProps {
   isOpen: boolean;
@@ -21,12 +25,32 @@ interface AttendancePopUpProps {
 const isAbsenceStatus = (value: string): value is AbsenceStatus =>
   ABSENCE_STATUSES.includes(value as AbsenceStatus);
 
-const isAbsenceReason = (value: string): value is AbsenceReason =>
-  ABSENCE_REASONS.includes(value as AbsenceReason);
+const getReasonOptionsForStatus = (status: string): FilterOption[] => {
+  if (!isAbsenceStatus(status)) {
+    return [];
+  }
 
-const parseInitialAbsence = (value: string) => {
+  const reasons = ABSENCE_REASONS_BY_STATUS[status];
+
+  if (reasons.length === 0) {
+    return [];
+  }
+
+  return [
+    { value: '', label: 'No reason' },
+    ...reasons.map((reason) => ({
+      value: reason,
+      label: reason,
+    })),
+  ];
+};
+
+const isAbsenceReasonForStatus = (status: AbsenceStatus, value: string): value is AbsenceReason =>
+  ABSENCE_REASONS_BY_STATUS[status].includes(value as never);
+
+const parseInitialAbsence = (value: string): { status: AbsenceStatus | ''; reason: string } => {
   const [possibleStatus, ...reasonParts] = value.split(': ');
-  const status = isAbsenceStatus(possibleStatus) ? possibleStatus : '';
+  const status: AbsenceStatus | '' = isAbsenceStatus(possibleStatus) ? possibleStatus : '';
   const reason = status ? reasonParts.join(': ') : value;
 
   return { status, reason };
@@ -35,11 +59,6 @@ const parseInitialAbsence = (value: string) => {
 const STATUS_OPTIONS: FilterOption[] = [
   { value: '', label: 'Select status' },
   ...ABSENCE_STATUSES.map((status) => ({ value: status, label: status })),
-];
-
-const REASON_OPTIONS: FilterOption[] = [
-  { value: '', label: 'Select reason' },
-  ...ABSENCE_REASONS.map((reason) => ({ value: reason, label: reason })),
 ];
 
 const AttendancePopUp = ({
@@ -61,12 +80,16 @@ const AttendancePopUp = ({
     }
 
     const parsedAbsence = parseInitialAbsence(initialReason);
+    const canUseReason = parsedAbsence.status
+      ? ABSENCE_REASONS_BY_STATUS[parsedAbsence.status].length > 0
+      : false;
+
     setSelectedStatus(parsedAbsence.status);
 
-    if (isAbsenceReason(parsedAbsence.reason)) {
+    if (parsedAbsence.status && isAbsenceReasonForStatus(parsedAbsence.status, parsedAbsence.reason)) {
       setSelectedReason(parsedAbsence.reason);
       setCustomReason('');
-    } else if (parsedAbsence.reason) {
+    } else if (canUseReason && parsedAbsence.reason) {
       setSelectedReason('Other');
       setCustomReason(parsedAbsence.reason);
     } else {
@@ -75,8 +98,16 @@ const AttendancePopUp = ({
     }
   }, [initialReason, isOpen]);
 
-  const finalReason = selectedReason === 'Other' ? customReason.trim() : selectedReason;
-  const finalValue = selectedStatus && finalReason ? `${selectedStatus}: ${finalReason}` : '';
+  const reasonOptions = getReasonOptionsForStatus(selectedStatus);
+  const shouldShowReasonFilter = reasonOptions.length > 0;
+  const finalReason = shouldShowReasonFilter
+    ? selectedReason === 'Other'
+      ? customReason.trim()
+      : selectedReason
+    : '';
+  const isCustomReasonRequired = selectedStatus === 'Excused absence' && selectedReason === 'Other';
+  const canSubmit = Boolean(selectedStatus) && (!isCustomReasonRequired || Boolean(customReason.trim()));
+  const finalValue = selectedStatus ? (finalReason ? `${selectedStatus}: ${finalReason}` : selectedStatus) : '';
 
   const detailInputClassName = useMemo(
     () =>
@@ -89,7 +120,7 @@ const AttendancePopUp = ({
   const handleSubmit = (event: React.FormEvent<HTMLFormElement>) => {
     event.preventDefault();
 
-    if (finalValue) {
+    if (canSubmit && finalValue) {
       onConfirm(finalValue);
     }
   };
@@ -115,22 +146,28 @@ const AttendancePopUp = ({
           <Filter
             label="Status"
             value={selectedStatus}
-            onChange={setSelectedStatus}
+            onChange={(value) => {
+              setSelectedStatus(value);
+              setSelectedReason('');
+              setCustomReason('');
+            }}
             options={STATUS_OPTIONS}
             selectClassName={popupFilterSelectClassName}
           />
-          <Filter
-            label="Reason"
-            value={selectedReason}
-            onChange={(value) => {
-              setSelectedReason(value);
-              if (value !== 'Other') {
-                setCustomReason('');
-              }
-            }}
-            options={REASON_OPTIONS}
-            selectClassName={popupFilterSelectClassName}
-          />
+          {shouldShowReasonFilter && (
+            <Filter
+              label="Reason"
+              value={selectedReason}
+              onChange={(value) => {
+                setSelectedReason(value);
+                if (value !== 'Other') {
+                  setCustomReason('');
+                }
+              }}
+              options={reasonOptions}
+              selectClassName={popupFilterSelectClassName}
+            />
+          )}
 
           {selectedReason === 'Other' && (
             <label className="flex flex-col gap-2 text-sm font-medium text-palette-pine">
@@ -139,7 +176,8 @@ const AttendancePopUp = ({
                 id="other-reason"
                 value={customReason}
                 onChange={(event) => setCustomReason(event.target.value)}
-                placeholder="Describe the reason..."
+                placeholder={isCustomReasonRequired ? 'Describe the reason...' : 'Optional details...'}
+                required={isCustomReasonRequired}
                 className={detailInputClassName}
               />
             </label>
@@ -156,7 +194,7 @@ const AttendancePopUp = ({
           </button>
           <button
             type="submit"
-            disabled={!finalValue}
+            disabled={!canSubmit}
             className="rounded-md bg-red-100 px-4 py-2 text-sm font-semibold text-red-700 hover:bg-red-200 disabled:cursor-not-allowed disabled:opacity-50"
           >
             Mark Absent

@@ -69,7 +69,7 @@ const UserPage: React.FC = () => {
                 firstName: user.firstName || '',
                 lastName: user.lastName || '',
                 email: user.email || '',
-                birthday: user.birthday || '',
+                birthday: user.birthday ? user.birthday.split('T')[0] : '',
                 phone: user.phone || '',
                 adress: user.adress || '',
             });
@@ -98,7 +98,12 @@ const UserPage: React.FC = () => {
     const handleProfileSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         // In a real application, there would be an API call here to save the data
-        console.log('Saving profile:', formData);
+        // Convert the date back to ISO 8601 format for the backend
+        const payloadToSave = {
+            ...formData,
+            birthday: formData.birthday ? new Date(formData.birthday).toISOString() : null
+        };
+        console.log('Saving profile:', payloadToSave);
         setMessage({ type: 'success', text: 'Profile updated successfully!' });
         setIsEditing(false);
     };
@@ -114,6 +119,13 @@ const UserPage: React.FC = () => {
         console.log('Changing password for user:', user.id);
         setMessage({ type: 'success', text: 'Password changed successfully!' });
         setPasswordData({ currentPassword: '', newPassword: '', confirmPassword: '' });
+    };
+
+    const formatDisplayDate = (dateStr: string) => {
+        if (!dateStr) return '';
+        const parts = dateStr.split('-');
+        if (parts.length !== 3) return dateStr;
+        return `${parts[2]}.${parts[1]}.${parts[0]}`; // DD.MM.YYYY format
     };
 
     return (
@@ -169,11 +181,12 @@ const UserPage: React.FC = () => {
                             />
                             <UserInfoRow 
                                 label="Date of Birth" 
-                                value={formData.birthday} 
+                                value={formatDisplayDate(formData.birthday)} 
                                 name="birthday" 
                                 isEditing={isEditing} 
                                 inputValue={formData.birthday}
                                 onChange={handleFormChange}
+                                type="date"
                             />
                             <UserInfoRow 
                                 label="Phone Number" 

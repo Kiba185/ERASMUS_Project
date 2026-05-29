@@ -45,14 +45,14 @@ const CLASS_SCHEDULES: Record<ClassName, Subject[]> = {
 };
 
 const STUDENTS: StudentProfile[] = [
-  { id: 'john-west', name: 'John West', className: '4.B' },
-  { id: 'dominik-novak', name: 'Dominik Novak', className: '4.B' },
-  { id: 'richard-urban', name: 'Richard Urban', className: '4.B' },
-  { id: 'filip-marek', name: 'Filip Marek', className: '4.B' },
-  { id: 'anna-kralova', name: 'Anna Kralova', className: '4.B' },
-  { id: 'petr-svoboda', name: 'Petr Svoboda', className: '4.B' },
-  { id: 'eva-horakova', name: 'Eva Horakova', className: '4.B' },
-  { id: 'mark-johnson', name: 'Mark Johnson', className: '4.C' },
+  { id: 'kanye-west', name: 'Kanye West', className: '4.B' },
+  { id: 'walter-white', name: 'Walter White', className: '4.B' },
+  { id: 'michal-džeksn', name: 'Michal Džeksn', className: '4.B' },
+  { id: 'tomas-gregorik', name: 'Tomas Gregorik', className: '4.B' },
+  { id: 'saul-Goodman', name: 'Saul Goodman', className: '4.B' },
+  { id: 'hank-schrader', name: 'Hank Schrader', className: '4.B' },
+  { id: 'lil-tito', name: 'LiL Tito', className: '4.B' },
+  { id: 'prophet-brohammed', name: 'ProphetBrohammed', className: '4.C' },
   { id: 'jane-doe', name: 'Jane Doe', className: '4.C' },
   { id: 'linda-brown', name: 'Linda Brown', className: '4.C' },
   { id: 'tomas-benes', name: 'Tomas Benes', className: '4.C' },
@@ -118,6 +118,7 @@ const getStatusMeta = (status: AttendanceStatus, absenceReason?: string) => {
       label: STATUS_LABELS.present,
       className: 'bg-palette-sage/25 text-palette-leaf',
       showWarningIcon: false,
+      warningIconClassName: '',
     };
   }
 
@@ -128,13 +129,17 @@ const getStatusMeta = (status: AttendanceStatus, absenceReason?: string) => {
       label: STATUS_LABELS.absent,
       className: 'bg-red-100 text-red-700',
       showWarningIcon: false,
+      warningIconClassName: '',
     };
   }
+
+  const showWarningIcon = absenceStatus === 'Unexcused absence' || absenceStatus === 'Late';
 
   return {
     label: ABSENCE_STATUS_LABELS[absenceStatus],
     className: ABSENCE_STATUS_CLASS_NAMES[absenceStatus],
-    showWarningIcon: absenceStatus === 'Unexcused absence',
+    showWarningIcon,
+    warningIconClassName: absenceStatus === 'Late' ? 'bg-orange-600' : 'bg-red-600',
   };
 };
 
@@ -147,10 +152,10 @@ const getStatusButtonClassName = (
     ? getStatusMeta(buttonStatus, absenceReason).className
     : 'bg-palette-mist text-palette-moss hover:bg-palette-sage/15';
 
-const WarningIcon = () => (
+const WarningIcon = ({ className = 'bg-red-600' }: { className?: string }) => (
   <span
     aria-hidden="true"
-    className="flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] font-bold leading-none text-white"
+    className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold leading-none text-white ${className}`}
   >
     !
   </span>
@@ -342,7 +347,7 @@ const AttendancePage = () => {
                     const absentTitle =
                       status === 'absent'
                         ? absenceReason
-                          ? `Reason: ${absenceReason}`
+                          ? absenceReason
                           : 'No reason selected'
                         : undefined;
 
@@ -367,7 +372,9 @@ const AttendancePage = () => {
                                   title={option === 'absent' ? absentTitle : undefined}
                                   aria-label={`Mark ${student.name} as ${STATUS_LABELS[option]} for ${subject}`}
                                 >
-                                  {isSelectedOption && optionMeta.showWarningIcon && <WarningIcon />}
+                                  {isSelectedOption && optionMeta.showWarningIcon && (
+                                    <WarningIcon className={optionMeta.warningIconClassName} />
+                                  )}
                                   <span>{isSelectedOption ? optionMeta.label : STATUS_LABELS[option]}</span>
                                 </button>
                               );
@@ -378,7 +385,9 @@ const AttendancePage = () => {
                             title={absentTitle}
                             className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${statusMeta.className}`}
                           >
-                            {statusMeta.showWarningIcon && <WarningIcon />}
+                            {statusMeta.showWarningIcon && (
+                              <WarningIcon className={statusMeta.warningIconClassName} />
+                            )}
                             <span>{statusMeta.label}</span>
                           </span>
                         )}
