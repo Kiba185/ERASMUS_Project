@@ -34,7 +34,7 @@ const Login: React.FC = () => {
         login(formattedUsername, data.user);
         navigate('/dashboard');
       } else {
-        setError('Nesprávné přihlašovací údaje. Zkuste zadat roli jako jméno i heslo (např. teacher).');
+        setError('Nesprávné přihlašovací údaje.');
       }
     } catch (err) {
       setError('Chyba připojení k serveru.');

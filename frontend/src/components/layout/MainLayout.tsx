@@ -2,17 +2,21 @@ import React from 'react';
 import { Outlet } from 'react-router-dom';
 import Header from './Header';
 import Sidebar from './Sidebar';
+import Footer from './Footer';
 
 const MainLayout: React.FC = () => {
   return (
-    <div className="flex h-screen bg-palette-sage/15 font-sans">
-      <Sidebar />
-      <div className="flex-1 flex flex-col overflow-hidden">
-        <Header />
-        <main className="flex-1 overflow-x-hidden overflow-y-auto p-6 lg:p-8">
-          <Outlet />
-        </main>
+    <div className="flex min-h-screen flex-col overflow-x-hidden bg-palette-sage/15 font-sans [scrollbar-gutter:stable]">
+      <div className="flex min-h-[calc(100vh-4rem)] flex-1">
+        <Sidebar />
+        <div className="flex min-w-0 flex-1 flex-col">
+          <Header />
+          <main className="flex-1 overflow-x-hidden p-6 lg:p-8">
+            <Outlet />
+          </main>
+        </div>
       </div>
+      <Footer />
     </div>
   );
 };

@@ -5,6 +5,7 @@ import GradesWidget from '../components/widgets/GradesWidget';
 import ClassesWidget from '../components/widgets/ClassesWidget';
 import StatisticsWidget from '../components/widgets/StatisticsWidget';
 import EventsWidget from '../components/widgets/EventsWidget';
+import AttendanceWidget from '../components/widgets/AttendanceWidget';
 
 
 const Dashboard: React.FC = () => {
@@ -29,7 +30,13 @@ const Dashboard: React.FC = () => {
 
         {user.role === 'teacher' && (
           <ClassesWidget />
+          
         )}
+        {user.role === 'student' && (
+          <AttendanceWidget />
+          
+        )}
+
 
         {user.role === 'admin' && (
           <StatisticsWidget />

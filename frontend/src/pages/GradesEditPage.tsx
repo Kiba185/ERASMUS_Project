@@ -141,9 +141,14 @@ const GradesEditPage: React.FC = () => {
   const [selectedClass, setSelectedClass] = useState<string>('');
   const [selectedSubject, setSelectedSubject] = useState<string>('');
 
-  // 3. NEW COLUMN STATES
+  // 3. NEW COLUMN STATES (Supports empty string to allow deletion)
   const [newColTitle, setNewColTitle] = useState('');
-  const [newColWeight, setNewColWeight] = useState<number>(10);
+  const [newColWeight, setNewColWeight] = useState<number | ''>(10);
+
+  // 4. EDIT COLUMN MODAL STATES
+  const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
+  const [editTitle, setEditTitle] = useState('');
+  const [editWeight, setEditWeight] = useState<number | ''>(10);
 
   const [subjects, setSubjects] = useState<{ id: number; name: string }[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number>(0);
@@ -191,16 +196,61 @@ const GradesEditPage: React.FC = () => {
     }
   };
 
-  // --- GRADE CHANGE LOGIC ---
-  const handleGradeChange = (studentId: string, assignmentId: string, value: string) => {
-    setGrades(prev => {
-      const filtered = prev.filter(g => !(g.studentId === studentId && g.assignmentId === assignmentId));
-      if (value.trim() === '') return filtered;
-      return [...filtered, { studentId, assignmentId, value }];
-    });
+  // --- OPEN EDIT MODAL ---
+  const startEditingColumn = (assignment: Assignment) => {
+    setEditingAssignment(assignment);
+    setEditTitle(assignment.title);
+    setEditWeight(assignment.weight);
   };
 
-  // Clear single grade cell button click
+  // --- SAVE EDIT LOGIC ---
+  const handleSaveEditColumn = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingAssignment || !editTitle || editWeight === '') return;
+
+    setAssignments(prev =>
+      prev.map(a => a.id === editingAssignment.id ? { ...a, title: editTitle, weight: Number(editWeight) } : a)
+    );
+    setEditingAssignment(null);
+  };
+
+  // --- GRADE CHANGE LOGIC (WITH VALIDATIONS & TRANSFORMATIONS) ---
+  const handleGradeChange = (studentId: string, assignmentId: string, value: string) => {
+    let val = value.trim();
+
+    // Clear cell if empty
+    if (val === '') {
+      setGrades(prev => prev.filter(g => !(g.studentId === studentId && g.assignmentId === assignmentId)));
+      return;
+    }
+
+    // Allow typing intermediate dot while inputting valid decimal values
+    if (val === '1.' || val === '2.' || val === '3.' || val === '4.') {
+      setGrades(prev => {
+        const filtered = prev.filter(g => !(g.studentId === studentId && g.assignmentId === assignmentId));
+        return [...filtered, { studentId, assignmentId, value: val }];
+      });
+      return;
+    }
+
+    // Auto-transform allowed decimals to minus format notation
+    if (val === '1.5' || val === '1.50') val = '1-';
+    if (val === '2.5' || val === '2.50') val = '2-';
+    if (val === '3.5' || val === '3.50') val = '3-';
+    if (val === '4.5' || val === '4.50') val = '4-';
+
+    // Strictly validate final allowed grade strings (Whole numbers 1-5 & half-grades 1- to 4-)
+    const validGrades = ['1', '2', '3', '4', '5', '1-', '2-', '3-', '4-'];
+    if (validGrades.includes(val)) {
+      setGrades(prev => {
+        const filtered = prev.filter(g => !(g.studentId === studentId && g.assignmentId === assignmentId));
+        return [...filtered, { studentId, assignmentId, value: val }];
+      });
+    } else {
+      alert('Invalid grade format! Only whole numbers (1-5) and specific half-grades (.5 values transformed to minus notation, e.g., 1.5 -> 1-) are allowed.');
+    }
+  };
+
   const handleClearCell = (studentId: string, assignmentId: string) => {
     setGrades(grades.filter(g => !(g.studentId === studentId && g.assignmentId === assignmentId)));
   };
@@ -339,11 +389,11 @@ const GradesEditPage: React.FC = () => {
 
               {/* Dynamic Column Headers */}
               {currentAssignments.map((assignment) => (
-                <th key={assignment.id} className="p-2 border-r border-gray-200 text-center min-w-[140px] group/header relative">
-                  <div className="text-xs uppercase tracking-wider text-gray-500 truncate pr-8 pl-2" title={assignment.title}>
+                <th key={assignment.id} className="p-3 border-r border-gray-200 text-center min-w-[160px] max-w-[220px] group/header relative align-middle">
+                  <div className="text-xs uppercase tracking-tight text-gray-600 font-bold pr-14 pl-1 break-words whitespace-normal line-clamp-2" title={assignment.title}>
                     {assignment.title}
                   </div>
-                  <div className="text-[10px] bg-white border border-gray-300 rounded px-2 py-0.5 inline-block mt-1 text-gray-600 mr-6">
+                  <div className="text-[10px] bg-white border border-gray-300 rounded px-1.5 py-0.5 inline-block mt-1.5 text-gray-500 mr-12 font-medium">
                     W: {assignment.weight}
                   </div>
 
@@ -392,7 +442,7 @@ const GradesEditPage: React.FC = () => {
                             placeholder="-"
                           />
 
-                          {/* Larger grade clear button centered vertically and aligned close to the right edge */}
+                          {/* Large grade clear cross button aligned vertically center, close to right side */}
                           {val && (
                             <button
                               onClick={() => handleClearCell(student.id, assignment.id)}
@@ -420,6 +470,65 @@ const GradesEditPage: React.FC = () => {
           </tbody>
         </table>
       </div>
+
+      {/* 5. EDIT COLUMN POPUP/MODAL OVERLAY */}
+      {editingAssignment && (
+        <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xl max-w-md w-full mx-4 space-y-4">
+            <div className="flex justify-between items-center border-b pb-2">
+              <h3 className="text-lg font-bold text-gray-800">Edit Column Properties</h3>
+              <button 
+                onClick={() => setEditingAssignment(null)} 
+                className="text-gray-400 hover:text-gray-600 font-bold"
+              >
+                ✕
+              </button>
+            </div>
+            
+            <form onSubmit={handleSaveEditColumn} className="space-y-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Column Title (Max 75 chars)</label>
+                <input 
+                  type="text"
+                  value={editTitle}
+                  onChange={(e) => setEditTitle(e.target.value)}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                  maxLength={25}
+                  required
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-semibold text-gray-600 mb-1">Weight</label>
+                <input 
+                  type="number"
+                  min="1" max="10"
+                  value={editWeight}
+                  onChange={(e) => setEditWeight(e.target.value === '' ? '' : Number(e.target.value))}
+                  className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                  required
+                />
+              </div>
+
+              <div className="flex justify-end gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setEditingAssignment(null)}
+                  className="px-4 py-2 text-sm font-semibold text-gray-500 hover:bg-gray-100 rounded-lg transition"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-sm"
+                >
+                  Save Changes
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
 
     </div>
   );
