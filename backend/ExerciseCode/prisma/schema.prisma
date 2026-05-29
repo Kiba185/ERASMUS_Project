@@ -62,10 +62,10 @@ model GradeColumn {
 }
 
 model Grade {
-  id        Int @id @default(autoincrement())
-  gColumnId Int
-  userId    Int
-  grade     Int
+  id          Int       @id @default(autoincrement())
+  gColumnId   Int
+  userId      Int
+  grade       Decimal
 }
 
 model Class {

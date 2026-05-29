@@ -30,8 +30,8 @@ const privileges = {
 
 
 app.use(cors({
-  origin: 'http://localhost:5173', 
-  credentials: true               
+    origin: 'http://localhost:5173',
+    credentials: true
 }));
 app.use(express.json());
 app.use(session({
@@ -140,7 +140,7 @@ async function logout(req: express.Request, res: express.Response, next: express
         if (err) {
             return res.status(500).json({ error: 'Logout failed' });
         }
-        
+
         try {
             return res.json({ success: true, message: 'Logged out successfully' });
         } catch (err) {
@@ -195,8 +195,12 @@ app.get('/api/users', async (req, res, next) => {
 
 //GET ALL USERS OF ROLE - ADMIN ONLY
 app.get('/api/users/:role', async (req, res, next) => {
-    /// AUTH ///
-    if (await requireAuth(req, res, next, 10) !== true) { return; }
+    /// AUTH - if requesting all of STUDENT or all of PARENT then TEACHER and ADMIN can access ///
+    if (req.params.role === 'student' || req.params.role === 'parent') {
+        if (await requireAuth(req, res, next, 5) !== true) { return; }
+    } else {
+        if (await requireAuth(req, res, next, 10) !== true) { return; }
+    }
 
     const users = await prisma.user.findMany({ where: { role: req.params.role } });
     const usersToClassesRelations = await prisma.user.findMany({ where: { role: req.params.role }, include: { classes: true } });
@@ -216,7 +220,11 @@ app.get('/api/user/:username', async (req, res, next) => {
         const user = await prisma.user.findFirst({ where: { username } });
 
         /// AUTH ///
-        if (req.session.userId !== user?.id) { if (await requireAuth(req, res, next, 10) !== true) { return; } }
+        if (user?.role === 'student' || user?.role === 'parent') {
+            if (req.session.userId !== user?.id) { if (await requireAuth(req, res, next, 5) !== true) { return; } }
+        } else {
+            if (req.session.userId !== user?.id) { if (await requireAuth(req, res, next, 10) !== true) { return; } }
+        }
 
         res.json(user);
     } catch (error) {
@@ -244,10 +252,10 @@ app.get('/api/user', async (req, res, next) => {
 ///////////////////////////////////////
 //      --=== GRADE STUFF ===--
 
-//GET ALL GRADE COLUMNS - ADMIN ONLY
+//GET ALL GRADE COLUMNS - TEACHER ONLY
 app.get('/api/gradeColumns', async (req, res, next) => {
     /// AUTH ///
-    if (await requireAuth(req, res, next, 10) !== true) { return; }
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
 
     const gradeColumns = await prisma.gradeColumn.findMany();
     res.json(gradeColumns);
@@ -259,12 +267,12 @@ app.post('/api/gradeColumns', async (req, res, next) => {
 
     const { name, subjectId, weight, date } = req.body;
     const newGradeColumn = await prisma.gradeColumn.create({
-        data: { 
-            name, 
+        data: {
+            name,
             subjectId: Number(subjectId), // 👈 make sure it's an Int
             weight: Number(weight),
             date: new Date(date),
-            TeacherId: req.session.userId! 
+            TeacherId: req.session.userId!
         }
     });
     res.status(201).json(newGradeColumn);
@@ -276,7 +284,7 @@ app.delete('/api/gradeColumns/:id', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) { return; }
 
     const gradeColumnId = parseInt(req.params.id);
-    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });  
+    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });
     if (!gradeColumn) {
         return res.status(404).json({ success: false, message: 'Grade column not found' });
     }
@@ -297,7 +305,7 @@ app.put('/api/gradeColumns/:id', async (req, res, next) => {
     if (!gradeColumn) {
         return res.status(404).json({ success: false, message: 'Grade column not found' });
     }
-    if (gradeColumn.TeacherId !== req.session.userId) {
+    if (gradeColumn.TeacherId !== req.session.userId && await requireAuth(req, res, next, 10) !== true) {
         return res.status(403).json({ success: false, message: 'You can only update your own grade columns' });
     }
 
@@ -310,26 +318,62 @@ app.put('/api/gradeColumns/:id', async (req, res, next) => {
 });
 
 
+async function formatGradeResponse(grade: any) {
+    // Add a subjectId and String subjectName to the grade for easier frontend handling and also add a date, weight and column name for better frontend handling
 
-//GET ALL GRADES - ADMIN ONLY
+    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: grade.gColumnId } });
+    const subject = gradeColumn?.subjectId ? await prisma.subject.findUnique({ where: { id: gradeColumn.subjectId } }) : null;
+
+    return {
+        ...grade,
+        subjectId: subject?.id,
+        subjectName: subject?.name,
+        date: gradeColumn?.date,
+        weight: gradeColumn?.weight,
+        gColumnName: gradeColumn?.name
+    };
+}
+
+
+
+//GET ALL GRADES - TEACHER ONLY
 app.get('/api/grades', async (req, res, next) => {
     /// AUTH ///
-    if (await requireAuth(req, res, next, 10) !== true) { return; }
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
 
     const grades = await prisma.grade.findMany();
     res.json(grades);
+});
+
+//DELETE SPECIFIC GRADE BY ID - TEACHER ONLY
+app.delete('/api/grades/:id', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    const gradeId = parseInt(req.params.id);
+    const grade = await prisma.grade.findUnique({ where: { id: gradeId } });
+    if (!grade) {
+        return res.status(404).json({ success: false, message: 'Grade not found' });
+    }
+    await prisma.grade.delete({ where: { id: gradeId } });
+    res.json({ success: true, message: 'Grade deleted' });
 });
 
 //GET GRADES FROM X USER FUNCTION
 async function getUserGrades(req: express.Request, res: express.Response, next: express.NextFunction, userId?: number) {
     try {
         /// AUTH ///
-        if (req.session.userId !== userId) { if (await requireAuth(req, res, next, 10) !== true) { return; } }
+        if (req.session.userId !== userId) { if (await requireAuth(req, res, next, 5) !== true) { return; } }
 
         const allGrades = await prisma.grade.findMany();
         const userGrades = allGrades.filter(grade => grade.userId === userId);
 
-        return userGrades;
+        //format each grade with formatGradeResponse for easier frontend handling
+        const formattedGrades = [];
+        for (const grade of userGrades) {
+            formattedGrades.push(await formatGradeResponse(grade));
+        }
+
+        return formattedGrades;
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch user grades' });
     }
@@ -355,6 +399,93 @@ app.get('/api/mygrades', async (req, res, next) => {
 });
 
 
+//GET SPECIFIC GRADE VIA GRADECOLUMNID AND USERID - TEACHER FOR FOREIGN, ALL FOR THEMSELVES
+app.get('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
+    try {
+        const { studentId, gradeColumnId } = req.params;
+
+        // Check if grade exists
+        const grade = await prisma.grade.findFirst({ where: { userId: Number(studentId), gColumnId: Number(gradeColumnId) } });
+        if (!grade) {
+            return res.status(404).json({ success: false, message: 'Grade not found' });
+        }
+
+        /// AUTH ///
+        if (req.session.userId !== Number(studentId)) { if (await requireAuth(req, res, next, 5) !== true) { return; } }
+
+        const formattedGrade = await formatGradeResponse(grade);
+        res.json(formattedGrade);
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch grade' });
+    }
+});
+
+//CREATE GRADE - TEACHER ONLY
+app.post('/api/grades', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    const { value, userId, gradeColumnId } = req.body;
+
+    // Check if the grade column exists and belongs to the teacher
+    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: Number(gradeColumnId) } });
+    if (!gradeColumn) {
+        return res.status(404).json({ success: false, message: 'Grade column not found' });
+    }
+    if (gradeColumn.TeacherId !== req.session.userId && await requireAuth(req, res, next, 5) !== true) {
+        return res.status(403).json({ success: false, message: 'You can only add grades to your own grade columns' });
+    }
+
+    // Check if the user exists
+    const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Check if there is not already a grade for this user and grade column
+    const existingGrade = await prisma.grade.findFirst({
+        where: {
+            userId: Number(userId),
+            gColumnId: Number(gradeColumnId)
+        }
+    });
+    if (existingGrade) {
+        await prisma.grade.delete({ where: { id: existingGrade.id } });
+    }
+
+    const newGrade = await prisma.grade.create({
+        data: {
+            gColumnId: Number(gradeColumnId),
+            userId: Number(userId),
+            grade: Number(value)
+        }
+    });
+    res.status(201).json(newGrade);
+});
+
+//DELETE GRADE - TEACHER ONLY
+app.delete('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    //const gradeId = parseInt(req.params.id);
+    const { studentId, gradeColumnId } = req.params;
+    const grade = await prisma.grade.findFirst({ where: { userId: Number(studentId), gColumnId: Number(gradeColumnId) } });
+    const gradeId = grade?.id;
+
+    // Check if the grade exists
+    if (!grade) {
+        return res.status(404).json({ success: false, message: 'Grade not found' });
+    }
+
+    // Check if the grade column belongs to the teacher
+    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: grade.gColumnId } });
+    if (gradeColumn?.TeacherId !== req.session.userId && await requireAuth(req, res, next, 5) !== true) {
+        return res.status(403).json({ success: false, message: 'You can only delete grades from your own grade columns' });
+    }
+
+    await prisma.grade.delete({ where: { id: gradeId } });
+    res.json({ success: true, message: 'Grade deleted' });
+});
+
+
 
 
 
@@ -363,10 +494,10 @@ app.get('/api/mygrades', async (req, res, next) => {
 ///////////////////////////////////////
 //      --=== CLASSES STUFF ===--
 
-//GET ALL CLASSES - ADMIN ONLY
+//GET ALL CLASSES - TEACHER ONLY
 app.get('/api/classes', async (req, res, next) => {
     /// AUTH ///
-    if (await requireAuth(req, res, next, 10) !== true) { return; }
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
 
     const classes = await prisma.class.findMany();
     const classToUserRelagtions = await prisma.class.findMany({ include: { students: true } });
@@ -383,10 +514,10 @@ app.get('/api/classes', async (req, res, next) => {
 ///////////////////////////////////////
 //      --=== SUBJECTS STUFF ===--
 
-//GET ALL SUBJECTS - ADMIN ONLY
+//GET ALL SUBJECTS - TEACHER ONLY
 app.get('/api/subjects', async (req, res, next) => {
     /// AUTH ///
-    if (await requireAuth(req, res, next, 10) !== true) { return; }
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
 
     const subjects = await prisma.subject.findMany();
     res.json(subjects);
@@ -403,10 +534,10 @@ app.get('/api/subjects', async (req, res, next) => {
 ///////////////////////////////////////
 //      --=== LESSONS STUFF ===--
 
-//GET ALL LESSONS - ADMIN ONLY
+//GET ALL LESSONS - TEACHER ONLY
 app.get('/api/lessons', async (req, res, next) => {
     /// AUTH ///
-    if (await requireAuth(req, res, next, 10) !== true) { return; }
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
 
     const lessons = await prisma.lesson.findMany();
     res.json(lessons);
