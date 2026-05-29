@@ -71,3 +71,26 @@ model Class {
   students  User[]
   name      String
 }
+
+
+
+
+
+
+
+
+model TimeTable{
+  id        Int     @id @default(autoincrement())
+  subjectId Int
+
+  day       String
+  startTime String
+  endTime   String
+
+
+  teacherId Int
+  classId   Int
+}
+
+
+
