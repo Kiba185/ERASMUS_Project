@@ -13,6 +13,9 @@ const Footer: React.FC = () => {
                 <div className="text-gray-600 text-sm">
                     <p>© 2026 Engineers. All rights reserved (maybe not).</p>
                 </div>
+                <div>
+                    
+                </div>
             </footer>
     );
 };
