@@ -29,8 +29,8 @@ const privileges = {
 
 
 app.use(cors({
-  origin: 'http://localhost:5173', 
-  credentials: true               
+    origin: 'http://localhost:5173',
+    credentials: true
 }));
 app.use(express.json());
 app.use(session({
@@ -139,7 +139,7 @@ async function logout(req: express.Request, res: express.Response, next: express
         if (err) {
             return res.status(500).json({ error: 'Logout failed' });
         }
-        
+
         try {
             return res.json({ success: true, message: 'Logged out successfully' });
         } catch (err) {
@@ -258,12 +258,12 @@ app.post('/api/gradeColumns', async (req, res, next) => { // 👈 add next
 
     const { name, subjectId, weight, date } = req.body;
     const newGradeColumn = await prisma.gradeColumn.create({
-        data: { 
-            name, 
+        data: {
+            name,
             subjectId: Number(subjectId), // 👈 make sure it's an Int
             weight: Number(weight),
             date: new Date(date),
-            TeacherId: req.session.userId! 
+            TeacherId: req.session.userId!
         }
     });
     res.status(201).json(newGradeColumn);
@@ -275,7 +275,7 @@ app.delete('/api/gradeColumns/:id', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) { return; }
 
     const gradeColumnId = parseInt(req.params.id);
-    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });  
+    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });
     if (!gradeColumn) {
         return res.status(404).json({ success: false, message: 'Grade column not found' });
     }
@@ -296,7 +296,7 @@ app.put('/api/gradeColumns/:id', async (req, res, next) => {
     if (!gradeColumn) {
         return res.status(404).json({ success: false, message: 'Grade column not found' });
     }
-    if (gradeColumn.TeacherId !== req.session.userId) {
+    if (gradeColumn.TeacherId !== req.session.userId && await requireAuth(req, res, next, 10) !== true) {
         return res.status(403).json({ success: false, message: 'You can only update your own grade columns' });
     }
 
@@ -351,6 +351,92 @@ app.get('/api/mygrades', async (req, res, next) => {
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch user grades' });
     }
+});
+
+
+//GET SPECIFIC GRADE VIA GRADECOLUMNID AND USERID - TEACHER FOR FOREIGN, ALL FOR THEMSELVES
+app.get('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
+    try {
+        const { studentId, gradeColumnId } = req.params;
+
+        // Check if grade exists
+        const grade = await prisma.grade.findFirst({ where: { userId: Number(studentId), gColumnId: Number(gradeColumnId) } });
+        if (!grade) {
+            return res.status(404).json({ success: false, message: 'Grade not found' });
+        }
+
+        /// AUTH ///
+        if (req.session.userId !== Number(studentId)) { if (await requireAuth(req, res, next, 5) !== true) { return; } }
+        
+        res.json(grade);
+    } catch (error) {
+        res.status(500).json({ success: false, message: 'Failed to fetch grade' });
+    }
+});
+
+//CREATE GRADE - TEACHER ONLY
+app.post('/api/grades', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    const { value, userId, gradeColumnId } = req.body;
+
+    // Check if the grade column exists and belongs to the teacher
+    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: Number(gradeColumnId) } });
+    if (!gradeColumn) {
+        return res.status(404).json({ success: false, message: 'Grade column not found' });
+    }
+    if (gradeColumn.TeacherId !== req.session.userId && await requireAuth(req, res, next, 10) !== true) {
+        return res.status(403).json({ success: false, message: 'You can only add grades to your own grade columns' });
+    }
+
+    // Check if the user exists
+    const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Check if there is not already a grade for this user and grade column
+    const existingGrade = await prisma.grade.findFirst({
+        where: {
+            userId: Number(userId),
+            gColumnId: Number(gradeColumnId)
+        }
+    });
+    if (existingGrade) {
+        await prisma.grade.delete({ where: { id: existingGrade.id } });
+    }
+
+    const newGrade = await prisma.grade.create({
+        data: {
+            gColumnId: Number(gradeColumnId),
+            userId: Number(userId),
+            grade: Number(value)
+        }
+    });
+    res.status(201).json(newGrade);
+});
+
+//DELETE GRADE - TEACHER ONLY
+app.delete('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    //const gradeId = parseInt(req.params.id);
+    const { studentId, gradeColumnId } = req.params;
+    const grade = await prisma.grade.findFirst({ where: { userId: Number(studentId), gColumnId: Number(gradeColumnId) } });
+    const gradeId = grade?.id;
+
+    // Check if the grade exists
+    if (!grade) {
+        return res.status(404).json({ success: false, message: 'Grade not found' });
+    }
+
+    // Check if the grade column belongs to the teacher
+    const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: grade.gColumnId } });
+    if (gradeColumn?.TeacherId !== req.session.userId && await requireAuth(req, res, next, 10) !== true) {
+        return res.status(403).json({ success: false, message: 'You can only delete grades from your own grade columns' });
+    }
+
+    await prisma.grade.delete({ where: { id: gradeId } });
+    res.json({ success: true, message: 'Grade deleted' });
 });
 
 
