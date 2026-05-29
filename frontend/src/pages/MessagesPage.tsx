@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
-import { Filter, type FilterOption } from '../components/ui/Filter';
 
 /* pro backend tvurce toto je mockup*/
-const STUDENT_OPTIONS: FilterOption[] = [
-  { value: '', label: 'Select student' },
-  { value: 'john-west', label: 'John West' },
-  { value: 'dominik-novak', label: 'Dominik Novak' },
-  { value: 'richard-urban', label: 'Richard Urban' },
-  { value: 'filip-marek', label: 'Filip Marek' },
-  { value: 'anna-kralova', label: 'Anna Kralova' },
-  { value: 'petr-svoboda', label: 'Petr Svoboda' },
-  { value: 'eva-horakova', label: 'Eva Horakova' },
+const STUDENTS = [
+  'John West',
+  'Dominik Novak',
+  'Richard Urban',
+  'Filip Marek',
+  'Anna Kralova',
+  'Petr Svoboda',
+  'Eva Horakova',
 ];
 
 const MessagesPage: React.FC = () => {
@@ -32,9 +30,20 @@ const MessagesPage: React.FC = () => {
             aria-label="New message"
             title="New message"
             aria-expanded={isNewMessageOpen}
-            className="flex h-12 w-12 items-center justify-center rounded-full bg-green-700 text-3xl font-semibold leading-none text-white transition hover:bg-green-800"
+            className="flex h-12 w-12 items-center justify-center rounded-full bg-green-700 text-white transition hover:bg-green-800"
           >
-            +
+            <svg
+              aria-hidden="true"
+              className="h-6 w-6"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2.5"
+              strokeLinecap="round"
+            >
+              <path d="M12 5v14" />
+              <path d="M5 12h14" />
+            </svg>
           </button>
         </div>
       </div>
@@ -43,13 +52,30 @@ const MessagesPage: React.FC = () => {
         <div className="rounded-lg bg-white p-4 shadow-sm">
           <h2 className="mb-4 text-xl font-bold">New Message</h2>
           <div className="space-y-4">
-            <Filter
-              label="Recipient"
-              value={recipient}
-              onChange={setRecipient}
-              options={STUDENT_OPTIONS}
-              selectClassName="border-gray-300 focus:ring-green-700"
-            />
+            <label className="flex flex-col gap-2 text-sm font-medium text-palette-pine">
+              Recipient
+              <input
+                type="search"
+                list="message-recipients"
+                placeholder="Search recipient..."
+                value={recipient}
+                onChange={(event) => setRecipient(event.target.value)}
+                className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/20"
+              />
+            </label>
+            <label className="flex flex-col gap-2 text-sm font-medium text-palette-pine">
+              Subject
+              <input
+                type="text"
+                placeholder="Enter subject..."
+                className="h-10 w-full rounded-md border border-gray-300 px-3 text-sm outline-none focus:border-green-700 focus:ring-2 focus:ring-green-700/20"
+              />
+            </label>
+            <datalist id="message-recipients">
+              {STUDENTS.map((student) => (
+                <option key={student} value={student} />
+              ))}
+            </datalist>
             <textarea
               placeholder="Message"
               rows={4}
