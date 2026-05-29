@@ -2,8 +2,8 @@ import React, { useState, useEffect } from 'react';
 
 // --- TYPES ---
 type Student = { id: string; name: string; classes: string[] };
-type Assignment = { id: string; classId: string; subject: string; title: string; weight: number, date: string };
-type Grade = { studentId: string; assignmentId: string; value: string };
+type Assignment = { id: string; subjectId: number; name: string; weight: number; date: string, classId: string };
+type Grade = { id: string; gColumnId: string; userId: string; grade: string };
 
 const GradesEditPage: React.FC = () => {
   // 1. DATABASE
@@ -42,7 +42,7 @@ const GradesEditPage: React.FC = () => {
       }
     };
 
-    const loadAssignments = async () => {        //  "grade columns" in DB, not individual grades
+    const loadAssignments = async () => {
       try {
         const response = await fetch('http://localhost:3000/api/gradeColumns', {
           credentials: 'include',
@@ -57,10 +57,8 @@ const GradesEditPage: React.FC = () => {
         const data = await response.json();
         const mapped: Assignment[] = data.map((a: any) => ({
           id: String(a.id),
-          //classId: a.classId,
-          subject: a.subject,
-          userId: a.userId,
-          //title: a.title,
+          subjectId: a.subjectId,
+          name: a.name,       // was commented out as "title"
           weight: a.weight,
           date: a.date
         }));
@@ -82,12 +80,21 @@ const GradesEditPage: React.FC = () => {
           throw new Error(`Failed to load students: ${response.statusText}`);
         }
 
+        const toDisplayGrade = (val: number): string => {
+          val = parseFloat(val.toString()); // ensure it's a number
+          if (val === 1.5) return '1-';
+          if (val === 2.5) return '2-';
+          if (val === 3.5) return '3-';
+          if (val === 4.5) return '4-';
+          return String(Math.round(val)); // 1, 2, 3, 4, 5
+        };
+
         const data = await response.json();
         const mapped: Grade[] = data.map((g: any) => ({
           id: String(g.id),
-          studentId: String(g.studentId),
-          assignmentId: String(g.assignmentId),
-          value: g.value
+          gColumnId: String(g.gColumnId),
+          userId: String(g.userId),
+          grade: toDisplayGrade(g.grade) // 👈 convert 3.5 → "3-" on load
         }));
         setGrades(mapped);
       } catch (error) {
@@ -130,7 +137,7 @@ const GradesEditPage: React.FC = () => {
       }
     };
 
-    loadSubjects(); // don't forget to call it
+    loadSubjects();
     loadStudents();
     loadAssignments();
     loadGrades();
@@ -139,7 +146,7 @@ const GradesEditPage: React.FC = () => {
 
   // 2. FILTER STATES
   const [selectedClass, setSelectedClass] = useState<string>('');
-  const [selectedSubject, setSelectedSubject] = useState<string>('');
+  //const [selectedSubject, setSelectedSubject] = useState<string>('');
 
   // 3. NEW COLUMN STATES (Supports empty string to allow deletion)
   const [newColTitle, setNewColTitle] = useState('');
@@ -154,21 +161,13 @@ const GradesEditPage: React.FC = () => {
   const [selectedSubjectId, setSelectedSubjectId] = useState<number>(0);
 
   const currentStudents = students.filter(s => s.classes.includes(selectedClass));
-  const currentAssignments = assignments.filter(a => a.classId === selectedClass && a.subject === selectedSubject);
+  const currentAssignments = assignments.filter(a => a.subjectId === selectedSubjectId);
+
 
   // --- ADD COLUMN LOGIC ---
   const handleAddColumn = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!newColTitle) return;
-
-    const newAssignment: Assignment = {
-      id: `a${Date.now()}`,
-      classId: selectedClass,
-      subject: selectedSubject,
-      title: newColTitle,
-      weight: newColWeight,
-      date: new Date().toISOString()
-    };;
+    if (!newColTitle || newColWeight === '') return;
 
     fetch('http://localhost:3000/api/gradeColumns', {
       method: 'POST',
@@ -188,31 +187,78 @@ const GradesEditPage: React.FC = () => {
       });
   };
 
+
+
   // --- DELETE COLUMN LOGIC ---
-  const handleDeleteColumn = (assignmentId: string, assignmentTitle: string) => {
-    if (window.confirm(`Are you sure you want to delete the entire column "${assignmentTitle}" and all its grades?`)) {
-      setAssignments(assignments.filter(a => a.id !== assignmentId));
-      setGrades(grades.filter(g => g.assignmentId !== assignmentId));
+  const handleDeleteColumn = async (assignmentId: string, assignmentName: string) => {
+    if (!window.confirm(`Delete column "${assignmentName}" and all its grades?`)) return;
+
+    try {
+      const res = await fetch(`http://localhost:3000/api/gradeColumns/${assignmentId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+
+      if (!res.ok) throw new Error('Failed to delete');
+
+      // Only remove from UI if backend succeeded
+      setAssignments(prev => prev.filter(a => a.id !== assignmentId));
+      setGrades(prev => prev.filter(g => g.gColumnId !== assignmentId));
+    } catch (error) {
+      console.error('Delete failed:', error);
+      alert('Failed to delete column.');
     }
   };
+
+
 
   // --- OPEN EDIT MODAL ---
   const startEditingColumn = (assignment: Assignment) => {
     setEditingAssignment(assignment);
-    setEditTitle(assignment.title);
+    setEditTitle(assignment.name);
     setEditWeight(assignment.weight);
   };
 
+
+
   // --- SAVE EDIT LOGIC ---
-  const handleSaveEditColumn = (e: React.FormEvent) => {
+  const handleSaveEditColumn = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingAssignment || !editTitle || editWeight === '') return;
 
     setAssignments(prev =>
-      prev.map(a => a.id === editingAssignment.id ? { ...a, title: editTitle, weight: Number(editWeight) } : a)
+      prev.map(a => a.id === editingAssignment.id ? { ...a, name: editTitle, weight: Number(editWeight) } : a)
     );
+
+    const assignmentId = editingAssignment.id;
+    try {
+      const res = await fetch(`http://localhost:3000/api/gradeColumns/${assignmentId}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          name: editTitle,
+          subjectId: selectedSubjectId,
+          weight: Number(editWeight),
+          date: new Date().toISOString()
+        })
+      });
+
+      if (!res.ok) throw new Error('Failed to update');
+
+      // Only remove from UI if backend succeeded
+      setAssignments(prev => prev.filter(a => a.id !== assignmentId));
+      setGrades(prev => prev.filter(g => g.gColumnId !== assignmentId));
+    } catch (error) {
+      console.error('Update failed:', error);
+      alert('Failed to update column.');
+    }
+
     setEditingAssignment(null);
   };
+
+
+
 
   // --- GRADE CHANGE LOGIC (WITH VALIDATIONS & TRANSFORMATIONS) ---
   const handleGradeChange = (studentId: string, assignmentId: string, value: string) => {
@@ -220,15 +266,26 @@ const GradesEditPage: React.FC = () => {
 
     // Clear cell if empty
     if (val === '') {
-      setGrades(prev => prev.filter(g => !(g.studentId === studentId && g.assignmentId === assignmentId)));
+      setGrades(prev => prev.filter(g => !(g.userId === studentId && g.gColumnId === assignmentId)));
+
+      fetch(`http://localhost:3000/api/grades/${studentId}/${assignmentId}`, {
+        method: 'DELETE',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          userId: studentId,
+          gradeColumnId: assignmentId
+        })
+      })
+
       return;
     }
 
     // Allow typing intermediate dot while inputting valid decimal values
     if (val === '1.' || val === '2.' || val === '3.' || val === '4.') {
       setGrades(prev => {
-        const filtered = prev.filter(g => !(g.studentId === studentId && g.assignmentId === assignmentId));
-        return [...filtered, { studentId, assignmentId, value: val }];
+        const filtered = prev.filter(g => !(g.userId === studentId && g.gColumnId === assignmentId));
+        return [...filtered, { id: `${studentId}-${assignmentId}`, userId: studentId, gColumnId: assignmentId, grade: val }];
       });
       return;
     }
@@ -243,22 +300,46 @@ const GradesEditPage: React.FC = () => {
     const validGrades = ['1', '2', '3', '4', '5', '1-', '2-', '3-', '4-'];
     if (validGrades.includes(val)) {
       setGrades(prev => {
-        const filtered = prev.filter(g => !(g.studentId === studentId && g.assignmentId === assignmentId));
-        return [...filtered, { studentId, assignmentId, value: val }];
+        const filtered = prev.filter(g => !(g.userId === studentId && g.gColumnId === assignmentId));
+        return [...filtered, { id: `${studentId}-${assignmentId}`, userId: studentId, gColumnId: assignmentId, grade: val }];
       });
+
+      fetch('http://localhost:3000/api/grades', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          value: val.includes('-') ? parseInt(val[0]) + 0.5 : parseInt(val),
+          userId: studentId,
+          gradeColumnId: assignmentId
+        })
+      })
     } else {
       alert('Invalid grade format! Only whole numbers (1-5) and specific half-grades (.5 values transformed to minus notation, e.g., 1.5 -> 1-) are allowed.');
     }
   };
 
   const handleClearCell = (studentId: string, assignmentId: string) => {
-    setGrades(grades.filter(g => !(g.studentId === studentId && g.assignmentId === assignmentId)));
+    setGrades(grades.filter(g => !(g.userId === studentId && g.gColumnId === assignmentId)));
+
+    fetch(`http://localhost:3000/api/grades/${studentId}/${assignmentId}`, {
+      method: 'DELETE',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        userId: studentId,
+        gradeColumnId: assignmentId
+      })
+    })
   };
 
   const getGradeValue = (studentId: string, assignmentId: string) => {
-    const grade = grades.find(g => g.studentId === studentId && g.assignmentId === assignmentId);
-    return grade ? grade.value : '';
+    const grade = grades.find(g => g.userId === studentId && g.gColumnId === assignmentId);
+    return grade ? grade.grade : '';
   };
+
+
+
 
   // --- AVERAGE CALCULATION LOGIC ---
   const calculateAverage = (studentId: string) => {
@@ -266,9 +347,9 @@ const GradesEditPage: React.FC = () => {
     let weightSum = 0;
 
     currentAssignments.forEach(assignment => {
-      const grade = grades.find(g => g.studentId === studentId && g.assignmentId === assignment.id);
-      if (grade && grade.value) {
-        const numValue = grade.value.includes('-') ? parseInt(grade.value[0]) + 0.5 : parseInt(grade.value[0]);
+      const grade = grades.find(g => g.userId === studentId && g.gColumnId === assignment.id);
+      if (grade && grade.grade) {
+        const numValue = grade.grade.includes('-') ? parseInt(grade.grade[0]) + 0.5 : parseInt(grade.grade[0]);
         if (!isNaN(numValue)) {
           sum += numValue * assignment.weight;
           weightSum += assignment.weight;
@@ -278,6 +359,9 @@ const GradesEditPage: React.FC = () => {
 
     return weightSum > 0 ? (sum / weightSum).toFixed(2) : '-';
   };
+
+
+
 
   // --- ARROW & ENTER KEY NAVIGATION ---
   const handleKeyDown = (e: React.KeyboardEvent<HTMLInputElement>, rowIndex: number, colIndex: number) => {
@@ -314,6 +398,9 @@ const GradesEditPage: React.FC = () => {
       (targetCell as HTMLInputElement).select();
     }
   };
+
+
+
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">
@@ -390,16 +477,23 @@ const GradesEditPage: React.FC = () => {
               {/* Dynamic Column Headers */}
               {currentAssignments.map((assignment) => (
                 <th key={assignment.id} className="p-3 border-r border-gray-200 text-center min-w-[160px] max-w-[220px] group/header relative align-middle">
-                  <div className="text-xs uppercase tracking-tight text-gray-600 font-bold pr-14 pl-1 break-words whitespace-normal line-clamp-2" title={assignment.title}>
-                    {assignment.title}
+                  <div className="text-xs uppercase tracking-tight text-gray-600 font-bold pr-14 pl-1 break-words whitespace-normal line-clamp-2" title={assignment.name}>
+                    {assignment.name}
                   </div>
                   <div className="text-[10px] bg-white border border-gray-300 rounded px-1.5 py-0.5 inline-block mt-1.5 text-gray-500 mr-12 font-medium">
                     W: {assignment.weight}
                   </div>
 
-                  {/* Larger delete column button positioned near the right side */}
                   <button
-                    onClick={() => handleDeleteColumn(assignment.id, assignment.title)}
+                    onClick={() => startEditingColumn(assignment)}
+                    className="absolute top-1/2 -translate-y-1/2 right-10 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded px-2 py-1 opacity-0 group-hover/header:opacity-100 transition-all text-xs font-semibold border border-blue-200 shadow-sm"
+                    title="Edit column properties"
+                  >
+                    ✎
+                  </button>
+
+                  <button
+                    onClick={() => handleDeleteColumn(assignment.id, assignment.name)}
                     className="absolute top-1/2 -translate-y-1/2 right-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded px-2 py-1 opacity-0 group-hover/header:opacity-100 transition-all text-xs font-semibold border border-red-200 shadow-sm"
                     title="Delete entire column"
                   >
@@ -477,18 +571,18 @@ const GradesEditPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xl max-w-md w-full mx-4 space-y-4">
             <div className="flex justify-between items-center border-b pb-2">
               <h3 className="text-lg font-bold text-gray-800">Edit Column Properties</h3>
-              <button 
-                onClick={() => setEditingAssignment(null)} 
+              <button
+                onClick={() => setEditingAssignment(null)}
                 className="text-gray-400 hover:text-gray-600 font-bold"
               >
                 ✕
               </button>
             </div>
-            
+
             <form onSubmit={handleSaveEditColumn} className="space-y-4">
               <div>
                 <label className="block text-sm font-semibold text-gray-600 mb-1">Column Title (Max 75 chars)</label>
-                <input 
+                <input
                   type="text"
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
@@ -500,7 +594,7 @@ const GradesEditPage: React.FC = () => {
 
               <div>
                 <label className="block text-sm font-semibold text-gray-600 mb-1">Weight</label>
-                <input 
+                <input
                   type="number"
                   min="1" max="10"
                   value={editWeight}
