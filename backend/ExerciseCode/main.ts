@@ -18,7 +18,7 @@ declare module 'express-session' {
 const adapter = new PrismaBetterSqlite3({ url: process.env.DATABASE_URL! });
 const prisma = new PrismaClient({ adapter });
 const app = express();
-const PORT = 3005;
+const PORT = 3000;
 
 const privileges = {
     "student": 1,

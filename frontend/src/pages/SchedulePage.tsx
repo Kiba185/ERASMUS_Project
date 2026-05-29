@@ -51,7 +51,7 @@ const SchedulePage: React.FC = () => {
       setIsLoading(true);
       try {
         // Nezapomeň upravit URL podle toho, na jakém portu ti běží backend!
-        const response = await fetch(`http://localhost:3005/api/timetables/student/${user.id}`);
+        const response = await fetch(`http://localhost:3000/api/timetables/student/${user.id}`);
         
         if (!response.ok) {
           throw new Error('Nepodařilo se načíst rozvrh');
