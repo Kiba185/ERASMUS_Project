@@ -14,10 +14,15 @@ const Dashboard: React.FC = () => {
   if (!user) return null;
 
   return (
-    <div>
-      <h1 className="text-3xl font-bold text-palette-pine mb-6">Dashboard - {user.firstName.toUpperCase()}</h1>
+    <div className="p-4 md:p-8 max-w-[1400px] mx-auto">
+      <div className="mb-8">
+        <h1 className="text-3xl md:text-4xl font-black text-palette-pine tracking-tight">
+          Welcome back, {user.firstName}!
+        </h1>
+        <p className="text-palette-moss mt-2 font-medium">Here is an overview of what's happening today.</p>
+      </div>
       
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 auto-rows-fr">
         
         {/* Zobrazení widgetů podle role */}
         {(user.role === 'student' || user.role === 'parent') && (

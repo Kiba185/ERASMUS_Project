@@ -1,4 +1,7 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 // --- MOCK DATA ---
 type Role = 'student' | 'teacher' | 'parent' | 'admin';
@@ -39,6 +42,9 @@ const initialUsers: MockUser[] = [
 
 // --- COMPONENT ---
 const UsersPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
   const [users, setUsers] = useState<MockUser[]>(initialUsers);
   const [classes] = useState<MockClass[]>(initialClasses);
 
@@ -119,6 +125,15 @@ const UsersPage: React.FC = () => {
   const openEditModal = (user: MockUser) => {
     setEditingUser({ ...user });
     setIsModalOpen(true);
+  };
+
+  const handleLoginAs = (user: MockUser) => {
+    const authUser: any = {
+      ...user,
+      id: user.id.toString(),
+    };
+    login(authUser.id, authUser);
+    navigate('/dashboard');
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -224,8 +239,9 @@ const UsersPage: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">{user.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">{user.phone}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <button onClick={() => openEditModal(user)} className="text-palette-fern hover:text-palette-leaf font-bold">Edit</button>
+                <td className="px-6 py-4 whitespace-nowrap text-right flex justify-end gap-3">
+                  <button onClick={() => handleLoginAs(user)} className="text-palette-moss hover:text-palette-pine font-bold transition">Login As</button>
+                  <button onClick={() => openEditModal(user)} className="text-palette-fern hover:text-palette-leaf font-bold transition">Edit</button>
                 </td>
               </tr>
             ))}
@@ -239,7 +255,7 @@ const UsersPage: React.FC = () => {
       </div>
 
       {/* Modal */}
-      {isModalOpen && editingUser && (
+      {isModalOpen && editingUser && createPortal(
         <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-palette-mist">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-palette-mist/30">
@@ -345,7 +361,8 @@ const UsersPage: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
