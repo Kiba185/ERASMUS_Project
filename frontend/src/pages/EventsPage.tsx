@@ -334,10 +334,13 @@ const EventsPage: React.FC = () => {
         </div>
       </div>
 
-      {/* --- MODAL DIALOG VIA PORTAL --- */}
+      {/* --- MODÁLNÍ OKNO FIXNUTÉ PROTI MEZERÁM --- */}
       {isModalOpen && createPortal(
-        <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4 bg-slate-900/40 backdrop-blur-xs">
-          <div className="bg-white rounded-2xl border border-slate-200 p-6 shadow-xl max-w-md w-full space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
+        <div 
+          className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto bg-palette-sage/45 px-4 py-6 backdrop-blur-[1px]"
+        >
+          
+          <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xl max-w-md w-full space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
             
             {/* Modal Header */}
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
