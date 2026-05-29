@@ -32,7 +32,7 @@ const GradesPage: React.FC = () => {
         case '2': return 'bg-lime-600 text-white border-lime-700 font-bold';     // Chvalitebně (Sytá azurová/modrá)
         case '3': return 'bg-amber-500 text-white border-amber-600 font-bold';   // Pozor (Jasná žlutá/oranžová)
         case '4': return 'bg-orange-600 text-white border-orange-700 font-bold'; // Velké varování (Sytá oranžová)
-        case '5': return 'bg-red-600 text-white border-red-700 font-black animate-pulse'; // Kritické (Ostrá červená, můžeš nechat i blikání 'animate-pulse')
+        case '5': return 'bg-red-600 text-white border-red-700 font-black'; // Kritické (Ostrá červená, můžeš nechat i blikání 'animate-pulse')
         default: return 'bg-gray-500 text-white border-gray-600';
     }
 };
@@ -41,7 +41,7 @@ const GradesPage: React.FC = () => {
 
     return (
         <div className="p-8">
-            <h1 className="text-2xl font-bold">My Grades</h1>
+            
             <div className="p-6 max-w-7xl mx-auto">
             
                 {/* HLAVIČKA STRÁNKY A FILTR */}
