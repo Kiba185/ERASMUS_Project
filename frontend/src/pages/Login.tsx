@@ -31,7 +31,18 @@ const Login: React.FC = () => {
       const data = await response.json();
 
       if (data?.success === true) {
-        login(formattedUsername, data.user);
+        const authUser = { ...data.user };
+        
+        // MOCK DATA: Zatímco čekáme na backendovou tabulku pro vazby rodič-dítě,
+        // vložíme sem mock data, aby fungoval UI přepínač dětí.
+        if (authUser.role === 'parent') {
+          authUser.children = [
+            { id: '1', firstName: 'Jan', lastName: 'Novák' },
+            { id: '2', firstName: 'Petr', lastName: 'Svoboda' }
+          ];
+        }
+
+        login(formattedUsername, authUser);
         navigate('/dashboard');
       } else {
         setError('Nesprávné přihlašovací údaje.');
