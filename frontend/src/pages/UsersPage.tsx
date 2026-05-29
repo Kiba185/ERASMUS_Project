@@ -1,4 +1,6 @@
 import React, { useState, useMemo } from 'react';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../context/AuthContext';
 
 // --- MOCK DATA ---
 type Role = 'student' | 'teacher' | 'parent' | 'admin';
@@ -39,6 +41,9 @@ const initialUsers: MockUser[] = [
 
 // --- COMPONENT ---
 const UsersPage: React.FC = () => {
+  const navigate = useNavigate();
+  const { login } = useAuth();
+
   const [users, setUsers] = useState<MockUser[]>(initialUsers);
   const [classes] = useState<MockClass[]>(initialClasses);
 
@@ -119,6 +124,15 @@ const UsersPage: React.FC = () => {
   const openEditModal = (user: MockUser) => {
     setEditingUser({ ...user });
     setIsModalOpen(true);
+  };
+
+  const handleLoginAs = (user: MockUser) => {
+    const authUser: any = {
+      ...user,
+      id: user.id.toString(),
+    };
+    login(authUser.id, authUser);
+    navigate('/dashboard');
   };
 
   const handleSave = (e: React.FormEvent) => {
@@ -224,8 +238,9 @@ const UsersPage: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">{user.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">{user.phone}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <button onClick={() => openEditModal(user)} className="text-palette-fern hover:text-palette-leaf font-bold">Edit</button>
+                <td className="px-6 py-4 whitespace-nowrap text-right flex justify-end gap-3">
+                  <button onClick={() => handleLoginAs(user)} className="text-palette-moss hover:text-palette-pine font-bold transition">Login As</button>
+                  <button onClick={() => openEditModal(user)} className="text-palette-fern hover:text-palette-leaf font-bold transition">Edit</button>
                 </td>
               </tr>
             ))}

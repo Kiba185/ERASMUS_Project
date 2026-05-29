@@ -20,10 +20,10 @@ const SIDEBAR_LINKS: SidebarLink[] = [
   { label: 'Grades editing', path: '/grades-edit', roles: ['teacher', 'admin'] },
   { label: 'Attendance', path: '/attendance', roles: ['teacher', 'admin'] },
   { label: 'Classes', path: '/classes', roles: ['teacher', 'admin'] },
-  { label: 'Schedule', path: '/schedule', roles: ['student', 'admin', 'parent', 'teacher'] },
-  { label: 'Grades', path: '/grades', roles: ['student', 'admin', 'parent', 'teacher'] },
-  { label: 'Semester', path: '/semester', roles: ['parent', 'admin', 'student', 'teacher'] },
-  { label: 'Absence notes', path: '/absence-notes', roles: ['parent', 'admin', 'teacher', 'student' ] },
+  { label: 'Schedule', path: '/schedule', roles: ['student', 'parent', 'teacher'] },
+  { label: 'Grades', path: '/grades', roles: ['student', 'parent', 'teacher'] },
+  { label: 'Semester', path: '/semester', roles: ['parent', 'student', 'teacher'] },
+  { label: 'Absence notes', path: '/absence-notes', roles: ['parent', 'teacher', 'student' ] },
   { label: 'User info', path: '/user', roles: ['parent', 'admin', 'student', 'teacher'] },
 ];
 
