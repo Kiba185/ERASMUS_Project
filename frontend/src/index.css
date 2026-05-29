@@ -1,5 +1,10 @@
 @import "@fortawesome/fontawesome-free/css/all.min.css";
+<<<<<<< HEAD
 @import "https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200%27";
+=======
+@import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200');
+
+>>>>>>> 1c8d11a2387ad3723f55daf150165717aaf1251b
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
