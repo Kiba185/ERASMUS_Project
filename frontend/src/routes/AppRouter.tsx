@@ -8,6 +8,7 @@ import Landing from '../pages/Landing';
 import Login from '../pages/Login';
 import Dashboard from '../pages/Dashboard';
 import SchedulePage from '../pages/SchedulePage';
+import ScheduleEditPage from '../pages/ScheduleEditPage';
 import GradesPage from '../pages/GradesPage';
 import GradesEditPage from '../pages/GradesEditPage';
 import SemesterPage from '../pages/SemesterPage';
@@ -40,6 +41,7 @@ export const appRouter = createBrowserRouter([
     children: [
       { path: '/dashboard', element: <Dashboard /> },
       { path: '/schedule', element: <SchedulePage /> },
+      { path: '/schedule-edit', element: <ScheduleEditPage />},
       { path: '/grades', element: <GradesPage /> },
       { path: '/grades-edit', element: <GradesEditPage /> },
       { path: '/classes', element: <ClassesPage /> },
