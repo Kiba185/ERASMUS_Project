@@ -1,4 +1,5 @@
 import React, { useState, useMemo } from 'react';
+import { createPortal } from 'react-dom';
 
 // --- MOCK DATA ---
 type Role = 'student' | 'teacher' | 'parent' | 'admin';
@@ -239,7 +240,7 @@ const UsersPage: React.FC = () => {
       </div>
 
       {/* Modal */}
-      {isModalOpen && editingUser && (
+      {isModalOpen && editingUser && createPortal(
         <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-palette-mist">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-palette-mist/30">
@@ -345,7 +346,8 @@ const UsersPage: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
