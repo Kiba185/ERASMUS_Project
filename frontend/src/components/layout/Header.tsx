@@ -15,9 +15,7 @@ const Header = () => {
   const isUserRoute = location.pathname === '/user' || location.pathname.startsWith('/user/');
 
   const handleProfileClick = () => {
-    if (!isUserRoute) {
-      setIsPopupOpen(!isPopupOpen);
-    }
+    setIsPopupOpen(!isPopupOpen);
   };
 
   return (
@@ -30,15 +28,13 @@ const Header = () => {
         <div className="relative flex items-center space-x-4">
           <div 
             onClick={handleProfileClick}
-            className={`h-8 w-8 rounded-full bg-palette-lichen/35 flex items-center justify-center text-palette-pine font-bold select-none transition ${
-              isUserRoute ? 'cursor-default opacity-80' : 'cursor-pointer hover:bg-palette-sage/45'
-            }`} 
-            title={isUserRoute ? 'Profil' : 'Nastavení profilu'}
+            className="h-8 w-8 rounded-full bg-palette-lichen/35 flex items-center justify-center text-palette-pine font-bold select-none transition cursor-pointer hover:bg-palette-sage/45"
+            title="Nastavení profilu"
           >
             {user?.firstName ? user.firstName.charAt(0).toUpperCase() : (user?.id ? user.id.charAt(0).toUpperCase() : 'U')}
           </div>
           <UserPopup 
-            isOpen={isPopupOpen && !isUserRoute} 
+            isOpen={isPopupOpen} 
             onClose={() => setIsPopupOpen(false)} 
           />
         </div>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -7,8 +7,10 @@ type EventType = 'exam' | 'excursion' | 'meeting' | 'holiday' | string;
 type SchoolEvent = {
   id: string;
   title: string;
-  date: string;
-  time: string;
+  startDate: string; // YYYY-MM-DD
+  endDate: string;   // YYYY-MM-DD
+  time: string;      // Použije se, pokud isAllDay === false
+  isAllDay: boolean;
   type: EventType;
   className?: string;
   description?: string;
@@ -23,12 +25,12 @@ const EventsPage: React.FC = () => {
   const isAdmin = userRole === 'admin';
   const canManageEvents = isTeacher || isAdmin;
 
-  // 1. DATA & STAV
+  // --- STAV PRO UDÁLOSTI ---
   const [events, setEvents] = useState<SchoolEvent[]>([
-    { id: 'e1', title: 'Math Midterm Examination Block', date: '2026-05-13', time: '08:15', type: 'exam', className: '4.A', description: 'Covers algebra and geometry modules. Room 204.' },
-    { id: 'e2', title: 'Prague Castle Field Trip & History Lecture', date: '2026-05-20', time: '07:45', type: 'excursion', className: '4.A', description: 'History excursion focused on gothic architecture.' },
-    { id: 'e3', title: 'Regular Parent-Teacher Association Meeting', date: '2026-05-14', time: '17:00', type: 'meeting', description: 'Main school auditorium.' },
-    { id: 'e4', title: 'State Holiday - Liberation Day', date: '2026-05-01', time: '00:00', type: 'holiday', description: 'School completely closed.' },
+    { id: 'e1', title: 'Math Midterm Examination Block', startDate: '2026-05-13', endDate: '2026-05-13', time: '08:15', isAllDay: false, type: 'exam', className: '4.A', description: 'Covers algebra and geometry modules. Room 204.' },
+    { id: 'e2', title: 'Prague Castle Field Trip & History Lecture', startDate: '2026-05-20', endDate: '2026-05-20', time: '07:45', isAllDay: false, type: 'excursion', className: '4.A', description: 'History excursion focused on gothic architecture.' },
+    { id: 'e3', title: 'Regular Parent-Teacher Association Meeting', startDate: '2026-05-14', endDate: '2026-05-14', time: '17:00', isAllDay: false, type: 'meeting', description: 'Main school auditorium.' },
+    { id: 'e4', title: 'State Holiday - Liberation Day', startDate: '2026-05-01', endDate: '2026-05-03', time: '', isAllDay: true, type: 'holiday', description: 'School completely closed.' },
   ]);
 
   const [navDate, setNavDate] = useState<Date>(new Date(2026, 4, 1));
@@ -37,63 +39,83 @@ const EventsPage: React.FC = () => {
   const [selectedDateStr, setSelectedDateStr] = useState('');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
   
-  // FORM STATES
-  const [newEventTitle, setNewEventTitle] = useState('');
-  const [newEventTime, setNewEventTime] = useState('08:00');
-  const [newEventType, setNewEventType] = useState<EventType>('exam');
+  // --- FORM STATES ---
+  const [eventTitle, setEventTitle] = useState('');
+  const [eventStartDate, setEventStartDate] = useState('');
+  const [eventEndDate, setEventEndDate] = useState('');
+  const [eventTime, setEventTime] = useState('08:00');
+  const [isAllDay, setIsAllDay] = useState(false);
+  const [eventType, setEventType] = useState<EventType>('exam');
   const [customType, setCustomType] = useState(''); 
-  const [newEventClass, setNewEventClass] = useState('');
-  const [newEventDesc, setNewEventDesc] = useState('');
+  const [eventClass, setEventClass] = useState('');
+  const [eventDesc, setEventDesc] = useState('');
 
-  // KALENDÁŘ LOGIKA
+  // --- KALENDÁŘ LOGIKA ---
   const year = navDate.getFullYear();
   const month = navDate.getMonth();
   const monthNames = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
 
-  const firstDayOfMonth = new Date(year, month, 1);
-  let startDayOfWeek = firstDayOfMonth.getDay() - 1;
-  if (startDayOfWeek === -1) startDayOfWeek = 6; 
-  const totalDaysInMonth = new Date(year, month + 1, 0).getDate();
-  const calendarCells: (Date | null)[] = [];
-  for (let i = 0; i < startDayOfWeek; i++) calendarCells.push(null);
-  for (let day = 1; day <= totalDaysInMonth; day++) calendarCells.push(new Date(year, month, day));
+  const calendarCells = useMemo(() => {
+    const firstDay = new Date(year, month, 1);
+    let startDayOfWeek = firstDay.getDay() - 1;
+    if (startDayOfWeek === -1) startDayOfWeek = 6; 
+    
+    const totalDays = new Date(year, month + 1, 0).getDate();
+    const cells: (Date | null)[] = [];
+    
+    for (let i = 0; i < startDayOfWeek; i++) cells.push(null);
+    for (let day = 1; day <= totalDays; day++) cells.push(new Date(year, month, day));
+    
+    return cells;
+  }, [year, month]);
 
-  // OBSLUHA AKCÍ
+  // --- POMOCNÁ FUNKCE PRO ZJIŠTĚNÍ, ZDA UDÁLOST SPADÁ DO DANÉHO DNE ---
+  const isEventOnDate = (event: SchoolEvent, dateStr: string) => {
+    return dateStr >= event.startDate && dateStr <= event.endDate;
+  };
+
   const handleDayClick = (dateStr: string) => {
     setSelectedDateStr(dateStr);
-    const dayEvents = events.filter(e => e.date === dateStr);
+    const dayEvents = events.filter(e => isEventOnDate(e, dateStr));
+    
     if (dayEvents.length > 0) {
       setModalView('details');
       setIsModalOpen(true);
     } else if (canManageEvents) {
-      resetForm();
+      resetForm(dateStr);
       setModalView('create');
       setIsModalOpen(true);
     }
   };
 
-  const resetForm = () => {
-    setNewEventTitle('');
-    setNewEventTime('08:00');
-    setNewEventType('exam');
+  const resetForm = (targetDate: string = '') => {
+    setEventTitle('');
+    setEventStartDate(targetDate || new Date().toISOString().split('T')[0]);
+    setEventEndDate(targetDate || new Date().toISOString().split('T')[0]);
+    setEventTime('08:00');
+    setIsAllDay(false);
+    setEventType('exam');
     setCustomType('');
-    setNewEventClass('');
-    setNewEventDesc('');
+    setEventClass('');
+    setEventDesc('');
   };
 
   const prepareEditForm = (event: SchoolEvent) => {
     if (!canManageEvents) return;
     setSelectedEventId(event.id);
-    setNewEventTitle(event.title);
-    setNewEventTime(event.time);
-    setNewEventClass(event.className || '');
-    setNewEventDesc(event.description || '');
+    setEventTitle(event.title);
+    setEventStartDate(event.startDate);
+    setEventEndDate(event.endDate);
+    setEventTime(event.time || '08:00');
+    setIsAllDay(event.isAllDay);
+    setEventClass(event.className || '');
+    setEventDesc(event.description || '');
     
     if (['exam', 'excursion', 'meeting', 'holiday'].includes(event.type)) {
-      setNewEventType(event.type);
+      setEventType(event.type);
       setCustomType('');
     } else {
-      setNewEventType('custom');
+      setEventType('custom');
       setCustomType(event.type);
     }
     setModalView('edit');
@@ -101,30 +123,38 @@ const EventsPage: React.FC = () => {
 
   const handleFormSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!canManageEvents || !newEventTitle.trim()) return;
+    if (!canManageEvents || !eventTitle.trim()) return;
 
-    const finalType = (isAdmin && newEventType === 'custom') ? (customType.trim().toLowerCase() || 'other') : newEventType;
+    const finalType = (isAdmin && eventType === 'custom') ? (customType.trim().toLowerCase() || 'other') : eventType;
+
+    // Bezpečná validace datumu (aby konec nebyl před začátkem)
+    const finalEndDate = eventEndDate < eventStartDate ? eventStartDate : eventEndDate;
 
     if (modalView === 'create') {
       const created: SchoolEvent = {
         id: `e${Date.now()}`,
-        title: newEventTitle,
-        date: selectedDateStr,
-        time: newEventTime,
+        title: eventTitle,
+        startDate: eventStartDate,
+        endDate: finalEndDate,
+        time: isAllDay ? '' : eventTime,
+        isAllDay,
         type: finalType,
-        className: newEventClass || undefined,
-        description: newEventDesc || undefined,
+        className: eventClass || undefined,
+        description: eventDesc || undefined,
       };
-      setEvents([...events, created]);
+      setEvents(prev => [...prev, created]);
       setIsModalOpen(false);
     } else if (modalView === 'edit' && selectedEventId) {
-      setEvents(events.map(ev => ev.id === selectedEventId ? {
+      setEvents(prev => prev.map(ev => ev.id === selectedEventId ? {
         ...ev,
-        title: newEventTitle,
-        time: newEventTime,
+        title: eventTitle,
+        startDate: eventStartDate,
+        endDate: finalEndDate,
+        time: isAllDay ? '' : eventTime,
+        isAllDay,
         type: finalType,
-        className: newEventClass || undefined,
-        description: newEventDesc || undefined,
+        className: eventClass || undefined,
+        description: eventDesc || undefined,
       } : ev));
       setModalView('details');
     }
@@ -132,92 +162,135 @@ const EventsPage: React.FC = () => {
 
   const handleDeleteEvent = (id: string) => {
     if (!canManageEvents) return;
-    const updated = events.filter(ev => ev.id !== id);
-    setEvents(updated);
-    if (updated.filter(e => e.date === selectedDateStr).length > 0) {
-      setModalView('details');
-    } else {
-      setIsModalOpen(false);
-    }
+    setEvents(prev => {
+      const updated = prev.filter(ev => ev.id !== id);
+      const remainingForDay = updated.filter(e => isEventOnDate(e, selectedDateStr));
+      if (remainingForDay.length > 0) {
+        setModalView('details');
+      } else {
+        setIsModalOpen(false);
+      }
+      return updated;
+    });
   };
 
-  const activeDayEvents = events
-    .filter(e => e.date === selectedDateStr)
-    .sort((a, b) => a.time.localeCompare(b.time));
+  const activeDayEvents = useMemo(() => {
+    return events
+      .filter(e => isEventOnDate(e, selectedDateStr))
+      .sort((a, b) => {
+        if (a.isAllDay && !b.isAllDay) return -1;
+        if (!a.isAllDay && b.isAllDay) return 1;
+        return a.time.localeCompare(b.time);
+      });
+  }, [events, selectedDateStr]);
 
+  // --- ZELENÝ DESIGN SYSTEM (Diferencovaný podle typů aktivit) ---
   const getStyle = (type: string) => {
-    const styles: Record<string, { badge: string; border: string; bg: string; cellBorder: string }> = {
-      exam: { badge: 'bg-red-50 text-red-700 border-red-200', border: 'border-l-red-500', bg: '#FEF2F2', cellBorder: '#FCA5A5' },
-      excursion: { badge: 'bg-green-50 text-green-700 border-green-200', border: 'border-l-green-500', bg: '#F0FDF4', cellBorder: '#86EFAC' },
-      meeting: { badge: 'bg-blue-50 text-blue-700 border-blue-200', border: 'border-l-blue-500', bg: '#EFF6FF', cellBorder: '#93C5FD' },
-      holiday: { badge: 'bg-purple-50 text-purple-700 border-purple-200', border: 'border-l-purple-500', bg: '#F3E8FF', cellBorder: '#D8B4FE' },
+    const styles: Record<string, { badge: string; border: string; bg: string; text: string }> = {
+      exam: { 
+        badge: 'bg-emerald-100 text-emerald-800 border-emerald-300', 
+        border: 'border-l-emerald-600', 
+        bg: 'bg-emerald-50/80 hover:bg-emerald-100/60', 
+        text: 'text-emerald-900' 
+      },
+      excursion: { 
+        badge: 'bg-green-100 text-green-800 border-green-300', 
+        border: 'border-l-green-600', 
+        bg: 'bg-green-50/80 hover:bg-green-100/60', 
+        text: 'text-green-900' 
+      },
+      meeting: { 
+        badge: 'bg-teal-100 text-teal-800 border-teal-300', 
+        border: 'border-l-teal-600', 
+        bg: 'bg-teal-50/80 hover:bg-teal-100/60', 
+        text: 'text-teal-900' 
+      },
+      holiday: { 
+        badge: 'bg-lime-100 text-lime-800 border-lime-300', 
+        border: 'border-l-lime-600', 
+        bg: 'bg-lime-50/60 hover:bg-lime-100/50', 
+        text: 'text-lime-900' 
+      },
     };
-    return styles[type] || { badge: 'bg-amber-50 text-amber-700 border-amber-200', border: 'border-l-amber-500', bg: '#FFFBEB', cellBorder: '#FCD34D' };
+    return styles[type] || { 
+      badge: 'bg-slate-100 text-slate-700 border-slate-300', 
+      border: 'border-l-slate-500', 
+      bg: 'bg-slate-50 hover:bg-slate-100', 
+      text: 'text-slate-900' 
+    };
   };
 
   return (
-    <div className="p-6 max-w-7xl mx-auto space-y-6">
+    <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 antialiased text-slate-800">
       
       {/* HEADER */}
-      <div className="bg-white p-6 rounded-xl shadow-xs border border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-2xs">
         <div>
-          <h1 className="text-3xl font-bold text-gray-800 tracking-tight">School Events Calendar</h1>
-          <p className="text-gray-500 text-sm">Track examinations, class schedules, excursions, and activities</p>
+          <h1 className="text-2xl font-bold tracking-tight text-slate-900">Events & Activities</h1>
+          <p className="text-slate-500 text-sm">Organize and track exams, excursions, meetings, and holidays</p>
         </div>
         {canManageEvents && (
           <button
             onClick={() => {
-              setSelectedDateStr(new Date().toISOString().split('T')[0]);
               resetForm();
               setModalView('create');
               setIsModalOpen(true);
             }}
-            className="py-2.5 px-5 bg-green-600 text-white font-bold text-sm rounded-lg hover:bg-green-700 transition shadow-sm"
+            className="py-2 px-4 bg-emerald-600 text-white font-semibold text-sm rounded-xl hover:bg-emerald-700 transition shadow-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
           >
-            + Add Event
+            + New Event
           </button>
         )}
       </div>
 
-      {/* KALENDÁŘ GRID */}
+      {/* WORKSPACE GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        <div className="lg:col-span-3 bg-white rounded-xl shadow-xs border border-gray-200 overflow-hidden">
-          <div className="p-4 bg-gray-50 border-b border-gray-200 flex justify-between items-center">
-            <h2 className="text-xl font-extrabold text-gray-800">
-              {monthNames[month]} <span className="text-gray-400 font-normal">{year}</span>
+        
+        {/* CALENDAR BLOCK */}
+        <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
+          <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
+            <h2 className="text-lg font-bold text-slate-900">
+              {monthNames[month]} <span className="text-slate-400 font-normal">{year}</span>
             </h2>
-            <div className="flex gap-2">
-              <button onClick={() => setNavDate(new Date(year, month - 1, 1))} className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 text-sm font-medium">‹ Prev</button>
-              <button onClick={() => setNavDate(new Date(year, month + 1, 1))} className="p-2 bg-white border border-gray-300 rounded-lg hover:bg-gray-100 text-sm font-medium">Next ›</button>
+            <div className="flex gap-1.5">
+              <button onClick={() => setNavDate(new Date(year, month - 1, 1))} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-xs font-semibold shadow-2xs">‹ Prev</button>
+              <button onClick={() => setNavDate(new Date(year, month + 1, 1))} className="p-2 bg-white border border-slate-200 rounded-lg hover:bg-slate-50 text-xs font-semibold shadow-2xs">Next ›</button>
             </div>
           </div>
 
-          <div className="grid grid-cols-7 text-center bg-gray-100 border-b border-gray-200 text-xs font-bold text-gray-500 py-2 uppercase">
+          <div className="grid grid-cols-7 text-center bg-slate-50 border-b border-slate-200 text-[11px] font-bold text-slate-400 py-2 uppercase tracking-wider">
             <div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div><div>Sun</div>
           </div>
 
-          <div className="grid grid-cols-7 auto-rows-[115px] bg-gray-200 gap-[1px]">
+          <div className="grid grid-cols-7 auto-rows-[120px] bg-slate-100 gap-[1px]">
             {calendarCells.map((cellDate, index) => {
-              if (!cellDate) return <div key={`empty-${index}`} className="bg-gray-50/60" />;
+              if (!cellDate) return <div key={`empty-${index}`} className="bg-slate-50/40" />;
+              
               const localDateStr = `${cellDate.getFullYear()}-${String(cellDate.getMonth() + 1).padStart(2, '0')}-${String(cellDate.getDate()).padStart(2, '0')}`;
-              const dayEvents = events.filter(e => e.date === localDateStr).sort((a, b) => a.time.localeCompare(b.time));
+              const dayEvents = events.filter(e => isEventOnDate(e, localDateStr)).sort((a, b) => a.time.localeCompare(b.time));
 
               return (
                 <div
                   key={localDateStr}
                   onClick={() => handleDayClick(localDateStr)}
-                  className="bg-white p-2 relative flex flex-col gap-1 group hover:bg-green-50/30 cursor-pointer overflow-hidden select-none"
+                  className="bg-white p-2 flex flex-col gap-1 hover:bg-slate-50/80 cursor-pointer overflow-hidden transition-colors select-none group"
                 >
-                  <span className="text-sm font-bold text-gray-700 group-hover:text-green-700">{cellDate.getDate()}</span>
-                  <div className="flex flex-col gap-1 overflow-y-auto max-h-[75px] w-full">
+                  <span className="text-xs font-bold text-slate-600 group-hover:text-emerald-600 transition-colors">{cellDate.getDate()}</span>
+                  <div className="flex flex-col gap-1 overflow-y-auto flex-1 pr-0.5">
                     {dayEvents.map(event => (
                       <div 
                         key={event.id}
-                        className="text-[10px] leading-tight font-bold rounded px-1.5 py-0.5 border flex items-center gap-1 truncate text-gray-800"
-                        style={{ backgroundColor: getStyle(event.type).bg, borderColor: getStyle(event.type).cellBorder }}
+                        className={`text-[10px] leading-tight font-semibold rounded-md px-2 py-1 border flex flex-col gap-0.5 truncate transition-all ${getStyle(event.type).bg} ${getStyle(event.type).text}`}
+                        style={{ borderLeftWidth: '3px' }}
                       >
-                        <span className="text-[9px] text-gray-400 font-medium shrink-0">{event.time}</span>
-                        <span className="truncate flex-1">{event.title}</span>
+                        <div className="flex items-center gap-1 font-bold truncate">
+                          {event.isAllDay ? (
+                            <span className="text-[9px] font-bold uppercase opacity-80">All Day</span>
+                          ) : (
+                            <span className="text-[9px] opacity-60 font-normal">{event.time}</span>
+                          )}
+                          <span className="truncate flex-1">{event.title}</span>
+                        </div>
                       </div>
                     ))}
                   </div>
@@ -227,31 +300,34 @@ const EventsPage: React.FC = () => {
           </div>
         </div>
 
-        {/* TIMELINE (PRAVÁ STRANA) */}
-        <div className="bg-white p-4 rounded-xl shadow-xs border border-gray-200 flex flex-col space-y-4 lg:col-span-1">
+        {/* TIMELINE (RIGHT SIDE) */}
+        <div className="bg-white p-5 rounded-2xl border border-slate-200 shadow-2xs flex flex-col space-y-4 lg:col-span-1">
           <div>
-            <h3 className="font-bold text-gray-800 text-lg">Month Overview</h3>
-            <p className="text-xs text-gray-400">Chronological list of activities</p>
+            <h3 className="font-bold text-slate-900 text-base">Monthly Agenda</h3>
+            <p className="text-xs text-slate-400">Chronological activity queue</p>
           </div>
-          <div className="space-y-3 overflow-y-auto max-h-[560px] pr-1 flex-1">
+          <div className="space-y-3 overflow-y-auto max-h-[580px] pr-1 flex-1">
             {events
               .filter(e => {
-                const d = new Date(e.date);
-                return d.getFullYear() === year && d.getMonth() === month;
+                const sD = new Date(e.startDate);
+                const eD = new Date(e.endDate);
+                return (sD.getFullYear() === year && sD.getMonth() === month) || (eD.getFullYear() === year && eD.getMonth() === month);
               })
-              .sort((a, b) => a.date.localeCompare(b.date) || a.time.localeCompare(b.time))
+              .sort((a, b) => a.startDate.localeCompare(b.startDate))
               .map(event => (
-                <div key={event.id} className={`p-3 rounded-lg border-l-4 bg-gray-50 border border-gray-200 flex flex-col gap-1.5 hover:bg-white transition-all ${getStyle(event.type).border}`}>
+                <div key={event.id} className={`p-3 rounded-xl border bg-slate-50/50 flex flex-col gap-1.5 hover:bg-slate-50/100 border-l-4 ${getStyle(event.type).border} transition-all`}>
                   <div className="flex justify-between items-center gap-2">
-                    <span className="text-xs font-bold text-gray-500">
-                      {new Date(event.date).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })} • <span className="text-green-700">{event.time}</span>
+                    <span className="text-[11px] font-medium text-slate-400">
+                      {new Date(event.startDate).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
+                      {event.startDate !== event.endDate && ` - ${new Date(event.endDate).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}`}
+                      {!event.isAllDay && <span className="text-emerald-600 font-semibold ml-1">• {event.time}</span>}
                     </span>
-                    <span className={`text-[9px] uppercase tracking-wider font-extrabold px-1.5 py-0.5 rounded border ${getStyle(event.type).badge}`}>
+                    <span className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border ${getStyle(event.type).badge}`}>
                       {event.type}
                     </span>
                   </div>
-                  <h4 className="font-bold text-gray-800 text-sm leading-snug break-words">{event.title}</h4>
-                  {event.description && <p className="text-xs text-gray-400 line-clamp-2 break-words">{event.description}</p>}
+                  <h4 className="font-bold text-slate-800 text-xs leading-snug break-words">{event.title}</h4>
+                  {event.isAllDay && <span className="text-[10px] text-slate-500 flex items-center gap-1">🕒 Whole Day Program</span>}
                 </div>
               ))}
           </div>
@@ -267,44 +343,48 @@ const EventsPage: React.FC = () => {
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xl max-w-md w-full space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
             
             {/* Modal Header */}
-            <div className="flex justify-between items-center border-b pb-2">
+            <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
-                <h3 className="text-lg font-bold text-gray-800">
-                  {modalView === 'details' ? 'Planned Activities' : modalView === 'create' ? 'Schedule New Activity' : 'Configure Event Details'}
+                <h3 className="text-base font-bold text-slate-900">
+                  {modalView === 'details' ? 'Planned Agenda' : modalView === 'create' ? 'Schedule New Activity' : 'Configure Event Details'}
                 </h3>
-                <p className="text-xs text-gray-400 font-medium">
+                <p className="text-xs text-slate-400 mt-0.5">
                   {new Date(selectedDateStr).toLocaleDateString('en-US', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}
                 </p>
               </div>
-              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-gray-600 font-bold">✕</button>
+              <button onClick={() => setIsModalOpen(false)} className="text-slate-400 hover:text-slate-600 text-sm p-1">✕</button>
             </div>
 
             {/* VIEW: DETAILS */}
             {modalView === 'details' && (
               <div className="space-y-4">
-                <div className="space-y-3 max-h-[340px] overflow-y-auto">
+                <div className="space-y-3 max-h-[360px] overflow-y-auto">
                   {activeDayEvents.map(event => (
-                    <div key={event.id} className={`p-3 rounded-lg border bg-gray-50/60 flex flex-col gap-2 border-l-4 ${getStyle(event.type).border}`}>
+                    <div key={event.id} className={`p-3 rounded-xl border bg-slate-50/40 flex flex-col gap-2 border-l-4 ${getStyle(event.type).border}`}>
                       <div className="flex justify-between items-center">
-                        <span className="text-xs font-bold text-green-700 bg-green-50 px-2 py-0.5 rounded border border-green-200"> {event.time}</span>
+                        <span className="text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-2xs">
+                          {event.isAllDay ? 'All Day' : event.time}
+                        </span>
                         {canManageEvents && (
                           <button
                             type="button"
                             onClick={() => prepareEditForm(event)}
-                            className="text-xs font-semibold text-gray-500 hover:text-green-700 bg-white border border-gray-200 px-2 py-0.5 rounded-md transition flex items-center gap-1 shadow-2xs"
+                            className="text-xs font-semibold text-slate-500 hover:text-emerald-600 bg-white border border-slate-200 px-2.5 py-1 rounded-md transition shadow-2xs"
                           >
-                            Config
+                            Edit
                           </button>
                         )}
                       </div>
-                      <h4 className="font-bold text-gray-800 text-sm break-words">{event.title}</h4>
-                      <div className="flex gap-2 items-center">
-                        <span className={`text-[9px] font-extrabold px-1.5 py-0.5 rounded border uppercase ${getStyle(event.type).badge}`}>{event.type}</span>
-                        {event.className && <span className="text-xs font-bold text-blue-600 bg-blue-50 px-1.5 py-0.5 rounded">Class: {event.className}</span>}
+                      <h4 className="font-bold text-slate-900 text-sm break-words leading-tight">{event.title}</h4>
+                      
+                      <div className="flex gap-1.5 items-center flex-wrap">
+                        <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${getStyle(event.type).badge}`}>{event.type}</span>
+                        {event.className && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md">Class: {event.className}</span>}
+                        {event.startDate !== event.endDate && <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">Multi-day event</span>}
                       </div>
+
                       {event.description && (
-                        <div className="text-xs text-gray-600 bg-white p-2.5 rounded border border-gray-100 break-words leading-relaxed">
-                          <span className="block text-[10px] font-bold uppercase text-gray-400 mb-0.5">Description:</span>
+                        <div className="text-xs text-slate-600 bg-white p-3 rounded-lg border border-slate-100 break-words leading-relaxed mt-1">
                           {event.description}
                         </div>
                       )}
@@ -313,37 +393,64 @@ const EventsPage: React.FC = () => {
                 </div>
                 {canManageEvents && (
                   <button
-                    onClick={() => { resetForm(); setModalView('create'); }}
-                    className="w-full py-2 px-4 text-xs font-bold text-green-700 bg-green-50 border border-green-200 hover:bg-green-100 rounded-lg transition"
+                    onClick={() => { resetForm(selectedDateStr); setModalView('create'); }}
+                    className="w-full py-2.5 px-4 text-xs font-semibold text-emerald-600 bg-emerald-50 border border-emerald-200 hover:bg-emerald-100/70 rounded-xl transition-colors"
                   >
-                    + Add Activity at another hour
+                    + Add another activity for this day
                   </button>
                 )}
               </div>
             )}
 
-            {/* VIEW: FORMULÁŘ (CREATE & EDIT) */}
+            {/* VIEW: FORM (CREATE & EDIT) */}
             {(modalView === 'create' || modalView === 'edit') && canManageEvents && (
-              <form onSubmit={handleFormSubmit} className="space-y-4">
-                <div className="grid grid-cols-3 gap-2">
-                  <div className="col-span-2">
-                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Target Date</label>
-                    <input type="date" value={selectedDateStr} onChange={(e) => setSelectedDateStr(e.target.value)} className="w-full p-2 bg-gray-50 border rounded-lg text-xs" required />
+              <form onSubmit={handleFormSubmit} className="space-y-4 text-xs font-medium text-slate-700">
+                
+                {/* DATE SELECTOR (MULTIPLE DAYS) */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Start Date</label>
+                    <input type="date" value={eventStartDate} onChange={(e) => setEventStartDate(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-hidden" required />
                   </div>
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Time</label>
-                    <input type="time" value={newEventTime} onChange={(e) => setNewEventTime(e.target.value)} className="w-full p-2 border rounded-lg text-xs font-bold text-green-700" required />
+                    <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">End Date</label>
+                    <input type="date" value={eventEndDate} min={eventStartDate} onChange={(e) => setEventEndDate(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-hidden" required />
                   </div>
                 </div>
 
-                <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Activity Title</label>
-                  <input type="text" placeholder="e.g., Final Exam..." value={newEventTitle} onChange={(e) => setNewEventTitle(e.target.value)} className="w-full p-2.5 border rounded-lg text-xs" maxLength={50} required />
+                {/* ALL DAY PROGRAM COMPONENT TOGGLE */}
+                <div className="bg-slate-50/80 p-3 rounded-xl border border-slate-200 flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <span className="text-lg"></span>
+                    <div>
+                      <span className="block font-bold text-slate-800 text-xs">Whole Day Event Program</span>
+                      <span className="block text-[10px] text-slate-400 font-normal">Holidays, field trips, custom notes</span>
+                    </div>
+                  </div>
+                  <input 
+                    type="checkbox" 
+                    checked={isAllDay} 
+                    onChange={(e) => setIsAllDay(e.target.checked)}
+                    className="w-4 h-4 text-emerald-600 bg-slate-100 border-slate-300 rounded-sm focus:ring-emerald-500" 
+                  />
                 </div>
 
-                {/* KATEGORIE - PODMÍNKA PRO ADMINA A UČITELE */}
+                {/* TIME INPUT CONTAINER */}
+                {!isAllDay && (
+                  <div className="animate-in fade-in duration-150">
+                    <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Event Start Time</label>
+                    <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-emerald-600" required={!isAllDay} />
+                  </div>
+                )}
+
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1.5">Category Type</label>
+                  <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Activity Title</label>
+                  <input type="text" placeholder="e.g., Spring Holidays..." value={eventTitle} onChange={(e) => setEventTitle(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500" maxLength={50} required />
+                </div>
+
+                {/* CATEGORIES SELECTION GRID */}
+                <div>
+                  <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1.5">Category Type</label>
                   <div className="grid grid-cols-2 gap-2">
                     {[
                       { key: 'exam', label: 'Exam' },
@@ -354,36 +461,34 @@ const EventsPage: React.FC = () => {
                       <button
                         key={cat.key}
                         type="button"
-                        onClick={() => setNewEventType(cat.key)}
-                        className={`p-2 text-xs font-bold rounded-lg border text-left flex items-center gap-2 transition-all ${newEventType === cat.key ? 'bg-green-50 border-green-500 text-green-700 ring-1 ring-green-500' : 'bg-white text-gray-600 hover:bg-gray-50'}`}
+                        onClick={() => setEventType(cat.key)}
+                        className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all ${eventType === cat.key ? 'bg-blue-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500 font-bold' : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'}`}
                       >
-                        <span className={`w-2 h-2 rounded-full ${newEventType === cat.key ? 'bg-green-600' : 'bg-gray-300'}`} />
+                        <span className={`w-2 h-2 rounded-full ${eventType === cat.key ? 'bg-emerald-600' : 'bg-slate-300'}`} />
                         <span>{cat.label}</span>
                       </button>
                     ))}
 
-                    {/* Pouze Admin vidí a může zvolit možnost "Custom" */}
                     {isAdmin && (
                       <button
                         type="button"
-                        onClick={() => setNewEventType('custom')}
-                        className={`p-2 text-xs font-bold rounded-lg border text-left flex items-center gap-2 transition-all col-span-2 ${newEventType === 'custom' ? 'bg-amber-50 border-amber-500 text-amber-700 ring-1 ring-amber-500' : 'bg-gray-50 text-gray-600 hover:bg-gray-100'}`}
+                        onClick={() => setEventType('custom')}
+                        className={`p-2 rounded-xl border text-left flex items-center gap-2 transition-all col-span-2 ${eventType === 'custom' ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500 font-bold' : 'bg-slate-50 border-slate-200 text-slate-600 hover:bg-slate-100/70'}`}
                       >
-                        <span className={`w-2 h-2 rounded-full ${newEventType === 'custom' ? 'bg-amber-600' : 'bg-gray-400'}`} />
-                        <span>+ Custom Announcement Type</span>
+                        <span className={`w-2 h-2 rounded-full ${eventType === 'custom' ? 'bg-yellow-600' : 'bg-slate-400'}`} />
+                        <span>+ Custom Type (Admin only)</span>
                       </button>
                     )}
                   </div>
                   
-                  {/* Pokud je Admin a zvolil Custom, zobrazí se textové pole */}
-                  {isAdmin && newEventType === 'custom' && (
-                    <div className="mt-2 animate-in fade-in duration-200">
+                  {isAdmin && eventType === 'custom' && (
+                    <div className="mt-2 animate-in fade-in duration-150">
                       <input 
                         type="text" 
-                        placeholder="Write custom category (e.g. workshop, sports...)" 
+                        placeholder="Write custom category (workshop, tournament...)" 
                         value={customType} 
                         onChange={(e) => setCustomType(e.target.value)} 
-                        className="w-full p-2 border border-amber-300 bg-white rounded-lg text-xs font-medium focus:outline-hidden focus:ring-1 focus:ring-amber-500"
+                        className="w-full p-2 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500"
                         required
                       />
                     </div>
@@ -392,31 +497,32 @@ const EventsPage: React.FC = () => {
 
                 <div className="grid grid-cols-1 gap-2">
                   <div>
-                    <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Target Class (Optional)</label>
-                    <input type="text" placeholder="4.A, 3.B" value={newEventClass} onChange={(e) => setNewEventClass(e.target.value)} className="w-full p-2.5 border rounded-lg text-xs uppercase" maxLength={5} />
+                    <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Target Class (Optional)</label>
+                    <input type="text" placeholder="e.g., 4.A" value={eventClass} onChange={(e) => setEventClass(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 uppercase" maxLength={5} />
                   </div>
                 </div>
 
                 <div>
-                  <label className="block text-xs font-semibold text-gray-500 uppercase mb-1">Detailed Description (Optional)</label>
-                  <textarea placeholder="Specify guidelines..." value={newEventDesc} onChange={(e) => setNewEventDesc(e.target.value)} rows={3} className="w-full p-2.5 border rounded-lg text-xs resize-none" />
+                  <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Detailed Description (Optional)</label>
+                  <textarea placeholder="Specify additional details..." value={eventDesc} onChange={(e) => setEventDesc(e.target.value)} rows={3} className="w-full p-2.5 border border-slate-200 rounded-xl resize-none focus:ring-1 focus:ring-emerald-500" />
                 </div>
 
-                <div className="flex justify-end gap-2 pt-2 border-t border-gray-100 items-center">
+                {/* FORM CONTROLS */}
+                <div className="flex justify-end gap-2 pt-3 border-t border-slate-100 items-center">
                   {modalView === 'edit' && selectedEventId && (
                     <button
                       type="button"
                       onClick={() => handleDeleteEvent(selectedEventId)}
-                      className="mr-auto text-xs font-bold text-red-600 hover:bg-red-50 px-2.5 py-1.5 rounded-lg transition"
+                      className="mr-auto text-xs font-semibold text-rose-600 hover:bg-rose-50 px-3 py-2 rounded-xl transition-colors"
                     >
-                      Delete Activity
+                      Delete Event
                     </button>
                   )}
-                  {activeDayEvents.length > 0 && (
-                    <button type="button" onClick={() => setModalView('details')} className="text-xs font-bold text-gray-500 hover:text-gray-700 px-2">← Back</button>
+                  {events.filter(e => isEventOnDate(e, selectedDateStr)).length > 0 && (
+                    <button type="button" onClick={() => setModalView('details')} className="text-xs font-semibold text-slate-400 hover:text-slate-600 px-2">← Back</button>
                   )}
-                  <button type="submit" className="px-4 py-2 text-xs font-bold text-white bg-green-600 hover:bg-green-700 rounded-lg transition">
-                    {modalView === 'create' ? 'Publish Activity' : 'Save Changes'}
+                  <button type="submit" className="px-4 py-2 text-xs font-semibold text-white bg-emerald-600 hover:bg-emerald-700 rounded-xl transition-colors shadow-xs">
+                    {modalView === 'create' ? 'Publish Event' : 'Save Changes'}
                   </button>
                 </div>
               </form>
@@ -426,7 +532,6 @@ const EventsPage: React.FC = () => {
         document.body,
       )}
     </div>
-    
   );
 };
 

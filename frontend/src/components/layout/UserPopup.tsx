@@ -49,7 +49,7 @@ const UserPopup: React.FC<UserPopupProps> = ({ isOpen, onClose }) => {
       >
         {/* Hlavička s tlačítkem zavřít */}
         <div className="flex justify-between items-start mb-3">
-          <div className="text-sm font-semibold text-palette-pine">Profil uživatele</div>
+          <div className="text-sm font-semibold text-palette-pine">User Profile</div>
           <button 
             onClick={handleClose}
             className="text-gray-400 hover:text-red-500 transition-colors p-1 -mt-1 -mr-1 rounded-full hover:bg-red-50"
