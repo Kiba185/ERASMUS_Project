@@ -3,6 +3,7 @@ import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 
 type EventType = 'exam' | 'excursion' | 'meeting' | 'holiday' | string;
+type AudienceType = 'class' | 'student' | 'everyoneStudents' | 'everyoneTeachers';
 
 type SchoolEvent = {
   id: string;
@@ -13,7 +14,101 @@ type SchoolEvent = {
   isAllDay: boolean;
   type: EventType;
   className?: string;
+  audienceTag?: string;
+  audienceTags?: string[];
   description?: string;
+};
+
+interface AudienceOption {
+  value: string;
+  label: string;
+}
+
+const CLASS_AUDIENCE_OPTIONS: AudienceOption[] = ['4.A', '4.B', '4.C', '4.D'].map((className) => ({
+  value: `@${className}`,
+  label: `@${className}`,
+}));
+
+const STUDENT_AUDIENCE_OPTIONS: AudienceOption[] = [
+  'John Doe',
+  'Marek Kalach',
+  'Jane Doe',
+  'Linda Brown',
+  'Tomas Benes',
+].map((studentName) => {
+  const handle = `@${studentName.toLowerCase().replace(/\s+/g, '-')}`;
+
+  return {
+    value: handle,
+    label: `${handle} (${studentName})`,
+  };
+});
+
+const EVERYONE_AUDIENCE_OPTIONS: AudienceOption[] = [
+  { value: '@everyone-students', label: '@everyone-students' },
+  { value: '@everyone-teachers', label: '@everyone-teachers' },
+];
+
+const ALL_AUDIENCE_OPTIONS = [
+  ...CLASS_AUDIENCE_OPTIONS,
+  ...STUDENT_AUDIENCE_OPTIONS,
+  ...EVERYONE_AUDIENCE_OPTIONS,
+];
+
+const normalizeAudienceTag = (value: string) => {
+  const trimmedValue = value.trim();
+
+  if (!trimmedValue) {
+    return '';
+  }
+
+  return trimmedValue.startsWith('@') ? trimmedValue : `@${trimmedValue}`;
+};
+
+const getAudienceOptionsForType = (type: AudienceType) => {
+  if (type === 'class') {
+    return CLASS_AUDIENCE_OPTIONS;
+  }
+
+  if (type === 'student') {
+    return STUDENT_AUDIENCE_OPTIONS;
+  }
+
+  return EVERYONE_AUDIENCE_OPTIONS.filter((option) =>
+    type === 'everyoneStudents' ? option.value === '@everyone-students' : option.value === '@everyone-teachers',
+  );
+};
+
+const getAudienceTagsFromEvent = (event: SchoolEvent) => {
+  if (event.audienceTags?.length) {
+    return event.audienceTags;
+  }
+
+  if (event.audienceTag) {
+    return event.audienceTag.split(',').map((tag) => tag.trim()).filter(Boolean);
+  }
+
+  if (event.className) {
+    return [`@${event.className}`];
+  }
+
+  return ['@everyone-students'];
+};
+
+const getAudienceTypeFromTags = (tags: string[]): AudienceType => {
+  if (tags.some((tag) => CLASS_AUDIENCE_OPTIONS.some((option) => option.value === tag))) {
+    return 'class';
+  }
+
+  if (tags.some((tag) => STUDENT_AUDIENCE_OPTIONS.some((option) => option.value === tag))) {
+    return 'student';
+  }
+
+  if (tags.includes('@everyone-teachers')) {
+    return 'everyoneTeachers';
+  }
+
+  return 'everyoneStudents';
 };
 
 const EventsPage: React.FC = () => {
@@ -27,10 +122,10 @@ const EventsPage: React.FC = () => {
 
   // --- STAV PRO UDÁLOSTI ---
   const [events, setEvents] = useState<SchoolEvent[]>([
-    { id: 'e1', title: 'Math Midterm Examination Block', startDate: '2026-05-13', endDate: '2026-05-13', time: '08:15', isAllDay: false, type: 'exam', className: '4.A', description: 'Covers algebra and geometry modules. Room 204.' },
-    { id: 'e2', title: 'Prague Castle Field Trip & History Lecture', startDate: '2026-05-20', endDate: '2026-05-20', time: '07:45', isAllDay: false, type: 'excursion', className: '4.A', description: 'History excursion focused on gothic architecture.' },
-    { id: 'e3', title: 'Regular Parent-Teacher Association Meeting', startDate: '2026-05-14', endDate: '2026-05-14', time: '17:00', isAllDay: false, type: 'meeting', description: 'Main school auditorium.' },
-    { id: 'e4', title: 'State Holiday - Liberation Day', startDate: '2026-05-01', endDate: '2026-05-03', time: '', isAllDay: true, type: 'holiday', description: 'School completely closed.' },
+    { id: 'e1', title: 'Math Midterm Examination Block', startDate: '2026-05-13', endDate: '2026-05-13', time: '08:15', isAllDay: false, type: 'exam', className: '4.A', audienceTag: '@4.A', audienceTags: ['@4.A'], description: 'Covers algebra and geometry modules. Room 204.' },
+    { id: 'e2', title: 'Prague Castle Field Trip & History Lecture', startDate: '2026-05-20', endDate: '2026-05-20', time: '07:45', isAllDay: false, type: 'excursion', className: '4.A', audienceTag: '@4.A', audienceTags: ['@4.A'], description: 'History excursion focused on gothic architecture.' },
+    { id: 'e3', title: 'Regular Parent-Teacher Association Meeting', startDate: '2026-05-14', endDate: '2026-05-14', time: '17:00', isAllDay: false, type: 'meeting', audienceTag: '@everyone-teachers', audienceTags: ['@everyone-teachers'], description: 'Main school auditorium.' },
+    { id: 'e4', title: 'State Holiday - Liberation Day', startDate: '2026-05-01', endDate: '2026-05-03', time: '', isAllDay: true, type: 'holiday', audienceTag: '@everyone-students', audienceTags: ['@everyone-students'], description: 'School completely closed.' },
   ]);
 
   const [navDate, setNavDate] = useState<Date>(new Date(2026, 4, 1));
@@ -47,7 +142,9 @@ const EventsPage: React.FC = () => {
   const [isAllDay, setIsAllDay] = useState(false);
   const [eventType, setEventType] = useState<EventType>('exam');
   const [customType, setCustomType] = useState(''); 
-  const [eventClass, setEventClass] = useState('');
+  const [audienceType, setAudienceType] = useState<AudienceType>('everyoneStudents');
+  const [audienceSearch, setAudienceSearch] = useState('');
+  const [selectedAudienceTags, setSelectedAudienceTags] = useState<string[]>(['@everyone-students']);
   const [eventDesc, setEventDesc] = useState('');
 
   // --- KALENDÁŘ LOGIKA ---
@@ -74,6 +171,52 @@ const EventsPage: React.FC = () => {
     return dateStr >= event.startDate && dateStr <= event.endDate;
   };
 
+  const audienceOptions = useMemo(() => {
+    const searchValue = audienceSearch.trim().toLowerCase();
+    const sourceOptions = audienceSearch.trim().startsWith('@')
+      ? ALL_AUDIENCE_OPTIONS
+      : getAudienceOptionsForType(audienceType);
+
+    if (!searchValue) {
+      return sourceOptions;
+    }
+
+    return sourceOptions.filter((option) =>
+      option.value.toLowerCase().includes(searchValue) || option.label.toLowerCase().includes(searchValue),
+    );
+  }, [audienceSearch, audienceType]);
+
+  const addAudienceTag = (tag: string) => {
+    const normalizedTag = normalizeAudienceTag(tag);
+
+    if (!normalizedTag) {
+      return;
+    }
+
+    setSelectedAudienceTags((currentTags) =>
+      currentTags.includes(normalizedTag) ? currentTags : [...currentTags, normalizedTag],
+    );
+    setAudienceSearch('');
+  };
+
+  const removeAudienceTag = (tag: string) => {
+    setSelectedAudienceTags((currentTags) => currentTags.filter((currentTag) => currentTag !== tag));
+  };
+
+  const toggleAudienceTag = (tag: string) => {
+    const normalizedTag = normalizeAudienceTag(tag);
+
+    if (!normalizedTag) {
+      return;
+    }
+
+    setSelectedAudienceTags((currentTags) =>
+      currentTags.includes(normalizedTag)
+        ? currentTags.filter((currentTag) => currentTag !== normalizedTag)
+        : [...currentTags, normalizedTag],
+    );
+  };
+
   const handleDayClick = (dateStr: string) => {
     setSelectedDateStr(dateStr);
     const dayEvents = events.filter(e => isEventOnDate(e, dateStr));
@@ -96,7 +239,9 @@ const EventsPage: React.FC = () => {
     setIsAllDay(false);
     setEventType('exam');
     setCustomType('');
-    setEventClass('');
+    setAudienceType('everyoneStudents');
+    setAudienceSearch('');
+    setSelectedAudienceTags(['@everyone-students']);
     setEventDesc('');
   };
 
@@ -108,7 +253,10 @@ const EventsPage: React.FC = () => {
     setEventEndDate(event.endDate);
     setEventTime(event.time || '08:00');
     setIsAllDay(event.isAllDay);
-    setEventClass(event.className || '');
+    const eventAudienceTags = getAudienceTagsFromEvent(event);
+    setAudienceType(getAudienceTypeFromTags(eventAudienceTags));
+    setAudienceSearch('');
+    setSelectedAudienceTags(eventAudienceTags);
     setEventDesc(event.description || '');
     
     if (['exam', 'excursion', 'meeting', 'holiday'].includes(event.type)) {
@@ -129,6 +277,12 @@ const EventsPage: React.FC = () => {
 
     // Bezpečná validace datumu (aby konec nebyl před začátkem)
     const finalEndDate = eventEndDate < eventStartDate ? eventStartDate : eventEndDate;
+    const finalAudienceTags = selectedAudienceTags.length > 0 ? selectedAudienceTags : ['@everyone-students'];
+    const finalAudienceTag = finalAudienceTags.join(', ');
+    const firstClassTag = finalAudienceTags.find((tag) =>
+      CLASS_AUDIENCE_OPTIONS.some((option) => option.value === tag),
+    );
+    const finalClassName = firstClassTag?.replace(/^@/, '');
 
     if (modalView === 'create') {
       const created: SchoolEvent = {
@@ -139,7 +293,9 @@ const EventsPage: React.FC = () => {
         time: isAllDay ? '' : eventTime,
         isAllDay,
         type: finalType,
-        className: eventClass || undefined,
+        className: finalClassName,
+        audienceTag: finalAudienceTag,
+        audienceTags: finalAudienceTags,
         description: eventDesc || undefined,
       };
       setEvents(prev => [...prev, created]);
@@ -153,7 +309,9 @@ const EventsPage: React.FC = () => {
         time: isAllDay ? '' : eventTime,
         isAllDay,
         type: finalType,
-        className: eventClass || undefined,
+        className: finalClassName,
+        audienceTag: finalAudienceTag,
+        audienceTags: finalAudienceTags,
         description: eventDesc || undefined,
       } : ev));
       setModalView('details');
@@ -379,7 +537,11 @@ const EventsPage: React.FC = () => {
                       
                       <div className="flex gap-1.5 items-center flex-wrap">
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${getStyle(event.type).badge}`}>{event.type}</span>
-                        {event.className && <span className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md">Class: {event.className}</span>}
+                        {getAudienceTagsFromEvent(event).map((tag) => (
+                          <span key={tag} className="text-[10px] font-bold text-emerald-600 bg-emerald-50 border border-emerald-100 px-1.5 py-0.5 rounded-md">
+                            {tag}
+                          </span>
+                        ))}
                         {event.startDate !== event.endDate && <span className="text-[10px] font-medium text-slate-500 bg-slate-100 px-1.5 py-0.5 rounded-md">Multi-day event</span>}
                       </div>
 
@@ -495,10 +657,93 @@ const EventsPage: React.FC = () => {
                   )}
                 </div>
 
-                <div className="grid grid-cols-1 gap-2">
-                  <div>
-                    <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Target Class (Optional)</label>
-                    <input type="text" placeholder="e.g., 4.A" value={eventClass} onChange={(e) => setEventClass(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 uppercase" maxLength={5} />
+                <div>
+                  <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1.5">Target audience</label>
+                  <div className="grid grid-cols-2 gap-2">
+                    {[
+                      { type: 'class' as const, label: '@class' },
+                      { type: 'student' as const, label: '@student' },
+                      { type: 'everyoneStudents' as const, label: '@everyone-students' },
+                      { type: 'everyoneTeachers' as const, label: '@everyone-teachers' },
+                    ].map((option) => (
+                      <button
+                        key={option.type}
+                        type="button"
+                        onClick={() => {
+                          setAudienceType(option.type);
+                          setAudienceSearch('');
+
+                          if (option.type === 'everyoneStudents') {
+                            toggleAudienceTag('@everyone-students');
+                          }
+
+                          if (option.type === 'everyoneTeachers') {
+                            toggleAudienceTag('@everyone-teachers');
+                          }
+                        }}
+                        className={`p-2 rounded-xl border text-left transition-all ${
+                          audienceType === option.type
+                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500 font-bold'
+                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  <div className="mt-2 min-h-24 rounded-xl border border-slate-200 bg-white p-2 focus-within:border-emerald-500 focus-within:ring-1 focus-within:ring-emerald-500">
+                    <div className="flex flex-wrap gap-2">
+                      {selectedAudienceTags.map((tag) => (
+                        <button
+                          key={tag}
+                          type="button"
+                          onClick={() => removeAudienceTag(tag)}
+                          className="flex items-center gap-1 rounded-lg border border-emerald-200 bg-emerald-50 px-2 py-1 text-[11px] font-bold text-emerald-700 hover:bg-emerald-100"
+                        >
+                          <span>{tag}</span>
+                          <span className="text-emerald-500">x</span>
+                        </button>
+                      ))}
+                      <input
+                        type="text"
+                        value={audienceSearch}
+                        onChange={(event) => setAudienceSearch(event.target.value)}
+                        onKeyDown={(event) => {
+                          if ((event.key === 'Enter' || event.key === ',') && audienceSearch.trim()) {
+                            event.preventDefault();
+                            addAudienceTag(audienceSearch);
+                          }
+
+                          if (event.key === 'Backspace' && !audienceSearch && selectedAudienceTags.length > 0) {
+                            removeAudienceTag(selectedAudienceTags[selectedAudienceTags.length - 1]);
+                          }
+                        }}
+                        placeholder="@search audience..."
+                        className="min-w-40 flex-1 bg-transparent p-1 text-xs text-slate-700 outline-hidden placeholder:text-slate-400"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="mt-2 max-h-36 overflow-y-auto rounded-xl border border-slate-200 bg-slate-50 p-2">
+                    {audienceOptions.map((option) => {
+                      const isChecked = selectedAudienceTags.includes(option.value);
+
+                      return (
+                        <label
+                          key={option.value}
+                          className="flex cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-white"
+                        >
+                          <input
+                            type="checkbox"
+                            checked={isChecked}
+                            onChange={() => toggleAudienceTag(option.value)}
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500"
+                          />
+                          <span className="text-xs font-semibold text-slate-700">{option.label}</span>
+                        </label>
+                      );
+                    })}
                   </div>
                 </div>
 
