@@ -134,6 +134,52 @@ app.post('/api/register', async (req, res, next) => {
 })
 
 
+//CREATE USER - ADMIN ONLY
+app.post('/api/admin/createuser', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+    const { firstName, lastName, birthday, username, password, email, phone, adress, role } = req.body;
+    const hashedPassword = await bcrypt.hash(password, 10);
+    if (await prisma.user.findFirst({ where: { username } })) { return res.status(400).json({ success: false, message: 'Username already exists' }) };
+    const newUser = await prisma.user.create({
+        data: { password: hashedPassword, firstName, lastName, birthday, username, email, phone, adress, role }
+    });
+
+    if (!newUser) { return res.status(400).json({ success: false, message: 'User creation failed' }); }
+    res.status(201).json({ success: true, user: newUser });
+});
+
+
+//INITIALIZE CLEAN DATABASE - WHEN FIRED, REISGTER 4 USERS - ADMIN, TEACHER, STUDENT, PARENT WITH USERNAME = ROLE AND PASSWORD = ROLE
+app.get('/api/initialize', async (req, res, next) => {
+    const users = await prisma.user.findMany();
+    if (users.length > 0) {
+        return res.status(400).json({ success: false, message: 'Database is not empty' });
+    }
+
+    for (const role of ['admin', 'teacher', 'student', 'parent']) {
+        const hashedPassword = await bcrypt.hash(role, 10);
+        await prisma.user.create({
+            data: {
+                role: role,
+                password: hashedPassword,
+                firstName: `${role.charAt(0).toUpperCase() + role.slice(1)}`,
+                lastName: 'User',
+                birthday: new Date('1990-01-01'),
+                username: role,
+                email: `${role}@example.com`,
+                phone: '123456789',
+                adress: '123 Main St'
+            }
+        });
+    }
+
+    // Create other users (teacher, student, parent) with their respective roles
+    // ...
+
+    res.json({ success: true, message: 'Database initialized successfully' });
+});
+
 //LOGOUT
 async function logout(req: express.Request, res: express.Response, next: express.NextFunction) {
     req.session.destroy((err) => {
@@ -196,7 +242,7 @@ app.get('/api/users', async (req, res, next) => {
 //GET ALL USERS OF ROLE - ADMIN ONLY
 app.get('/api/users/:role', async (req, res, next) => {
     /// AUTH - if requesting all of STUDENT or all of PARENT then TEACHER and ADMIN can access ///
-    if (req.params.role === 'student' || req.params.role === 'parent') {
+    if (req.params.role === 'student' || req.params.role === 'parent' || req.params.role === 'teacher') {
         if (await requireAuth(req, res, next, 5) !== true) { return; }
     } else {
         if (await requireAuth(req, res, next, 10) !== true) { return; }
@@ -262,7 +308,7 @@ app.get('/api/gradeColumns', async (req, res, next) => {
 });
 
 //CREATE GRADE COLUMN - TEACHER ONLY
-app.post('/api/gradeColumns', async (req, res, next) => { 
+app.post('/api/gradeColumns', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) { return; }
 
     const { name, subjectId, weight, date } = req.body;
@@ -601,7 +647,7 @@ app.post('/api/events', async (req, res, next) => {
             startDate: new Date(startDate),
             endDate: new Date(endDate),
             type,
-            startTime: new Date(startTime),
+            startTime: (startTime && startTime !== 'null') ? new Date(startTime) : new Date(startDate),
             allDay,
             participantsIndividuals: {
                 connect: participantIndividualIds.map((id: number) => ({ id }))
@@ -649,7 +695,7 @@ app.put('/api/events/:id', async (req, res, next) => {
             startDate: new Date(startDate),
             endDate: new Date(endDate),
             type,
-            startTime: new Date(startTime),
+            startTime: (startTime && startTime !== 'null') ? new Date(startTime) : new Date(startDate),
             allDay,
             participantsIndividuals: {
                 set: participantIndividualIds.map((id: number) => ({ id }))
@@ -675,7 +721,7 @@ app.put('/api/events/:id', async (req, res, next) => {
 
 
 
-app.use(timetableRouter); 
+app.use(timetableRouter);
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
