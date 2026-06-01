@@ -25,19 +25,19 @@ model User {
   firstName String
   birthday  DateTime
   createdAt DateTime @default(now())
-  username  String   
+  username  String
   password  String
   email     String
   phone     String
   adress    String
 
   classes    Class[]
-  timeTables TimeTable[] 
+  timeTables TimeTable[]
 
   // Parent-child relationship
-  parentId    Int?
-  parent      User?     @relation("ParentChild", fields: [parentId], references: [id])
-  children    User[]    @relation("ParentChild")
+  parentId Int?
+  parent   User?  @relation("ParentChild", fields: [parentId], references: [id])
+  children User[] @relation("ParentChild")
 
   // Other relations
   events Event[]
@@ -48,7 +48,7 @@ model Subject {
   name       String
   code       String
   color      String
-  timeTables TimeTable[] 
+  timeTables TimeTable[]
 }
 
 model Lesson {
@@ -70,10 +70,10 @@ model GradeColumn {
 }
 
 model Grade {
-  id          Int       @id @default(autoincrement())
-  gColumnId   Int
-  userId      Int
-  grade       Decimal
+  id        Int     @id @default(autoincrement())
+  gColumnId Int
+  userId    Int
+  grade     Decimal
 }
 
 model Class {
@@ -105,14 +105,14 @@ model TimeTable {
 }
 
 model Event {
-  id                            Int     @id @default(autoincrement())
-  participantsIndividuals       User[]
-  participantsClasses           Class[]
-  title                         String
-  description                   String
-  startDate                     DateTime
-  endDate                       DateTime
-  type                          String
-  startTime                     DateTime
-  allDay                        Boolean
+  id                      Int      @id @default(autoincrement())
+  participantsIndividuals User[]
+  participantsClasses     Class[]
+  title                   String
+  description             String
+  startDate               DateTime
+  endDate                 DateTime
+  type                    String
+  startTime               DateTime
+  allDay                  Boolean
 }
