@@ -5,7 +5,7 @@ import Logo from './Logo';
 import UserPopup from './UserPopup';
 
 const Header = () => {
-  const { user } = useAuth();
+  const { user, activeChildId, setActiveChildId } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
   
@@ -15,9 +15,7 @@ const Header = () => {
   const isUserRoute = location.pathname === '/user' || location.pathname.startsWith('/user/');
 
   const handleProfileClick = () => {
-    if (!isUserRoute) {
-      setIsPopupOpen(!isPopupOpen);
-    }
+    setIsPopupOpen(!isPopupOpen);
   };
 
   return (
@@ -28,17 +26,34 @@ const Header = () => {
 
       {user ? (
         <div className="relative flex items-center space-x-4">
+          
+          {/* Multi-Child Switcher for Parents */}
+          {user.role === 'parent' && user.children && user.children.length > 1 && (
+            <div className="flex items-center space-x-2 mr-2 border-r border-palette-mist pr-4">
+              <span className="text-sm font-bold text-palette-moss hidden sm:inline-block">Viewing:</span>
+              <select 
+                value={activeChildId || ''} 
+                onChange={(e) => setActiveChildId(e.target.value)}
+                className="bg-white border border-palette-sage text-palette-pine text-sm rounded-lg focus:ring-palette-fern focus:border-palette-fern block p-1.5 shadow-sm font-bold outline-none cursor-pointer hover:border-palette-fern transition-colors"
+              >
+                {user.children.map(child => (
+                  <option key={child.id} value={child.id}>
+                    {child.firstName} {child.lastName}
+                  </option>
+                ))}
+              </select>
+            </div>
+          )}
+
           <div 
             onClick={handleProfileClick}
-            className={`h-8 w-8 rounded-full bg-palette-lichen/35 flex items-center justify-center text-palette-pine font-bold select-none transition ${
-              isUserRoute ? 'cursor-default opacity-80' : 'cursor-pointer hover:bg-palette-sage/45'
-            }`} 
-            title={isUserRoute ? 'Profil' : 'Nastavení profilu'}
+            className="h-8 w-8 rounded-full bg-palette-lichen/35 flex items-center justify-center text-palette-pine font-bold select-none transition cursor-pointer hover:bg-palette-sage/45"
+            title="Nastavení profilu"
           >
             {user?.firstName ? user.firstName.charAt(0).toUpperCase() : (user?.id ? user.id.charAt(0).toUpperCase() : 'U')}
           </div>
           <UserPopup 
-            isOpen={isPopupOpen && !isUserRoute} 
+            isOpen={isPopupOpen} 
             onClose={() => setIsPopupOpen(false)} 
           />
         </div>

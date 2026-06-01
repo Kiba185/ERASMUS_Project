@@ -9,4 +9,5 @@ export interface User {
   birthday: string;
   email: string;
   phone: string;
+  children?: { id: string; firstName: string; lastName: string }[];
 }

@@ -7,24 +7,25 @@ import type { User } from '../../types';
 interface SidebarLink {
   label: string;
   path: string;
+  icon: string;
   roles: User['role'][];
 }
 
 const SIDEBAR_LINKS: SidebarLink[] = [
-  { label: 'Dashboard', path: '/dashboard', roles: ['admin', 'teacher', 'student', 'parent'] },
-  { label: 'Events', path: '/events', roles: ['admin', 'teacher', 'student', 'parent'] },
-  { label: 'Messages', path: '/messages', roles: ['admin', 'teacher', 'student', 'parent'] },
-
-  // Admin
-  { label: 'User management', path: '/users', roles: ['admin'] },
-  { label: 'Grades editing', path: '/grades-edit', roles: ['teacher', 'admin'] },
-  { label: 'Attendance', path: '/attendance', roles: ['teacher', 'admin'] },
-  { label: 'Classes', path: '/classes', roles: ['teacher', 'admin'] },
-  { label: 'Schedule', path: '/schedule', roles: ['student', 'admin', 'parent', 'teacher'] },
-  { label: 'Grades', path: '/grades', roles: ['student', 'admin', 'parent', 'teacher'] },
-  { label: 'Semester', path: '/semester', roles: ['parent', 'admin', 'student', 'teacher'] },
-  { label: 'Absence notes', path: '/absence-notes', roles: ['parent', 'admin', 'teacher', 'student' ] },
-  { label: 'User info', path: '/user', roles: ['parent', 'admin', 'student', 'teacher'] },
+  { label: 'Dashboard',icon: 'dashboard_2', path: '/dashboard', roles: ['admin', 'teacher', 'student', 'parent'] },
+  { label: 'User management', icon: 'people', path: '/users', roles: ['admin'] },
+  { label: 'Schedule', icon: 'calendar_today', path: '/schedule', roles: ['student', 'parent', 'teacher'] },
+  { label: 'Grades editing', icon: 'edit', path: '/grades-edit', roles: ['teacher', 'admin'] },
+  { label: 'Grades', icon: 'looks_one', path: '/grades', roles: ['student', 'parent',] },
+  { label: 'Attendance', icon: 'check_circle', path: '/attendance', roles: ['teacher', 'admin'] },
+  { label: 'Absence', icon: 'error', path: '/absence', roles: ['admin', 'student', 'parent'] },
+  { label: 'Absence notes', icon: 'note', path: '/absence-notes', roles: ['parent', 'admin', 'teacher'] },
+  { label: 'Messages', icon: 'message', path: '/messages', roles: ['admin', 'teacher', 'student', 'parent'] },
+  { label: 'Classes', icon: 'class', path: '/classes', roles: ['teacher', 'admin'] },
+  { label: 'Semester', icon: 'date_range', path: '/semester', roles: ['parent', 'admin', 'student', 'teacher'] },
+  { label: 'Events', icon: 'map_pin_review', path: '/events', roles: ['admin', 'teacher', 'student', 'parent'] },
+  { label: 'User info', icon: 'person', path: '/user', roles: ['parent', 'admin', 'student', 'teacher'] },
+  { label: 'Edit Schedule', icon: 'edit_calendar', path: '/schedule-edit', roles: ['admin'] }
 ];
 
 const Sidebar: React.FC = () => {
@@ -39,15 +40,14 @@ const Sidebar: React.FC = () => {
     : visibleLinks.filter((link) => !(link.path === '/user' || link.path.startsWith('/user/')));
 
   return (
-    <aside className="hidden w-64 shrink-0 self-stretch bg-palette-pine text-palette-mist md:block">
-      <nav className="sticky top-0 h-[calc(100vh-4rem)] overflow-y-auto px-4 py-6 space-y-2">
+    <aside className="w-full shrink-0 bg-palette-pine text-palette-mist md:w-64 border-b md:border-b-0 md:border-r border-palette-fern">
+      <nav className="max-h-[50vh] overflow-y-auto px-4 py-6 space-y-2 md:max-h-[calc(100vh-4rem)] md:sticky md:top-0">
         {isUserRoute && (
           <div className="mb-6">
             <button
               onClick={() => navigate('/dashboard')}
-              className="flex items-center text-palette-lichen hover:text-palette-mist transition-colors mb-4 w-full text-left"
-            >
-              Back
+              className="flex items-center text-palette-lichen hover:text-palette-mist transition-colors mb-4 w-full text-left">
+               <span className="material-symbols-outlined">arrow_back</span>Back
             </button>
             <hr className="border-palette-fern mb-4" />
           </div>
@@ -66,6 +66,7 @@ const Sidebar: React.FC = () => {
               }`
             }
           >
+            <span className="material-symbols-outlined mr-3 translate-y-[5px]">{link.icon}</span>
             {link.label}
           </NavLink>
         ))}

@@ -1,5 +1,5 @@
 import React, { useState, useMemo } from 'react';
-
+import { createPortal } from 'react-dom';
 // --- MOCK DATA ---
 interface MockStudent {
   id: number;
@@ -226,8 +226,8 @@ const ClassesPage: React.FC = () => {
       </div>
 
       {/* CREATE / EDIT MODAL */}
-      {isModalOpen && editingClass && (
-        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+      {isModalOpen && editingClass && createPortal(
+        <div className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto bg-palette-sage/45 px-4 py-6 backdrop-blur-[1px]">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden border border-palette-mist">
             <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-palette-mist/30">
               <h2 className="text-2xl font-bold text-palette-pine">
@@ -376,7 +376,8 @@ const ClassesPage: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
     </div>
   );
