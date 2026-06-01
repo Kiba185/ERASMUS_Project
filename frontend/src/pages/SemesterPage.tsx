@@ -198,18 +198,16 @@ const SemesterPage: React.FC = () => {
         {/* LIFETIME STATS */}
         <section className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           {[
-            { label: 'Career GPA', value: lifetimeGPA, icon: '' },
-            { label: 'Avg. Attendance', value: `${lifetimeAttendance}%`, icon: '' },
-            { label: 'Tracked Years', value: totalYears, icon: '' },
+            { label: 'Career GPA', value: lifetimeGPA},
+            { label: 'Avg. Attendance', value: `${lifetimeAttendance}%`},
+            { label: 'Tracked Years', value: totalYears},
           ].map((stat, idx) => (
             <div key={idx} className="bg-white p-5 rounded-2xl shadow-sm border border-slate-200/60 flex items-center justify-between">
               <div>
                 <p className="text-xs font-semibold text-slate-500 uppercase tracking-wider mb-1">{stat.label}</p>
                 <p className="text-2xl font-bold text-slate-900">{stat.value}</p>
               </div>
-              <div className="text-2xl bg-slate-50 w-12 h-12 rounded-xl flex items-center justify-center border border-slate-100">
-                {stat.icon}
-              </div>
+              
             </div>
           ))}
         </section>
