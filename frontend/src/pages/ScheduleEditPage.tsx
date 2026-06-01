@@ -1,5 +1,6 @@
 import React, { useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { loadSetupMockData, mergeUniqueOptions } from '../data/setupMockData';
 
 interface Lesson {
   id: string | number;
@@ -25,6 +26,7 @@ const availableTeachers = [
 ];
 
 const availableClasses = ['7.C', '8.A', '8.B', '9.B', '9.C'];
+const availableSubjects = ['Mathematics', 'Information Tech.', 'Gymnastics', 'Laboratory Physics'];
 const availableRooms = ['A10', 'A12', 'A15', 'B05', 'B11', 'B15', 'B20', 'B35', 'C21', 'D05', 'E10', 'Gym'];
 const availableGroups = ['Whole Class', 'Group 1', 'Group 2', 'Boys', 'Girls'];
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
@@ -121,6 +123,7 @@ const getWeekDatesStrings = (weekOffset: number): string[] => {
 
 const ScheduleEditPage: React.FC = () => {
   const { user } = useAuth();
+  const [setupMockData] = useState(loadSetupMockData);
   
   const [selectedClass, setSelectedClass] = useState<string>(availableClasses[3]); 
   const [weekOffset, setWeekOffset] = useState<number>(0);
@@ -129,6 +132,11 @@ const ScheduleEditPage: React.FC = () => {
   const [isPermanentEditMode, setIsPermanentEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Partial<Lesson> | null>(null);
+  const availableSubjectOptions = mergeUniqueOptions(
+    [...availableSubjects, ...lessons.map((lesson) => lesson.subject)],
+    setupMockData.subjects.map((subject) => subject.subject),
+  );
+  const availableRoomOptions = mergeUniqueOptions(availableRooms, setupMockData.rooms);
 
   const currentWeekDates = getWeekDatesStrings(weekOffset);
   const viewedMondayDate = getMondayOfOffsetWeek(weekOffset);
@@ -203,10 +211,10 @@ const ScheduleEditPage: React.FC = () => {
       id: Date.now(),
       day: 'Monday',
       time: timeSlots[0],
-      subject: '',
+      subject: availableSubjectOptions[0] ?? '',
       teacher: availableTeachers[0],
       className: selectedClass, 
-      room: availableRooms[0],
+      room: availableRoomOptions[0],
       weekType: 'all',
       group: 'Whole Class',
       color: 'border-gray-500 bg-gray-50',
@@ -506,7 +514,17 @@ const ScheduleEditPage: React.FC = () => {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Subject Name</label>
-                  <input type="text" name="subject" value={editingLesson.subject} onChange={handleChange} disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'} className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60" placeholder="e.g. Mathematics" />
+                  <select name="subject" value={editingLesson.subject} onChange={handleChange} disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'} className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60">
+                    {availableSubjectOptions.map((subject) => {
+                      const setupSubject = setupMockData.subjects.find((option) => option.subject === subject);
+
+                      return (
+                        <option key={subject} value={subject}>
+                          {setupSubject ? `${setupSubject.subject} (${setupSubject.abbreviation})` : subject}
+                        </option>
+                      );
+                    })}
+                  </select>
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Class Division Group</label>
@@ -526,7 +544,7 @@ const ScheduleEditPage: React.FC = () => {
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Assigned Room</label>
                 <select name="room" value={editingLesson.room} onChange={handleChange} disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'} className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60">
-                  {availableRooms.map(r => <option key={r} value={r}>{r}</option>)}
+                  {availableRoomOptions.map(r => <option key={r} value={r}>{r}</option>)}
                 </select>
               </div>
             </div>
