@@ -8,6 +8,7 @@ import bcrypt from 'bcrypt';
 import timetableRouter from './timeTable.ts';
 
 import { requireAuth } from './auth.ts';
+import userRoutes from './users.ts';
 
 declare module 'express-session' {
     interface SessionData {
@@ -42,7 +43,7 @@ app.use(session({
 }));
 
 
-
+app.use(userRoutes);
 
 
 //////////////////////////////////////
