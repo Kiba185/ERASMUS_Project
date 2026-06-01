@@ -14,6 +14,7 @@ interface SidebarLink {
 const SIDEBAR_LINKS: SidebarLink[] = [
   { label: 'Dashboard',icon: 'dashboard_2', path: '/dashboard', roles: ['admin', 'teacher', 'student', 'parent'] },
   { label: 'User management', icon: 'people', path: '/users', roles: ['admin'] },
+  { label: 'Setup', icon: 'settings', path: '/setup', roles: ['admin'] },
   { label: 'Schedule', icon: 'calendar_today', path: '/schedule', roles: ['student', 'parent', 'teacher'] },
   { label: 'Grades editing', icon: 'edit', path: '/grades-edit', roles: ['teacher', 'admin'] },
   { label: 'Grades', icon: 'looks_one', path: '/grades', roles: ['student', 'parent',] },

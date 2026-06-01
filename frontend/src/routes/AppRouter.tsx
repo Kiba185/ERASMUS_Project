@@ -20,6 +20,7 @@ import UsersPage from '../pages/UsersPage';
 import MessagesPage from '../pages/MessagesPage';
 import AbsenceNotesPage from '../pages/AbsenceNotesPage';
 import AbsencePage from '../pages/AbsencePage';
+import SetupPage from '../pages/SetupPage';
 
 export const appRouter = createBrowserRouter([
   {
@@ -55,6 +56,7 @@ export const appRouter = createBrowserRouter([
       { path: '/messages', element: <MessagesPage /> },
       { path: '/absence-notes', element: <AbsenceNotesPage /> },
       { path: '/absence', element: <AbsencePage /> },
+      { path: '/setup', element: <SetupPage /> },
 
     ]
   },
