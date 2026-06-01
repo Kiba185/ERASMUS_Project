@@ -5,7 +5,8 @@ import GradesWidget from '../components/widgets/GradesWidget';
 import ClassesWidget from '../components/widgets/ClassesWidget';
 import StatisticsWidget from '../components/widgets/StatisticsWidget';
 import EventsWidget from '../components/widgets/EventsWidget';
-import AttendanceWidget from '../components/widgets/AttendanceWidget';
+import AbsenceWidget from '../components/widgets/AbsenceWidget';
+import MessagesWidget from '../components/widgets/MessagesWidget';
 import { useState, useEffect } from 'react';
 
 type Grade = { id: string; gColumnId: string; userId: string; grade: string, subjectName: string; subjectId: number; date: string; gColumnName?: string; weight?: number };
@@ -46,7 +47,7 @@ const Dashboard: React.FC = () => {
 
         )}
         {user.role === 'student' && (
-          <AttendanceWidget />
+          <AbsenceWidget />
 
         )}
 
@@ -56,7 +57,10 @@ const Dashboard: React.FC = () => {
         )}
 
         {(user.role === 'admin' || user.role === 'teacher' || user.role === 'parent' || user.role === 'student') && (
-          <EventsWidget />
+          <>
+            <MessagesWidget />
+            <EventsWidget />
+          </>
         )}
       </div>
     </div>
