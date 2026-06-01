@@ -432,6 +432,9 @@ let lessons: typeof studentLessons = [];
     lessons = studentLessons;
   }
 
+
+
+
   return (
     <div className="p-8">
       <div className="flex items-center justify-between mb-8">
@@ -462,7 +465,7 @@ let lessons: typeof studentLessons = [];
                             lesson.color.includes('black')
                               ? ''
                               : 'hover:shadow-lg hover:scale-105'
-                          } ${lesson.color}`}           
+                          } ${lesson.color}`}     
                       >
                       <p className="text-sm text-gray-500 mb-1">
                         {lesson.time}
