@@ -13,26 +13,16 @@ interface Lesson {
   room: string;
   color: string;
   isPermanent: boolean;
-  weekType: 'all' | 'even' | 'odd'; 
-  group: string; 
-  exceptionDate?: string; 
+  weekType: 'all' | 'even' | 'odd';
+  group: string;
+  exceptionDate?: string;
   status?: 'active' | 'cancelled' | 'substituted' | 'regular';
 }
 
 const availableTeachers = [
-  'Mr. Novak', 'Mrs. Smith', 'Mr. Johnson', 'Mr. Green', 
-  'Mr. White', 'Ms. Davis', 'Mr. Wilson', 'Mrs. Thompson', 
+  'Mr. Novak', 'Mrs. Smith', 'Mr. Johnson', 'Mr. Green',
+  'Mr. White', 'Ms. Davis', 'Mr. Wilson', 'Mrs. Thompson',
   'Mr. Garcia', 'Mr. Lopez'
-];
-
-// Nové definice předmětů a jejich vazeb na učitele
-const availableSubjects = [
-  'Mathematics', 
-  'Information Tech.', 
-  'Gymnastics', 
-  'Laboratory Physics', 
-  'History', 
-  'Biology'
 ];
 
 const subjectTeachersMap: Record<string, string[]> = {
@@ -126,7 +116,7 @@ const getISOWeekDetails = (date: Date) => {
 const getMondayOfOffsetWeek = (weekOffset: number): Date => {
   const today = new Date();
   const currentDay = today.getDay();
-  const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay; 
+  const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
   const targetMonday = new Date(today.setDate(today.getDate() + distanceToMonday + weekOffset * 7));
   return targetMonday;
 };
@@ -143,10 +133,10 @@ const getWeekDatesStrings = (weekOffset: number): string[] => {
 const ScheduleEditPage: React.FC = () => {
   const { user } = useAuth();
   const [setupMockData] = useState(loadSetupMockData);
-  
-  const [selectedClass, setSelectedClass] = useState<string>(availableClasses[3]); 
+
+  const [selectedClass, setSelectedClass] = useState<string>(availableClasses[3]);
   const [weekOffset, setWeekOffset] = useState<number>(0);
-  
+
   const [lessons, setLessons] = useState<Lesson[]>(initialMockLessons);
   const [isPermanentEditMode, setIsPermanentEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -180,19 +170,19 @@ const ScheduleEditPage: React.FC = () => {
       return classLessons.filter(l => l.isPermanent);
     }
 
-    const permanentLessons = classLessons.filter(l => 
+    const permanentLessons = classLessons.filter(l =>
       l.isPermanent && (l.weekType === 'all' || l.weekType === activeWeekParity)
     );
-    
+
     const allExceptions = classLessons.filter(l => !l.isPermanent);
-    const currentWeekExceptions = allExceptions.filter(e => 
+    const currentWeekExceptions = allExceptions.filter(e =>
       e.exceptionDate && currentWeekDates.includes(e.exceptionDate)
     );
 
     const filteredPermanents = permanentLessons.filter(p => {
       const dayIndex = days.indexOf(p.day);
       const associatedCalendarDate = currentWeekDates[dayIndex];
-      
+
       const hasOverrideThisWeek = currentWeekExceptions.some(
         e => e.templateId === p.id && e.exceptionDate === associatedCalendarDate
       );
@@ -235,7 +225,7 @@ const ScheduleEditPage: React.FC = () => {
       time: timeSlots[0],
       subject: defaultSubject,
       teacher: defaultTeacher,
-      className: selectedClass, 
+      className: selectedClass,
       room: availableRoomOptions[0],
       weekType: 'all',
       group: 'Whole Class',
@@ -256,29 +246,29 @@ const ScheduleEditPage: React.FC = () => {
 
     const hasConflict = lessons.some(l => {
       if (l.id === editingLesson.id) return false;
-      
-      const groupsOverlap = l.group === 'Whole Class' || 
-                            editingLesson.group === 'Whole Class' || 
-                            l.group === editingLesson.group;
+
+      const groupsOverlap = l.group === 'Whole Class' ||
+        editingLesson.group === 'Whole Class' ||
+        l.group === editingLesson.group;
 
       if (isPermanentEditMode && l.isPermanent) {
-        const weeksOverlap = l.weekType === 'all' || 
-                             editingLesson.weekType === 'all' || 
-                             l.weekType === editingLesson.weekType;
+        const weeksOverlap = l.weekType === 'all' ||
+          editingLesson.weekType === 'all' ||
+          l.weekType === editingLesson.weekType;
 
-        return l.day === editingLesson.day && 
-               l.time === editingLesson.time && 
-               l.className === selectedClass &&
-               weeksOverlap &&
-               groupsOverlap;
+        return l.day === editingLesson.day &&
+          l.time === editingLesson.time &&
+          l.className === selectedClass &&
+          weeksOverlap &&
+          groupsOverlap;
       }
-      
+
       if (!isPermanentEditMode && !l.isPermanent) {
         return l.exceptionDate === editingLesson.exceptionDate &&
-               l.time === editingLesson.time &&
-               l.className === selectedClass &&
-               l.status !== 'cancelled' &&
-               groupsOverlap;
+          l.time === editingLesson.time &&
+          l.className === selectedClass &&
+          l.status !== 'cancelled' &&
+          groupsOverlap;
       }
 
       return false;
@@ -296,7 +286,7 @@ const ScheduleEditPage: React.FC = () => {
       }
       return [...prev, editingLesson as Lesson];
     });
-    
+
     setIsModalOpen(false);
     setEditingLesson(null);
   };
@@ -317,16 +307,16 @@ const ScheduleEditPage: React.FC = () => {
     const nextSubject = e.target.value;
     setEditingLesson((prev) => {
       if (!prev) return null;
-      
+
       const allowedTeachers = subjectTeachersMap[nextSubject] || [];
       const isSubstituted = prev.status === 'substituted';
-      
+
       let nextTeacher = prev.teacher || '';
       // Pokud to není suplování a učitel neučí nový předmět, vybereme prvního validního
       if (!isSubstituted && nextSubject && !allowedTeachers.includes(nextTeacher)) {
         nextTeacher = allowedTeachers[0] || '';
       }
-      
+
       return {
         ...prev,
         subject: nextSubject,
@@ -340,15 +330,15 @@ const ScheduleEditPage: React.FC = () => {
     const nextStatus = e.target.value as any;
     setEditingLesson((prev) => {
       if (!prev) return null;
-      
+
       let nextTeacher = prev.teacher || '';
       const isSubstituted = nextStatus === 'substituted';
       const allowedTeachers = subjectTeachersMap[prev.subject || ''] || [];
-      
+
       if (!isSubstituted && prev.subject && !allowedTeachers.includes(nextTeacher)) {
         nextTeacher = allowedTeachers[0] || '';
       }
-      
+
       return {
         ...prev,
         status: nextStatus,
@@ -373,8 +363,8 @@ const ScheduleEditPage: React.FC = () => {
         <div className="flex flex-wrap items-center gap-6">
           <div>
             <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Selected Target Class</label>
-            <select 
-              value={selectedClass} 
+            <select
+              value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
               disabled={isPermanentEditMode}
               className="border border-gray-200 rounded-xl px-4 py-2.5 font-bold text-palette-pine bg-gray-50 outline-none focus:bg-white transition disabled:opacity-50"
@@ -387,19 +377,19 @@ const ScheduleEditPage: React.FC = () => {
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Calendar Range Tracker</label>
               <div className="flex items-center gap-2">
-                <button 
+                <button
                   onClick={() => setWeekOffset(prev => prev - 1)}
                   className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === -1 ? 'bg-palette-pine text-white border-transparent' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
                 >
                   Previous Week
                 </button>
-                <button 
+                <button
                   onClick={() => setWeekOffset(0)}
                   className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === 0 ? 'bg-palette-pine text-white border-transparent shadow-inner' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
                 >
                   Current Week
                 </button>
-                <button 
+                <button
                   onClick={() => setWeekOffset(prev => prev + 1)}
                   className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === 1 ? 'bg-palette-pine text-white border-transparent' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
                 >
@@ -421,11 +411,10 @@ const ScheduleEditPage: React.FC = () => {
           )}
           <button
             onClick={() => setIsPermanentEditMode(!isPermanentEditMode)}
-            className={`px-6 py-3 rounded-xl transition font-bold shadow-sm border-2 ${
-              isPermanentEditMode 
-                ? 'bg-red-50 text-red-600 border-red-600 hover:bg-red-100' 
+            className={`px-6 py-3 rounded-xl transition font-bold shadow-sm border-2 ${isPermanentEditMode
+                ? 'bg-red-50 text-red-600 border-red-600 hover:bg-red-100'
                 : 'bg-palette-pine text-white border-transparent hover:bg-palette-leaf'
-            }`}
+              }`}
           >
             {isPermanentEditMode ? 'Disable Permanent Modifications' : 'Enable Permanent Schedule Editing'}
           </button>
@@ -437,8 +426,8 @@ const ScheduleEditPage: React.FC = () => {
         <div>
           <h1 className="text-4xl font-bold text-palette-pine">Schedule Matrix: Class {selectedClass}</h1>
           <p className="text-gray-500 mt-2">
-            {isPermanentEditMode 
-              ? 'Configuring master template cyclic rotations.' 
+            {isPermanentEditMode
+              ? 'Configuring master template cyclic rotations.'
               : `Displaying timeline window from ${currentWeekDates[0]} to ${currentWeekDates[4]}`
             }
           </p>
@@ -493,7 +482,7 @@ const ScheduleEditPage: React.FC = () => {
                         <p className="text-xs font-semibold text-gray-500 bg-white/50 px-2 py-1 rounded whitespace-nowrap">
                           {lesson.time}
                         </p>
-                        
+
                         {lesson.isPermanent && isPermanentEditMode && (
                           <span className={`text-[9px] px-1.5 py-0.5 font-bold uppercase rounded border ${lesson.weekType === 'even' ? 'bg-blue-50 border-blue-200 text-blue-700' : lesson.weekType === 'odd' ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
                             {lesson.weekType === 'all' ? 'All' : lesson.weekType}
@@ -511,7 +500,7 @@ const ScheduleEditPage: React.FC = () => {
                         {lesson.subject}
                       </h3>
                     </div>
-                    
+
                     <div className="mt-2">
                       {lesson.status !== 'cancelled' ? (
                         <div className="text-xs text-gray-600 space-y-0.5 bg-white/40 p-1.5 rounded-lg border border-gray-50">
@@ -591,11 +580,11 @@ const ScheduleEditPage: React.FC = () => {
                 {/* Změněno z textového inputu na Select předmětů */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Subject Name</label>
-                  <select 
-                    name="subject" 
-                    value={editingLesson.subject || ''} 
-                    onChange={handleSubjectChange} 
-                    disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'} 
+                  <select
+                    name="subject"
+                    value={editingLesson.subject || ''}
+                    onChange={handleSubjectChange}
+                    disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'}
                     className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60 font-medium"
                   >
                     <option value="" disabled>Select subject...</option>
@@ -615,17 +604,17 @@ const ScheduleEditPage: React.FC = () => {
                 <label className="block text-sm font-bold text-gray-700 mb-1">
                   Assigned Teacher {editingLesson.status === 'substituted' && <span className="text-xs text-amber-600 font-normal">(Substitution Mode: All options opened)</span>}
                 </label>
-                <select 
-                  name="teacher" 
-                  value={editingLesson.teacher || ''} 
-                  onChange={handleChange} 
-                  disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular' || !editingLesson.subject} 
+                <select
+                  name="teacher"
+                  value={editingLesson.teacher || ''}
+                  onChange={handleChange}
+                  disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular' || !editingLesson.subject}
                   className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60"
                 >
                   {getFilteredTeachers().length === 0 ? (
                     <option value="">-- No teachers available for this subject --</option>
                   ) : (
-                    getFilteredTeachers().map(t => <option key={t} value={t}>{t}</option> )
+                    getFilteredTeachers().map(t => <option key={t} value={t}>{t}</option>)
                   )}
                 </select>
               </div>
