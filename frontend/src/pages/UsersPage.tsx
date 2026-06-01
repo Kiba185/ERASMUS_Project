@@ -7,7 +7,11 @@ const API = 'http://localhost:3000';
 
 type Role = 'student' | 'teacher' | 'parent' | 'admin';
 
-interface MockClass { id: number; name: string; }
+interface MockSubject {
+  id: number;
+  name: string;
+}
+
 interface MockUser {
   id: number;
   firstName: string;
@@ -18,18 +22,19 @@ interface MockUser {
   adress: string;
   birthday: string;
   role: Role;
-  classId?: number | null;
-  childrenIds?: number[];
-  classes?: MockClass[];
+  classId?: number | null; 
+  childrenIds?: number[]; 
+  subjectIds?: number[];
 }
 
+// --- COMPONENT ---
 const UsersPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [users, setUsers] = useState<MockUser[]>([]);
-  const [classes, setClasses] = useState<MockClass[]>([]);
-  const [loading, setLoading] = useState(true);
+  const [users, setUsers] = useState<MockUser[]>(initialUsers);
+  const [classes] = useState<MockClass[]>(initialClasses);
+  const [subjects] = useState<MockSubject[]>(initialSubjects);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
@@ -93,9 +98,20 @@ const UsersPage: React.FC = () => {
   };
 
   const openAddModal = () => {
-    setIsNew(true);
-    setNewPassword('');
-    setEditingUser({ id: 0, firstName: '', lastName: '', username: '', email: '', phone: '', adress: '', birthday: '', role: 'student', classId: null, childrenIds: [] });
+    setEditingUser({
+      id: Date.now(),
+      firstName: '',
+      lastName: '',
+      username: '',
+      email: '',
+      phone: '',
+      adress: '',
+      birthday: '',
+      role: 'student',
+      classId: null,
+      childrenIds: [],
+      subjectIds: []
+    });
     setIsModalOpen(true);
   };
 
@@ -306,7 +322,7 @@ const UsersPage: React.FC = () => {
                 </div>
                 <div className="md:col-span-2 pt-4 border-t border-gray-100">
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">Role</label>
-                  <select value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as Role, classId: null, childrenIds: []})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition font-medium">
+                  <select value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as Role, classId: null, childrenIds: [], subjectIds: []})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition font-medium">
                     <option value="student">Student</option>
                     <option value="teacher">Teacher</option>
                     <option value="parent">Parent</option>
@@ -314,12 +330,45 @@ const UsersPage: React.FC = () => {
                   </select>
                 </div>
                 {(editingUser.role === 'student' || editingUser.role === 'teacher') && (
-                  <div className="md:col-span-2 bg-palette-mist/50 p-5 rounded-xl border border-palette-sage/30">
-                    <label className="block text-sm font-bold text-palette-pine mb-1.5">{editingUser.role === 'student' ? 'Assign to Class' : 'Head Teacher of Class (Optional)'}</label>
-                    <select value={editingUser.classId || ''} onChange={e => setEditingUser({...editingUser, classId: e.target.value ? Number(e.target.value) : null})} className="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-palette-meadow outline-none transition">
-                      <option value="">-- No class assigned --</option>
-                      {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-                    </select>
+                  <div className="md:col-span-2 bg-palette-mist/50 p-5 rounded-xl border border-palette-sage/30 space-y-5">
+                    <div>
+                      <label className="block text-sm font-bold text-palette-pine mb-1.5">
+                        {editingUser.role === 'student' ? 'Assign to Class' : 'Head Teacher of Class (Optional)'}
+                      </label>
+                      <select value={editingUser.classId || ''} onChange={e => setEditingUser({...editingUser, classId: e.target.value ? Number(e.target.value) : null})} className="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-palette-meadow outline-none transition">
+                        <option value="">-- No class assigned --</option>
+                        {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+                      </select>
+                    </div>
+
+                    {editingUser.role === 'teacher' && (
+                      <div className="pt-2 border-t border-palette-sage/30">
+                        <label className="block text-sm font-bold text-palette-pine mb-2">Assign Subjects (Teacher qualification)</label>
+                        <div className="max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 space-y-1 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-1">
+                          {subjects.map(subject => {
+                            const isSelected = editingUser.subjectIds?.includes(subject.id);
+                            return (
+                              <label key={subject.id} className={`flex items-center space-x-3 p-2.5 rounded-md cursor-pointer border transition ${isSelected ? 'bg-palette-mist border-palette-sage' : 'border-transparent hover:bg-gray-50'}`}>
+                                <input 
+                                  type="checkbox" 
+                                  checked={!!isSelected}
+                                  onChange={(e) => {
+                                    const currentIds = editingUser.subjectIds || [];
+                                    if (e.target.checked) {
+                                      setEditingUser({...editingUser, subjectIds: [...currentIds, subject.id]});
+                                    } else {
+                                      setEditingUser({...editingUser, subjectIds: currentIds.filter(id => id !== subject.id)});
+                                    }
+                                  }}
+                                  className="w-4 h-4 text-palette-fern border-gray-300 rounded focus:ring-palette-meadow cursor-pointer" 
+                                />
+                                <span className="text-sm font-bold text-palette-pine">{subject.name}</span>
+                              </label>
+                            );
+                          })}
+                        </div>
+                      </div>
+                    )}
                   </div>
                 )}
               </div>
