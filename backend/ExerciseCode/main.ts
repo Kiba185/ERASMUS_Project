@@ -5,6 +5,7 @@ import { PrismaClient } from '@prisma/client';
 import { PrismaBetterSqlite3 } from '@prisma/adapter-better-sqlite3';
 import session from 'express-session';
 import bcrypt from 'bcrypt';
+import timetableRouter from './timeTable.ts';
 
 import { requireAuth } from './auth.ts';
 
@@ -261,7 +262,7 @@ app.get('/api/gradeColumns', async (req, res, next) => {
 });
 
 //CREATE GRADE COLUMN - TEACHER ONLY
-app.post('/api/gradeColumns', async (req, res, next) => { // 👈 add next
+app.post('/api/gradeColumns', async (req, res, next) => { 
     if (await requireAuth(req, res, next, 5) !== true) { return; }
 
     const { name, subjectId, weight, date } = req.body;
@@ -674,7 +675,7 @@ app.put('/api/events/:id', async (req, res, next) => {
 
 
 
-
+app.use(timetableRouter); 
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);

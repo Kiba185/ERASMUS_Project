@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 // --- TYPES ---
 type Student = { id: string; name: string; classes: string[] };
@@ -151,11 +152,13 @@ const GradesEditPage: React.FC = () => {
   // 3. NEW COLUMN STATES (Supports empty string to allow deletion)
   const [newColTitle, setNewColTitle] = useState('');
   const [newColWeight, setNewColWeight] = useState<number | ''>(10);
+  const [newColDate, setNewColDate] = useState<string>(new Date().toISOString().slice(0, 10));
 
   // 4. EDIT COLUMN MODAL STATES
   const [editingAssignment, setEditingAssignment] = useState<Assignment | null>(null);
   const [editTitle, setEditTitle] = useState('');
   const [editWeight, setEditWeight] = useState<number | ''>(10);
+  const [editDate, setEditDate] = useState<string>(new Date().toISOString().slice(0, 10));
 
   const [subjects, setSubjects] = useState<{ id: number; name: string }[]>([]);
   const [selectedSubjectId, setSelectedSubjectId] = useState<number>(0);
@@ -177,7 +180,7 @@ const GradesEditPage: React.FC = () => {
         name: newColTitle,
         subjectId: selectedSubjectId,
         weight: newColWeight,
-        date: new Date().toISOString()
+        date: newColDate
       })
     })
       .then(res => res.json())
@@ -217,6 +220,7 @@ const GradesEditPage: React.FC = () => {
     setEditingAssignment(assignment);
     setEditTitle(assignment.name);
     setEditWeight(assignment.weight);
+    setEditDate(assignment.date ? assignment.date.slice(0, 10) : new Date().toISOString().slice(0, 10));
   };
 
 
@@ -240,7 +244,7 @@ const GradesEditPage: React.FC = () => {
           name: editTitle,
           subjectId: selectedSubjectId,
           weight: Number(editWeight),
-          date: new Date().toISOString()
+          date: editDate
         })
       });
 
@@ -261,8 +265,30 @@ const GradesEditPage: React.FC = () => {
 
 
   // --- GRADE CHANGE LOGIC (WITH VALIDATIONS & TRANSFORMATIONS) ---
+  const normalizeGradeValue = (value: string) => {
+    let normalized = value.trim();
+
+    if (normalized === '.5' || normalized === '-.5' || normalized === '-5' || normalized === '-') {
+      return '1-';
+    }
+
+    if (normalized === '1.' || normalized === '2.' || normalized === '3.' || normalized === '4.') {
+      return normalized;
+    }
+
+    if (/^[1-4](\.5|\.50)$/.test(normalized)) {
+      return `${normalized[0]}-`;
+    }
+
+    if (/^[1-4]-$/.test(normalized)) {
+      return normalized;
+    }
+
+    return normalized;
+  };
+
   const handleGradeChange = (studentId: string, assignmentId: string, value: string) => {
-    let val = value.trim();
+    const val = normalizeGradeValue(value);
 
     // Clear cell if empty
     if (val === '') {
@@ -276,7 +302,7 @@ const GradesEditPage: React.FC = () => {
           userId: studentId,
           gradeColumnId: assignmentId
         })
-      })
+      });
 
       return;
     }
@@ -289,12 +315,6 @@ const GradesEditPage: React.FC = () => {
       });
       return;
     }
-
-    // Auto-transform allowed decimals to minus format notation
-    if (val === '1.5' || val === '1.50') val = '1-';
-    if (val === '2.5' || val === '2.50') val = '2-';
-    if (val === '3.5' || val === '3.50') val = '3-';
-    if (val === '4.5' || val === '4.50') val = '4-';
 
     // Strictly validate final allowed grade strings (Whole numbers 1-5 & half-grades 1- to 4-)
     const validGrades = ['1', '2', '3', '4', '5', '1-', '2-', '3-', '4-'];
@@ -313,9 +333,9 @@ const GradesEditPage: React.FC = () => {
           userId: studentId,
           gradeColumnId: assignmentId
         })
-      })
+      });
     } else {
-      alert('Invalid grade format! Only whole numbers (1-5) and specific half-grades (.5 values transformed to minus notation, e.g., 1.5 -> 1-) are allowed.');
+      alert('Invalid grade format! Only whole numbers 1-5 and half-grades (use .5 or - to create minus notation) are allowed.');
     }
   };
 
@@ -440,9 +460,10 @@ const GradesEditPage: React.FC = () => {
       <div className="bg-green-50 p-4 rounded-xl border border-green-200 flex items-end gap-4">
         <form onSubmit={handleAddColumn} className="flex items-end gap-4 w-full">
           <div className="flex-1">
-            <label className="block text-sm font-semibold text-green-800 mb-1">New Column Title (e.g., Test)</label>
+            <label className="block text-sm font-semibold text-green-800 mb-1">New Column Title (Max 75 chars)</label>
             <input
               type="text"
+              maxLength={75}
               value={newColTitle}
               onChange={(e) => setNewColTitle(e.target.value)}
               placeholder="Enter topic/category..."
@@ -454,9 +475,32 @@ const GradesEditPage: React.FC = () => {
             <label className="block text-sm font-semibold text-green-800 mb-1">Weight</label>
             <input
               type="number"
-              min="1" max="10"
+              min="1"
+              max="10"
               value={newColWeight}
-              onChange={(e) => setNewColWeight(Number(e.target.value))}
+              onChange={(e) => {
+                const value = e.target.value;
+                if (value === '') {
+                  setNewColWeight('');
+                  return;
+                }
+                const parsed = Number(value);
+                if (Number.isNaN(parsed)) {
+                  setNewColWeight('');
+                  return;
+                }
+                setNewColWeight(Math.min(10, Math.max(1, parsed)));
+              }}
+              className="w-full p-2.5 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
+              required
+            />
+          </div>
+          <div className="w-32">
+            <label className="block text-sm font-semibold text-green-800 mb-1">Date</label>
+            <input
+              type="date"
+              value={newColDate}
+              onChange={(e) => setNewColDate(e.target.value)}
               className="w-full p-2.5 border border-green-300 rounded-lg focus:ring-2 focus:ring-green-500 outline-none"
               required
             />
@@ -477,28 +521,31 @@ const GradesEditPage: React.FC = () => {
               {/* Dynamic Column Headers */}
               {currentAssignments.map((assignment) => (
                 <th key={assignment.id} className="p-3 border-r border-gray-200 text-center min-w-[160px] max-w-[220px] group/header relative align-middle">
-                  <div className="text-xs uppercase tracking-tight text-gray-600 font-bold pr-14 pl-1 break-words whitespace-normal line-clamp-2" title={assignment.name}>
-                    {assignment.name}
+                  <div className="flex items-start justify-between gap-3 min-h-5">
+                    <div className="min-w-0 text-xs uppercase tracking-tight text-gray-600 font-bold pr-2 break-words whitespace-normal line-clamp-2" title={assignment.name}>
+                      {assignment.name}
+                    </div>
+                    <button
+                      onClick={() => handleDeleteColumn(assignment.id, assignment.name)}
+                      className="opacity-0 group-hover/header:opacity-100 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded px-2 py-1 text-xs font-semibold border border-red-200 shadow-sm transition"
+                      title="Delete entire column"
+                    >
+                      ✕
+                    </button>
                   </div>
-                  <div className="text-[10px] bg-white border border-gray-300 rounded px-1.5 py-0.5 inline-block mt-1.5 text-gray-500 mr-12 font-medium">
-                    W: {assignment.weight}
+                  <div className="flex items-center justify-between gap-2 mt-1 text-[10px] text-gray-500 font-medium">
+                    <span className="inline-flex items-center rounded px-1.5 py-0.5 bg-white border border-gray-300">W: {assignment.weight}</span>
+                    <div className="flex items-center gap-2">
+                      <span>D: {assignment.date ? assignment.date.slice(0, 10) : '-'}</span>
+                      <button
+                        onClick={() => startEditingColumn(assignment)}
+                        className="opacity-0 group-hover/header:opacity-100 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded px-2 py-1 text-xs font-semibold border border-blue-200 shadow-sm transition"
+                        title="Edit column properties"
+                      >
+                        ✎
+                      </button>
+                    </div>
                   </div>
-
-                  <button
-                    onClick={() => startEditingColumn(assignment)}
-                    className="absolute top-1/2 -translate-y-1/2 right-10 bg-blue-50 text-blue-600 hover:bg-blue-600 hover:text-white rounded px-2 py-1 opacity-0 group-hover/header:opacity-100 transition-all text-xs font-semibold border border-blue-200 shadow-sm"
-                    title="Edit column properties"
-                  >
-                    ✎
-                  </button>
-
-                  <button
-                    onClick={() => handleDeleteColumn(assignment.id, assignment.name)}
-                    className="absolute top-1/2 -translate-y-1/2 right-2 bg-red-50 text-red-600 hover:bg-red-600 hover:text-white rounded px-2 py-1 opacity-0 group-hover/header:opacity-100 transition-all text-xs font-semibold border border-red-200 shadow-sm"
-                    title="Delete entire column"
-                  >
-                    ✕
-                  </button>
                 </th>
               ))}
 
@@ -528,6 +575,8 @@ const GradesEditPage: React.FC = () => {
                           <input
                             id={`cell-${rowIndex}-${colIndex}`}
                             type="text"
+                            inputMode="decimal"
+                            maxLength={3}
                             value={val}
                             onChange={(e) => handleGradeChange(student.id, assignment.id, e.target.value)}
                             onKeyDown={(e) => handleKeyDown(e, rowIndex, colIndex)}
@@ -566,7 +615,7 @@ const GradesEditPage: React.FC = () => {
       </div>
 
       {/* 5. EDIT COLUMN POPUP/MODAL OVERLAY */}
-      {editingAssignment && (
+      {editingAssignment && createPortal(
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xl max-w-md w-full mx-4 space-y-4">
             <div className="flex justify-between items-center border-b pb-2">
@@ -587,21 +636,46 @@ const GradesEditPage: React.FC = () => {
                   value={editTitle}
                   onChange={(e) => setEditTitle(e.target.value)}
                   className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                  maxLength={25}
+                  maxLength={75}
                   required
                 />
               </div>
 
-              <div>
-                <label className="block text-sm font-semibold text-gray-600 mb-1">Weight</label>
-                <input
-                  type="number"
-                  min="1" max="10"
-                  value={editWeight}
-                  onChange={(e) => setEditWeight(e.target.value === '' ? '' : Number(e.target.value))}
-                  className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
-                  required
-                />
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-sm font-semibold text-gray-600 mb-1">Weight</label>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={editWeight}
+                    onChange={(e) => {
+                      const value = e.target.value;
+                      if (value === '') {
+                        setEditWeight('');
+                        return;
+                      }
+                      const parsed = Number(value);
+                      if (Number.isNaN(parsed)) {
+                        setEditWeight('');
+                        return;
+                      }
+                      setEditWeight(Math.min(10, Math.max(1, parsed)));
+                    }}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
+                <div>
+                  <label className="block text-sm font-semibold text-gray-600 mb-1">Date</label>
+                  <input
+                    type="date"
+                    value={editDate}
+                    onChange={(e) => setEditDate(e.target.value)}
+                    className="w-full p-2.5 border border-gray-300 rounded-lg outline-none focus:ring-2 focus:ring-blue-500"
+                    required
+                  />
+                </div>
               </div>
 
               <div className="flex justify-end gap-3 pt-2">
@@ -614,16 +688,16 @@ const GradesEditPage: React.FC = () => {
                 </button>
                 <button
                   type="submit"
-                  className="px-4 py-2 text-sm font-semibold text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition shadow-sm"
+                  className="px-4 py-2 text-sm font-semibold text-white bg-green-600 hover:bg-green-700 rounded-lg transition shadow-sm"
                 >
                   Save Changes
                 </button>
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
-
     </div>
   );
 };

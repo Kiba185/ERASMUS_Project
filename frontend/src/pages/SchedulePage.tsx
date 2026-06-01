@@ -29,7 +29,6 @@ const studentLessons = [
     day: 'Monday',
     time: '10:00 - 10:45',
     subject: 'History',
-    topic: 'World War II',
     teacher: 'Mr. Johnson',
     class: '',
     room: 'A15',
@@ -40,7 +39,6 @@ const studentLessons = [
     day: 'Monday',
     time: '10:55 - 11:40',
     subject: 'Physics',
-    topic: 'Newtonian Mechanics',
     teacher: 'Mr. Green',
     class: '',
     room: 'C21',
@@ -51,7 +49,6 @@ const studentLessons = [
     day: 'Monday',
     time: '11:50 - 12:35',
     subject: 'Chemistry',
-    topic: 'Organic Chemistry',
     teacher: 'Mr. White',
     class: '',
     room: 'B35',
@@ -62,7 +59,6 @@ const studentLessons = [
     day: 'Monday',
     time: '12:45 - 13:30',
     subject: 'Physical Education',
-    topic: 'Team Sports',
     teacher: 'Coach Brown',
     class: '',
     room: 'Gym',
@@ -73,7 +69,6 @@ const studentLessons = [
     day: 'Monday',
     time: '13:40 - 14:25',
     subject: 'Physical Education',
-    topic: 'Team Sports',
     teacher: 'Coach Brown',
     class: '',
     room: 'Gym',
@@ -84,7 +79,6 @@ const studentLessons = [
     day: 'Tuesday',
     time: '8:00 - 8:45',
     subject: 'Mathematics',
-    topic: 'Cancelled',
     teacher: 'Mr. Novak',
     class: '',
     room: 'A12',
@@ -95,7 +89,6 @@ const studentLessons = [
     day: 'Tuesday',
     time: '8:55 - 9:40',
     subject: 'Physics',
-    topic: 'Newtonian Mechanics',
     teacher: 'Mr. Green',
     class: '',
     room: 'C21',
@@ -106,7 +99,6 @@ const studentLessons = [
     day: 'Tuesday',
     time: '10:00 - 10:45',
     subject: 'Computer Science',
-    topic: 'Introduction to Programming',
     teacher: 'Mrs. White',
     class: '',
     room: 'B11',
@@ -117,7 +109,6 @@ const studentLessons = [
     day: 'Tuesday',
     time: '10:55 - 11:40',
     subject: 'Computer Science',
-    topic: 'Introduction to Programming',
     teacher: 'Mrs. White',
     class: '',
     room: 'B11',
@@ -128,7 +119,6 @@ const studentLessons = [
     day: 'Tuesday',
     time: '11:50 - 12:35',
     subject: 'Geography',
-    topic: 'World Geography',
     teacher: 'Mr. Wilson',
     class: '',
     room: 'A10',
@@ -149,7 +139,6 @@ const studentLessons = [
     day: "Wednesday",
     time: '8:00 - 8:45',
     subject: 'Mathematics',
-    topic: 'Quadratic Equations',
     teacher: 'Mr. Novak',
     room: 'A12',
     color: 'border-blue-500 bg-blue-50',
@@ -159,7 +148,6 @@ const studentLessons = [
     day: "Wednesday",
     time: '8:55 - 9:40',
     subject: 'English Language',
-    topic: 'Shakespearean Literature',
     teacher: 'Mrs. Smith',    
     room: 'B05',
     color: 'border-orange-500 bg-orange-50',
@@ -169,7 +157,6 @@ const studentLessons = [
     day: "Wednesday",
     time: '10:00 - 10:45',
     subject: 'History',
-    topic: 'World War II',
     teacher: 'Mr. Johnson',
     room: 'A15',
     color: 'border-yellow-500 bg-yellow-50',
@@ -179,7 +166,6 @@ const studentLessons = [
     day: "Wednesday",
     time: '10:55 - 11:40',
     subject: 'Art', 
-    topic: 'Visual Arts',
     teacher: 'Mrs. Johnson',
     room: 'D05',
     color: 'border-rose-500 bg-rose-50',
@@ -429,11 +415,15 @@ const teacherLessons = [
   },
 ];
 
+
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 const SchedulePage: React.FC = () => {
   const { user } = useAuth();
+  const [weekOffset, setWeekOffset] = React.useState(0);
   const [selectedLesson, setSelectedLesson] = React.useState<any>(null);
+
+  
 
 let lessons: typeof studentLessons = [];
   if (user?.role === 'teacher') {
@@ -442,11 +432,17 @@ let lessons: typeof studentLessons = [];
     lessons = studentLessons;
   }
 
+
+
+
   return (
     <div className="p-8">
-      <h1 className="text-4xl font-bold text-palette-pine mb-8">
-        Weekly Schedule
-      </h1>
+      <div className="flex items-center justify-between mb-8">
+  <h1 className="text-4xl font-bold text-palette-pine">
+    Weekly Schedule
+  </h1>
+
+</div>
 
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
           {days.map((day) => (
@@ -469,12 +465,12 @@ let lessons: typeof studentLessons = [];
                             lesson.color.includes('black')
                               ? ''
                               : 'hover:shadow-lg hover:scale-105'
-                          } ${lesson.color}`}           
+                          } ${lesson.color}`}     
                       >
                       <p className="text-sm text-gray-500 mb-1">
                         {lesson.time}
                       </p>
-                      
+
                       <h3 className="font-bold text-palette-pine w-48">
                         {lesson.subject}
                       </h3>
@@ -513,9 +509,7 @@ let lessons: typeof studentLessons = [];
       <div className="space-y-2">
         <p><strong>Day:</strong> {selectedLesson.day}</p>
         <p><strong>Time:</strong> {selectedLesson.time}</p>
-        {user?.role !== 'teacher' && (
-          <p><strong>Teacher:</strong> {selectedLesson.teacher}</p>
-        )}
+        <p><strong>Teacher:</strong> {selectedLesson.teacher}</p>
         <p><strong>Room:</strong> {selectedLesson.room}</p>
 
         {selectedLesson.class && (

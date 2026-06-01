@@ -1,8 +1,6 @@
 // This is your Prisma schema file,
 // learn more about it in the docs: https://pris.ly/d/prisma-schema
 
-// Get a free hosted Postgres database in seconds: `npx create-db`
-
 generator client {
   provider        = "prisma-client-js"
   previewFeatures = ["driverAdapters"]
@@ -13,25 +11,28 @@ datasource db {
 }
 
 model Todo {
-  id          Int       @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   title       String
   urgency     Int
-  isCompleted Boolean   @default(false)
-  createdAt   DateTime  @default(now())
+  isCompleted Boolean  @default(false)
+  createdAt   DateTime @default(now())
 }
 
 model User {
-  id          Int       @id @default(autoincrement())
-  role        String
-  lastName    String
-  firstName   String
-  birthday    DateTime?
-  createdAt   DateTime  @default(now())
-  username    String
-  password    String
-  email       String?
-  phone       String?
-  adress      String?
+  id        Int      @id @default(autoincrement())
+  role      String
+  lastName  String
+  firstName String
+  birthday  DateTime
+  createdAt DateTime @default(now())
+  username  String   
+  password  String
+  email     String
+  phone     String
+  adress    String
+
+  classes    Class[]
+  timeTables TimeTable[] 
 
   // Parent-child relationship
   parentId    Int?
@@ -39,31 +40,33 @@ model User {
   children    User[]    @relation("ParentChild")
 
   // Other relations
-  classes Class[]
   events Event[]
 }
 
 model Subject {
-  id          Int       @id @default(autoincrement())
-  name        String
+  id         Int         @id @default(autoincrement())
+  name       String
+  code       String
+  color      String
+  timeTables TimeTable[] 
 }
 
 model Lesson {
-  id          Int       @id @default(autoincrement())
-  teacherId   Int
-  classId     Int
-  subjectId   Int
-  name        String
-  classroom   String
+  id        Int    @id @default(autoincrement())
+  teacherId Int
+  classId   Int
+  subjectId Int
+  name      String
+  classroom String
 }
 
 model GradeColumn {
-  id          Int       @id @default(autoincrement())
-  subjectId   Int
-  TeacherId   Int
-  name        String
-  weight      Int
-  date        DateTime
+  id        Int      @id @default(autoincrement())
+  subjectId Int
+  TeacherId Int
+  name      String
+  weight    Int
+  date      DateTime
 }
 
 model Grade {
@@ -74,11 +77,29 @@ model Grade {
 }
 
 model Class {
-  id        Int     @id @default(autoincrement())
-  students  User[]
-  name      String
+  id         Int         @id @default(autoincrement())
+  name       String
+  students   User[]
+  timeTables TimeTable[] // 👈 OPRAVENO: Zpětná vazba pro rozvrh
+}
 
-  events Event[]
+model TimeTable {
+  id           Int    @id @default(autoincrement())
+  day          String
+  startTime    String
+  endTime      String
+  periodNumber Int
+  room         String
+
+  // 👈 OPRAVENO: Tady jsou konečně vysvětlené vztahy pro tvůj backend!
+  subjectId Int
+  subject   Subject @relation(fields: [subjectId], references: [id])
+
+  teacherId Int
+  teacher   User @relation(fields: [teacherId], references: [id])
+
+  classId Int
+  class   Class @relation(fields: [classId], references: [id])
 }
 
 model Event {
