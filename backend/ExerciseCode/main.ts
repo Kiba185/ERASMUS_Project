@@ -282,7 +282,7 @@ app.get('/api/user/:username', async (req, res, next) => {
 app.get('/api/user', async (req, res, next) => {
     try {
         const id = req.session.userId;
-        const user = await prisma.user.findUnique({ where: { id } });
+        const user = await prisma.user.findUnique({ where: { id } }); 
 
         res.json(user);
     } catch (error) {
