@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
+
 const colorMap: Record<string, string> = {
   'green': 'border-green-500 bg-green-50',
   'pink': 'border-pink-500 bg-pink-50',
@@ -8,160 +9,26 @@ const colorMap: Record<string, string> = {
   'emerald': 'border-emerald-500 bg-emerald-50',
   'amber': 'border-amber-500 bg-amber-50',
   'red': 'border-red-500 bg-red-50',
-  'blue': 'border-blue-500 bg-blue-50', // Naše výchozí záchranná barva
+  'blue': 'border-blue-500 bg-blue-50', 
 };
-const teacherLessons = [
-  {
-    id: 1,
-    day: 'Monday',
-    time: '08:00 - 08:45',
-    subject: 'Mathematics',
-    teacher: '',
-    class: '9.B',
-    room: 'A12',
-    color: 'border-blue-500 bg-blue-50',
-  },
-  {
-    id: 2,
-    day: 'Wednesday',
-    time: '8:00 - 8:45',
-    subject: 'Mathematics',
-    teacher: '',
-    class: '9.B',
-    room: 'A12',
-    color: 'border-blue-500 bg-blue-50',
-  },
-  {
-    id: 3,
-    day: 'Monday',
-    time: '08:55 - 09:40',
-    subject: 'Mathematics',
-    teacher: '',
-    class: '7.C',
-    room: 'A12',
-    color: 'border-blue-500 bg-blue-50',
-  },
-  {
-    id: 4,
-    day: 'Monday',
-    time: '10:00 - 10:45',
-    subject: 'Physics',
-    teacher: '',
-    class: '8.A',
-    room: 'A12',
-    color: 'border-green-500 bg-green-50',
-  },
-  {
-    id: 4,
-    day: 'Friday',
-    time: '10:00 - 10:45',
-    subject: 'Mathematics',
-    teacher: '',
-    class: '9.B',
-    room: 'A12',
-    color: 'border-blue-500 bg-blue-50',
-  },
-  {
-    id: 5,
-    day: 'Monday',
-    time: '11:50 - 12:35',
-    subject: 'Physics',
-    teacher: '',
-    class: '8.B',
-    room: 'A12',
-    color: 'border-green-500 bg-green-50',
-  },
-  {
-    id: 6,
-    day: 'Tuesday',
-    time: '8:00 - 8:45',
-    subject: 'Mathematics',
-    topic: 'Cancelled',
-    teacher: '',
-    class: '9.B',
-    room: 'A12',
-    color: 'border-black-500 bg-stone-50',
-  },
-  {
-    id: 7,
-    day: 'Tuesday',
-    time: '10:00 - 10:45',
-    subject: 'Mathematics',
-    teacher: '',
-    class: '7.C',
-    room: 'A12',
-    color: 'border-blue-500 bg-blue-50',
-  },
-  {
-    id: 8,
-    day: 'Tuesday',
-    time: '10:55 - 11:40',
-    subject: 'Physics',
-    teacher: '',
-    class: '8.A',
-    room: 'A12',
-    color: 'border-green-500 bg-green-50',
-  },
-  {
-    id: 9,
-    day: 'Tuesday',
-    time: '11:50 - 12:35',
-    subject: 'Mathematics',
-    teacher: '',
-    class: '9.C',
-    room: 'A12',
-    color: 'border-blue-500 bg-blue-50',
-  },
-  {
-    id: 10,
-    day: 'Wednesday',
-    time: '8:00 - 8:45',
-    subject: 'Mathematics',
-    teacher: '',
-    class: '9.C',
-    room: 'A12',
-    color: 'border-blue-500 bg-blue-50',
-  },
-  {
-    id: 11,
-    day: 'Wednesday',
-    time: '8:55 - 9:40',
-    subject: 'Mathematics',
-    teacher: '',
-    class: '7.C',
-    room: 'A12',
-    color: 'border-blue-500 bg-blue-50',
-  },
-  {
-    id: 12,
-    day: 'Wednesday',
-    time: '10:00 - 10:45',
-    subject: 'Mathematics',
-    teacher: '',
-    class: '8.B',
-    room: 'A12',
-    color: 'border-blue-500 bg-blue-50',
-  },
-];
 
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 const SchedulePage: React.FC = () => {
   const { user } = useAuth();
   
-  // 1. Přidáme stav pro uložení rozvrhu studenta a stav načítání
-  const [studentLessons, setStudentLessons] = useState<any[]>([]);
+  // Stačí nám jeden stav pro lekce, protože uživatel je buď student, nebo učitel
+  const [lessons, setLessons] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
 
-  // 2. Použijeme useEffect pro stažení dat z backendu
   useEffect(() => {
     const fetchTimetable = async () => {
-      // Pokud nemáme uživatele nebo není student, nestahujeme
-      if (!user || user.role !== 'student') return;
+      // Pokud nemáme uživatele, netahujeme data
+      if (!user) return;
 
       setIsLoading(true);
       try {
-        // Nezapomeň upravit URL podle toho, na jakém portu ti běží backend!
+        // Použijeme tvůj existující endpoint, který na backendu umí zpracovat obě role
         const response = await fetch(`http://localhost:3000/api/timetables/student/${user.id}`);
         
         if (!response.ok) {
@@ -170,27 +37,25 @@ const SchedulePage: React.FC = () => {
 
         const data = await response.json();
 
-        // 3. NAMAPOVÁNÍ DAT (DŮLEŽITÉ!)
-        // Tvoje databáze (Prisma) pravděpodobně vrací sloupečky s jinými názvy, než co čeká frontend.
-        // Tady data z backendu "přeložíme" do formátu, který čeká tvoje HTML.
+        // Mapování dat z DB do FE struktury
         const formattedLessons = data.map((item: any) => {
           const dbColor = item.subject?.color || 'blue';
           const tailwindColorClass = colorMap[dbColor] || colorMap['blue'];
-          return{
-             id: item.id,
-            day: item.day, // Pokud to máš v DB jinak, uprav to (např. item.dayOfWeek)
+          
+          return {
+            id: item.id,
+            day: item.day, 
             time: `${item.startTime} - ${item.endTime}`,
-            subject: item.subject?.code || 'Neznámý předmět',
-            teacher: item.teacher?.lastName || '',
-            class: item.class?.name || '',
-            room: item.room || 'Neznámá třída',
+            subject: item.subject?.code || 'Unknown Subject',
+            teacher: item.teacher ? `${item.teacher.firstName || ''} ${item.teacher.lastName || ''}`.trim() : '',
+            // Pokud učitel nemá přiřazenou třídu, napíšeme Free Time, jinak název třídy
+            class: item.class?.name || 'Free Time',
+            room: item.room || 'Unkown Room',
             color: tailwindColorClass,
-
-          }
-         
+          };
         });
 
-        setStudentLessons(formattedLessons);
+        setLessons(formattedLessons);
       } catch (error) {
         console.error('Chyba při stahování rozvrhu:', error);
       } finally {
@@ -199,73 +64,70 @@ const SchedulePage: React.FC = () => {
     };
 
     fetchTimetable();
-  }, [user]); // Spustí se znovu, pokud se změní uživatel (např. po přihlášení)
-
-  // Rozhodnutí, které lekce se mají zobrazit
-  const lessons = user?.role === 'teacher' ? teacherLessons : studentLessons;
+  }, [user]);
 
   return (
     <div className="p-8">
       <h1 className="text-4xl font-bold text-palette-pine mb-8">
-        Weekly Schedule
+        Weekly Schedule ({user?.role === 'teacher' ? 'Teacher' : 'Student'})
       </h1>
 
-      {/* Zobrazení stavu načítání */}
       {isLoading ? (
         <p className="text-gray-500">Načítám rozvrh...</p>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-5 gap-6">
-          {days.map((day) => (
-            <div
-              key={day}
-              className="bg-white rounded-2xl shadow-sm p-5"
-            >
-              <h2 className="text-xl font-bold text-palette-pine mb-5">
-                {day}
-              </h2>
+          {days.map((day) => {
+            const dayLessons = lessons.filter((lesson) => lesson.day === day);
 
-              <div className="space-y-4">
-                {lessons
-                  .filter((lesson) => lesson.day === day)
-                  .map((lesson) => (
+            return (
+              <div key={day} className="bg-white rounded-2xl shadow-sm p-5">
+                <h2 className="text-xl font-bold text-palette-pine mb-5">
+                  {day}
+                </h2>
+
+                <div className="space-y-4">
+                  {dayLessons.map((lesson) => (
                     <div
                       key={lesson.id}
-                      className={`rounded-xl border-l-4 p-4 shadow-sm transition duration-200 ${
-                        lesson.color?.includes('black')
-                          ? ''
-                          : 'hover:shadow-lg hover:scale-105'
-                      } ${lesson.color}`}
+                      className={`rounded-xl border-l-4 p-4 shadow-sm transition duration-200 hover:shadow-lg hover:scale-105 ${lesson.color}`}
                     >
                       <p className="text-sm text-gray-500 mb-1">
                         {lesson.time}
                       </p>
-                      
-                      <h3 className="font-bold text-palette-pine w-48">
+
+                      <h3 className="font-bold text-palette-pine">
                         {lesson.subject}
                       </h3>
 
-                      <p className="text-sm text-gray-600">
-                        {lesson.teacher}
-                      </p>
+                      {/* Studentům zobrazíme jméno učitele */}
+                      {user?.role !== 'teacher' && (
+                        <p className="text-sm text-gray-600">
+                          {lesson.teacher}
+                        </p>
+                      )}
 
                       <p className="text-sm text-gray-500 mt-1">
                         Room: {lesson.room}
                       </p>
-                      
-                      {user?.role === 'teacher' && (
-                        <p className="text-sm text-gray-500">
-                          Class: {lesson.class}
-                        </p>
-                      )}
+
+                      {/* Učiteli (nebo i studentovi) zobrazíme třídu */}
+                      <p className="text-sm font-medium text-palette-pine mt-1">
+                        Class: {lesson.class}
+                      </p>
                     </div>
                   ))}
-                {/* Zobrazení zprávy, pokud v daný den nejsou žádné hodiny */}
-                {lessons.filter((lesson) => lesson.day === day).length === 0 && (
-                  <p className="text-xs text-gray-400 italic">No classes</p>
-                )}
+
+                  {/* Zobrazení "Free Time" / "No classes", pokud v daný den učitel/student nic nemá */}
+                  {dayLessons.length === 0 && (
+                    <div className="rounded-xl border-l-4 border-gray-300 bg-gray-50 p-4 shadow-sm italic text-gray-400">
+                      <p className="text-sm font-semibold">Free Time</p>
+                      <p className="text-xs">No classes</p>
+                    </div>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
     </div>
