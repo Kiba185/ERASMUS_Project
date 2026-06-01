@@ -23,11 +23,11 @@ const ELAPSED_LESSONS = 100;
 const ABSENCE_WARNING_LIMIT = 25;
 
 const SUBJECT_STYLES: Record<SubjectName, { dotClassName: string; barClassName: string }> = {
-  Maths: { dotClassName: 'bg-yellow-400', barClassName: 'bg-yellow-400' },
-  Physics: { dotClassName: 'bg-gray-400', barClassName: 'bg-gray-400' },
-  'P.E.': { dotClassName: 'bg-cyan-300', barClassName: 'bg-cyan-300' },
-  'Czech Language': { dotClassName: 'bg-green-500', barClassName: 'bg-green-500' },
-  English: { dotClassName: 'bg-red-500', barClassName: 'bg-red-500' },
+  Maths: { dotClassName: 'bg-lime-500', barClassName: 'bg-lime-500' },
+  Physics: { dotClassName: 'bg-green-400', barClassName: 'bg-green-400' },
+  'P.E.': { dotClassName: 'bg-emerald-400', barClassName: 'bg-emerald-400' },
+  'Czech Language': { dotClassName: 'bg-emerald-600', barClassName: 'bg-emerald-600' },
+  English: { dotClassName: 'bg-teal-600', barClassName: 'bg-teal-600' },
 };
 
 const ABSENCE_DATES: AbsenceDateRecord[] = [
