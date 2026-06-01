@@ -197,6 +197,8 @@ const AttendancePage = () => {
   const [subjectFilter, setSubjectFilter] = useState(ALL_FILTER_VALUE);
   const [pendingAbsence, setPendingAbsence] = useState<PendingAbsence | null>(null);
   const [absenceReasons, setAbsenceReasons] = useState<Record<string, string>>({});
+  const [lessonTopics, setLessonTopics] = useState<Record<string, string>>({});
+  const [lessonTopicDrafts, setLessonTopicDrafts] = useState<Record<string, string>>({});
   const [studentsByDate, setStudentsByDate] = useState<Record<string, AttendanceStudent[]>>(() => ({
     [DATE_OPTIONS[0].value]: loadMockAttendanceForDate(DATE_OPTIONS[0].value),
   }));
@@ -245,6 +247,34 @@ const AttendancePage = () => {
   );
 
   const getAbsenceKey = (studentId: string, subject: Subject) => `${dateFilter}-${studentId}-${subject}`;
+  const getLessonTopicKey = (subject: Subject) => `${dateFilter}-${classFilter}-${subject}`;
+
+  const getLessonTopicDraftValue = (subject: Subject) => {
+    const topicKey = getLessonTopicKey(subject);
+    return lessonTopicDrafts[topicKey] ?? lessonTopics[topicKey] ?? '';
+  };
+
+  const updateLessonTopicDraft = (subject: Subject, topic: string) => {
+    setLessonTopicDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [getLessonTopicKey(subject)]: topic,
+    }));
+  };
+
+  const saveLessonTopic = (subject: Subject) => {
+    const topicKey = getLessonTopicKey(subject);
+    const savedTopic = getLessonTopicDraftValue(subject).trim();
+
+    setLessonTopics((currentTopics) => ({
+      ...currentTopics,
+      [topicKey]: savedTopic,
+    }));
+
+    setLessonTopicDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [topicKey]: savedTopic,
+    }));
+  };
 
   const updateAttendanceStatus = (studentId: string, subject: Subject, status: AttendanceStatus) => {
     setStudentsByDate((currentStudentsByDate) => {
@@ -320,6 +350,7 @@ const AttendancePage = () => {
             <Filter label="Class" value={classFilter} onChange={setClassFilter} options={CLASS_OPTIONS} />
             <Filter label="Subject" value={subjectFilter} onChange={setSubjectFilter} options={subjectOptions} />
           </div>
+
         </div>
 
         <div className="overflow-x-auto p-5">
@@ -329,8 +360,30 @@ const AttendancePage = () => {
                 <th className="w-56 px-4 py-3 font-semibold">Student</th>
                 <th className="w-24 px-4 py-3 font-semibold">Class</th>
                 {subjectsToShow.map((subject) => (
-                  <th key={subject} className="px-4 py-3 font-semibold">
-                    {getLessonLabel(classFilter, subject)}
+                  <th key={subject} className="min-w-64 px-4 py-3 align-top font-semibold">
+                    <span className="block">{getLessonLabel(classFilter, subject)}</span>
+                    {canEditAttendance ? (
+                      <div className="mt-2 flex gap-2">
+                        <input
+                          type="text"
+                          value={getLessonTopicDraftValue(subject)}
+                          onChange={(event) => updateLessonTopicDraft(subject, event.target.value)}
+                          placeholder="Topic..."
+                          className="h-9 min-w-0 flex-1 rounded-md border border-palette-lichen/60 bg-white px-2 text-xs font-semibold text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:ring-2 focus:ring-palette-leaf/20"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => saveLessonTopic(subject)}
+                          className="h-9 rounded-md bg-palette-fern px-3 text-xs font-black text-white transition hover:bg-palette-leaf"
+                        >
+                          Save
+                        </button>
+                      </div>
+                    ) : lessonTopics[getLessonTopicKey(subject)] ? (
+                      <span className="mt-1 block max-w-56 truncate text-xs font-medium text-palette-moss">
+                        {lessonTopics[getLessonTopicKey(subject)]}
+                      </span>
+                    ) : null}
                   </th>
                 ))}
               </tr>
