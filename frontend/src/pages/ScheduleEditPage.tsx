@@ -25,6 +25,25 @@ const availableTeachers = [
   'Mr. Garcia', 'Mr. Lopez'
 ];
 
+// Nové definice předmětů a jejich vazeb na učitele
+const availableSubjects = [
+  'Mathematics', 
+  'Information Tech.', 
+  'Gymnastics', 
+  'Laboratory Physics', 
+  'History', 
+  'Biology'
+];
+
+const subjectTeachersMap: Record<string, string[]> = {
+  'Mathematics': ['Mr. Novak', 'Mrs. Smith'],
+  'Information Tech': ['Mr. Green', 'Ms. Davis'],
+  'Gymnastics': ['Mr. Wilson', 'Mr. Lopez'],
+  'Laboratory Physics': ['Mr. Johnson', 'Mr. White'],
+  'History': ['Mrs. Thompson'],
+  'Biology': ['Mr. Garcia']
+};
+
 const availableClasses = ['7.C', '8.A', '8.B', '9.B', '9.C'];
 const availableSubjects = ['Mathematics', 'Information Tech.', 'Gymnastics', 'Laboratory Physics'];
 const availableRooms = ['A10', 'A12', 'A15', 'B05', 'B11', 'B15', 'B20', 'B35', 'C21', 'D05', 'E10', 'Gym'];
@@ -207,12 +226,15 @@ const ScheduleEditPage: React.FC = () => {
   };
 
   const handleAddNewPermanentLesson = () => {
+    const defaultSubject = availableSubjects[0];
+    const defaultTeacher = (subjectTeachersMap[defaultSubject] || [])[0] || availableTeachers[0];
+
     setEditingLesson({
       id: Date.now(),
       day: 'Monday',
       time: timeSlots[0],
-      subject: availableSubjectOptions[0] ?? '',
-      teacher: availableTeachers[0],
+      subject: defaultSubject,
+      teacher: defaultTeacher,
       className: selectedClass, 
       room: availableRoomOptions[0],
       weekType: 'all',
@@ -288,6 +310,60 @@ const ScheduleEditPage: React.FC = () => {
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
     const { name, value } = e.target;
     setEditingLesson((prev) => prev ? { ...prev, [name]: value } : null);
+  };
+
+  // Specifický handler pro změnu předmětu (validuje/přenastavuje učitele)
+  const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextSubject = e.target.value;
+    setEditingLesson((prev) => {
+      if (!prev) return null;
+      
+      const allowedTeachers = subjectTeachersMap[nextSubject] || [];
+      const isSubstituted = prev.status === 'substituted';
+      
+      let nextTeacher = prev.teacher || '';
+      // Pokud to není suplování a učitel neučí nový předmět, vybereme prvního validního
+      if (!isSubstituted && nextSubject && !allowedTeachers.includes(nextTeacher)) {
+        nextTeacher = allowedTeachers[0] || '';
+      }
+      
+      return {
+        ...prev,
+        subject: nextSubject,
+        teacher: nextTeacher
+      };
+    });
+  };
+
+  // Specifický handler pro změnu stavu hodiny (při změně na/ze suplování hlídá učitele)
+  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const nextStatus = e.target.value as any;
+    setEditingLesson((prev) => {
+      if (!prev) return null;
+      
+      let nextTeacher = prev.teacher || '';
+      const isSubstituted = nextStatus === 'substituted';
+      const allowedTeachers = subjectTeachersMap[prev.subject || ''] || [];
+      
+      if (!isSubstituted && prev.subject && !allowedTeachers.includes(nextTeacher)) {
+        nextTeacher = allowedTeachers[0] || '';
+      }
+      
+      return {
+        ...prev,
+        status: nextStatus,
+        teacher: nextTeacher
+      };
+    });
+  };
+
+  // Pomocná funkce pro získání seznamu učitelů na základě kontextu
+  const getFilteredTeachers = () => {
+    if (!editingLesson) return [];
+    if (editingLesson.status === 'substituted') {
+      return availableTeachers; // Suplování -> všichni učitelé školy k dispozici
+    }
+    return subjectTeachersMap[editingLesson.subject || ''] || [];
   };
 
   return (
@@ -476,7 +552,7 @@ const ScheduleEditPage: React.FC = () => {
                   </div>
                   <div>
                     <label className="block text-sm font-bold text-red-700 mb-1">Action Status</label>
-                    <select name="status" value={editingLesson.status} onChange={handleChange} className="w-full border rounded-lg p-2 outline-none">
+                    <select name="status" value={editingLesson.status} onChange={handleStatusChange} className="w-full border rounded-lg p-2 outline-none bg-white">
                       <option value="cancelled">Cancelled (No Class)</option>
                       <option value="substituted">Substitution</option>
                       <option value="regular">Regular Class (Reset)</option>
@@ -512,18 +588,18 @@ const ScheduleEditPage: React.FC = () => {
               )}
 
               <div className="grid grid-cols-2 gap-4">
+                {/* Změněno z textového inputu na Select předmětů */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Subject Name</label>
-                  <select name="subject" value={editingLesson.subject} onChange={handleChange} disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'} className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60">
-                    {availableSubjectOptions.map((subject) => {
-                      const setupSubject = setupMockData.subjects.find((option) => option.subject === subject);
-
-                      return (
-                        <option key={subject} value={subject}>
-                          {setupSubject ? `${setupSubject.subject} (${setupSubject.abbreviation})` : subject}
-                        </option>
-                      );
-                    })}
+                  <select 
+                    name="subject" 
+                    value={editingLesson.subject || ''} 
+                    onChange={handleSubjectChange} 
+                    disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'} 
+                    className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60 font-medium"
+                  >
+                    <option value="" disabled>Select subject...</option>
+                    {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
                   </select>
                 </div>
                 <div>
@@ -534,10 +610,23 @@ const ScheduleEditPage: React.FC = () => {
                 </div>
               </div>
 
+              {/* Dynamicky filtrovaný výběr učitelů */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Assigned Teacher</label>
-                <select name="teacher" value={editingLesson.teacher} onChange={handleChange} disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'} className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60">
-                  {availableTeachers.map(t => <option key={t} value={t}>{t}</option>)}
+                <label className="block text-sm font-bold text-gray-700 mb-1">
+                  Assigned Teacher {editingLesson.status === 'substituted' && <span className="text-xs text-amber-600 font-normal">(Substitution Mode: All options opened)</span>}
+                </label>
+                <select 
+                  name="teacher" 
+                  value={editingLesson.teacher || ''} 
+                  onChange={handleChange} 
+                  disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular' || !editingLesson.subject} 
+                  className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60"
+                >
+                  {getFilteredTeachers().length === 0 ? (
+                    <option value="">-- No teachers available for this subject --</option>
+                  ) : (
+                    getFilteredTeachers().map(t => <option key={t} value={t}>{t}</option> )
+                  )}
                 </select>
               </div>
 
