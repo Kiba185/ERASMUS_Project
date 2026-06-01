@@ -33,6 +33,14 @@ model User {
 
   classes    Class[]
   timeTables TimeTable[] 
+
+  // Parent-child relationship
+  parentId    Int?
+  parent      User?     @relation("ParentChild", fields: [parentId], references: [id])
+  children    User[]    @relation("ParentChild")
+
+  // Other relations
+  events Event[]
 }
 
 model Subject {
@@ -92,4 +100,17 @@ model TimeTable {
 
   classId Int
   class   Class @relation(fields: [classId], references: [id])
+}
+
+model Event {
+  id                            Int     @id @default(autoincrement())
+  participantsIndividuals       User[]
+  participantsClasses           Class[]
+  title                         String
+  description                   String
+  startDate                     DateTime
+  endDate                       DateTime
+  type                          String
+  startTime                     DateTime
+  allDay                        Boolean
 }
