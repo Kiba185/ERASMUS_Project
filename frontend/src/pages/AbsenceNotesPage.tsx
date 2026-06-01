@@ -4,7 +4,6 @@ type NoteStatus = 'unexcused' | 'sent';
 
 interface AbsenceNote {
   id: string;
-  subject: string;
   date: string;
   lessons: number;
   status: NoteStatus;
@@ -12,13 +11,13 @@ interface AbsenceNote {
 }
 
 const INITIAL_ABSENCES: AbsenceNote[] = [
-  { id: 'maths-2026-06-22', subject: 'Maths', date: '22. 6. 2026', lessons: 4, status: 'unexcused' },
-  { id: 'physics-2026-06-20', subject: 'Physics', date: '20. 6. 2026', lessons: 3, status: 'unexcused' },
-  { id: 'english-2026-06-18', subject: 'English', date: '18. 6. 2026', lessons: 2, status: 'unexcused' },
-  { id: 'czech-2026-06-14', subject: 'Czech Language', date: '14. 6. 2026', lessons: 5, status: 'unexcused' },
-  { id: 'pe-2026-06-10', subject: 'P.E.', date: '10. 6. 2026', lessons: 4, status: 'unexcused' },
-  { id: 'history-2026-06-06', subject: 'History', date: '6. 6. 2026', lessons: 3, status: 'unexcused' },
-  { id: 'chemistry-2026-06-03', subject: 'Chemistry', date: '3. 6. 2026', lessons: 3, status: 'unexcused' },
+  { id: 'maths-2026-06-22', date: '22. 6. 2026', lessons: 4, status: 'unexcused' },
+  { id: 'physics-2026-06-20', date: '20. 6. 2026', lessons: 3, status: 'unexcused' },
+  { id: 'english-2026-06-18', date: '18. 6. 2026', lessons: 2, status: 'unexcused' },
+  { id: 'czech-2026-06-14', date: '14. 6. 2026', lessons: 5, status: 'unexcused' },
+  { id: 'pe-2026-06-10', date: '10. 6. 2026', lessons: 4, status: 'unexcused' },
+  { id: 'history-2026-06-06', date: '6. 6. 2026', lessons: 3, status: 'unexcused' },
+  { id: 'chemistry-2026-06-03', date: '3. 6. 2026', lessons: 3, status: 'unexcused' },
 ];
 
 const AbsenceNotesPage: React.FC = () => {
@@ -98,9 +97,8 @@ const AbsenceNotesPage: React.FC = () => {
                   <div className="flex items-center justify-between gap-3">
                     <div>
                       <p className="text-base font-black text-palette-pine">
-                        {absence.subject} - {absence.lessons} lessons
+                        {absence.date} - {absence.lessons} lessons
                       </p>
-                      <p className="mt-1 text-xs font-bold text-palette-moss">{absence.date}</p>
                     </div>
                     <span
                       className={`rounded-md px-3 py-1 text-xs font-bold ${
@@ -127,9 +125,9 @@ const AbsenceNotesPage: React.FC = () => {
           {selectedAbsence ? (
             <form onSubmit={handleSubmitExcuse} className="mt-4 space-y-4">
               <div className="rounded-lg border border-palette-lichen/45 bg-white p-3">
-                <p className="text-sm font-black text-palette-pine">{selectedAbsence.subject}</p>
+                <p className="text-sm font-black text-palette-pine">{selectedAbsence.date}</p>
                 <p className="mt-1 text-xs font-bold text-palette-moss">
-                  {selectedAbsence.date} - {selectedAbsence.lessons} lessons
+                {selectedAbsence.lessons} lessons
                 </p>
               </div>
 
