@@ -25,7 +25,7 @@ const SIDEBAR_LINKS: SidebarLink[] = [
   { label: 'Semester', icon: 'date_range', path: '/semester', roles: ['parent', 'admin', 'student', 'teacher'] },
   { label: 'Events', icon: 'map_pin_review', path: '/events', roles: ['admin', 'teacher', 'student', 'parent'] },
   { label: 'User info', icon: 'person', path: '/user', roles: ['parent', 'admin', 'student', 'teacher'] },
-  
+  { label: 'Edit Schedule', icon: 'edit_calendar', path: '/schedule-edit', roles: ['admin'] }
 ];
 
 const Sidebar: React.FC = () => {
@@ -40,8 +40,8 @@ const Sidebar: React.FC = () => {
     : visibleLinks.filter((link) => !(link.path === '/user' || link.path.startsWith('/user/')));
 
   return (
-    <aside className="hidden w-64 shrink-0 self-stretch bg-palette-pine text-palette-mist md:block">
-      <nav className="sticky top-0 h-[calc(100vh-4rem)] overflow-y-auto px-4 py-6 space-y-2">
+    <aside className="w-full shrink-0 bg-palette-pine text-palette-mist md:w-64 border-b md:border-b-0 md:border-r border-palette-fern">
+      <nav className="max-h-[50vh] overflow-y-auto px-4 py-6 space-y-2 md:max-h-[calc(100vh-4rem)] md:sticky md:top-0">
         {isUserRoute && (
           <div className="mb-6">
             <button
