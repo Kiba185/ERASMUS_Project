@@ -6,12 +6,20 @@ import ClassesWidget from '../components/widgets/ClassesWidget';
 import StatisticsWidget from '../components/widgets/StatisticsWidget';
 import EventsWidget from '../components/widgets/EventsWidget';
 import AttendanceWidget from '../components/widgets/AttendanceWidget';
+import { useState, useEffect } from 'react';
 
+type Grade = { id: string; gColumnId: string; userId: string; grade: string, subjectName: string; subjectId: number; date: string; gColumnName?: string; weight?: number };
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();
 
   if (!user) return null;
+
+  /////
+
+  //gregyho kod kde ovsem nic neni, dominik je cerny
+
+  /////
 
   return (
     <div className="p-4 md:p-8 max-w-[1400px] mx-auto">
@@ -21,9 +29,9 @@ const Dashboard: React.FC = () => {
         </h1>
         <p className="text-palette-moss mt-2 font-medium">Here is an overview of what's happening today.</p>
       </div>
-      
+
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 lg:gap-8 auto-rows-fr">
-        
+
         {/* Zobrazení widgetů podle role */}
         {(user.role === 'student' || user.role === 'parent') && (
           <ScheduleWidget />
@@ -35,11 +43,11 @@ const Dashboard: React.FC = () => {
 
         {user.role === 'teacher' && (
           <ClassesWidget />
-          
+
         )}
         {user.role === 'student' && (
           <AttendanceWidget />
-          
+
         )}
 
 

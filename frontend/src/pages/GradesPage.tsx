@@ -116,7 +116,7 @@ const GradesPage: React.FC = () => {
                     {/* Průměr */}
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex items-center gap-4">
                         <div className="p-3 bg-green-50 text-green-600 rounded-lg">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M4.26 10.174a2.25 2.25 0 0 0-1.042 3.477 2.25 2.25 0 0 0 2.51.536l.094-.047m12.44-3.966a2.25 2.25 0 0 0 1.042 3.477 2.25 2.25 0 0 0-2.51.536l-.094.047m-9.656-.533a2.25 2.25 0 0 0-2.251 2.255v1.322c0 .984.662 1.847 1.63 2.007L12 21.75l5.523-1.002A1.986 1.986 0 0 0 19.125 18.74v-1.322A2.25 2.25 0 0 0 16.875 15.16M12 4.5l8.25 3-8.25 3-8.25-3 8.25-3Z" /></svg>
+                            <span className="material-symbols-outlined">school</span>
                         </div>
                         <div>
                             <p className="text-sm font-medium text-gray-500">Overall Average</p>
@@ -138,7 +138,7 @@ const GradesPage: React.FC = () => {
                     {/* Vybraný filtr */}
                     <div className="bg-white p-5 rounded-xl shadow-sm border border-gray-200 flex items-center gap-4">
                         <div className="p-3 bg-amber-50 text-amber-600 rounded-lg">
-                            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={2} stroke="currentColor" className="w-6 h-6"><path strokeLinecap="round" strokeLinejoin="round" d="M2.25 18 9 11.25l4.306 4.306a1.194 1.194 0 0 0 1.586.006L21.75 6.75m0 0V12m0-5.25H16.5" /></svg>
+                            <span className="material-symbols-outlined">filter_alt</span>
                         </div>
                         <div>
                             <p className="text-sm font-medium text-gray-500">Active Filter</p>
