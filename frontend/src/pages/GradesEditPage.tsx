@@ -457,9 +457,9 @@ const GradesEditPage: React.FC = () => {
       </div>
 
       {/* 2. ADD NEW COLUMN */}
-      <div className="bg-green-50 p-4 rounded-xl border border-green-200 flex items-end gap-4">
-        <form onSubmit={handleAddColumn} className="flex items-end gap-4 w-full">
-          <div className="flex-1">
+      <div className="bg-green-50 p-4 rounded-xl border border-green-200 flex flex-col md:flex-row md:items-end gap-4">
+        <form onSubmit={handleAddColumn} className="flex flex-col md:flex-row md:items-end gap-4 w-full">
+          <div className="w-full md:flex-1">
             <label className="block text-sm font-semibold text-green-800 mb-1">New Column Title (Max 75 chars)</label>
             <input
               type="text"
@@ -471,7 +471,7 @@ const GradesEditPage: React.FC = () => {
               required
             />
           </div>
-          <div className="w-32">
+          <div className="w-full md:w-32">
             <label className="block text-sm font-semibold text-green-800 mb-1">Weight</label>
             <input
               type="number"
@@ -495,7 +495,7 @@ const GradesEditPage: React.FC = () => {
               required
             />
           </div>
-          <div className="w-32">
+          <div className="w-full md:w-32">
             <label className="block text-sm font-semibold text-green-800 mb-1">Date</label>
             <input
               type="date"
@@ -505,7 +505,7 @@ const GradesEditPage: React.FC = () => {
               required
             />
           </div>
-          <button type="submit" className="py-2.5 px-6 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition h-[46px]">
+          <button type="submit" className="w-full md:w-auto py-2.5 px-6 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition h-[46px]">
             + Add Column
           </button>
         </form>
