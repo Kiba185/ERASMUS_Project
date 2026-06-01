@@ -12,8 +12,8 @@ interface Lesson {
   room: string;
   color: string;
   isPermanent: boolean;
-  weekType: 'all' | 'even' | 'odd'; // Supports cyclic rotations
-  group: string; // Supports class splitting/divisions
+  weekType: 'all' | 'even' | 'odd'; 
+  group: string; 
   exceptionDate?: string; 
   status?: 'active' | 'cancelled' | 'substituted' | 'regular';
 }
@@ -45,7 +45,6 @@ const initialMockLessons: Lesson[] = [
     group: 'Whole Class',
     status: 'active',
   },
-  // Split class example: Simultaneous lessons occurring at Monday 08:55
   {
     id: 2,
     day: 'Monday',
@@ -74,7 +73,6 @@ const initialMockLessons: Lesson[] = [
     group: 'Group 2',
     status: 'active',
   },
-  // Cyclic week variation example
   {
     id: 4,
     day: 'Tuesday',
@@ -91,7 +89,6 @@ const initialMockLessons: Lesson[] = [
   }
 ];
 
-// Standard ISO week calculator utility
 const getISOWeekDetails = (date: Date) => {
   const target = new Date(date.valueOf());
   const dayNr = (date.getDay() + 6) % 7;
@@ -125,7 +122,7 @@ const getWeekDatesStrings = (weekOffset: number): string[] => {
 const ScheduleEditPage: React.FC = () => {
   const { user } = useAuth();
   
-  const [selectedClass, setSelectedClass] = useState<string>(availableClasses[3]); // Default to 9.B for mock compatibility
+  const [selectedClass, setSelectedClass] = useState<string>(availableClasses[3]); 
   const [weekOffset, setWeekOffset] = useState<number>(0);
   
   const [lessons, setLessons] = useState<Lesson[]>(initialMockLessons);
@@ -156,7 +153,6 @@ const ScheduleEditPage: React.FC = () => {
       return classLessons.filter(l => l.isPermanent);
     }
 
-    // Filter permanent template rules bound to the active view's week cycle parity (Even/Odd)
     const permanentLessons = classLessons.filter(l => 
       l.isPermanent && (l.weekType === 'all' || l.weekType === activeWeekParity)
     );
@@ -228,11 +224,9 @@ const ScheduleEditPage: React.FC = () => {
       return;
     }
 
-    // Group-aware conflict detection system rule verification
     const hasConflict = lessons.some(l => {
       if (l.id === editingLesson.id) return false;
       
-      // Determine if groups clash (if either is Whole Class or if they explicitly name the same group subdivision track)
       const groupsOverlap = l.group === 'Whole Class' || 
                             editingLesson.group === 'Whole Class' || 
                             l.group === editingLesson.group;
@@ -407,39 +401,46 @@ const ScheduleEditPage: React.FC = () => {
                     className={`rounded-xl border-l-4 p-4 shadow-sm cursor-pointer transition duration-200 
                       hover:shadow-md hover:-translate-y-1 ${lesson.color} 
                       ${lesson.status === 'cancelled' ? 'opacity-60 bg-red-50/50 border-red-400' : ''}
+                      h-44 flex flex-col justify-between
                     `}
                   >
-                    <div className="flex justify-between items-start mb-1 gap-2">
-                      <p className="text-xs font-semibold text-gray-500 bg-white/50 px-2 py-1 rounded whitespace-nowrap">
-                        {lesson.time}
-                      </p>
-                      
-                      {lesson.isPermanent && isPermanentEditMode && (
-                        <span className={`text-[9px] px-1.5 py-0.5 font-bold uppercase rounded border ${lesson.weekType === 'even' ? 'bg-blue-50 border-blue-200 text-blue-700' : lesson.weekType === 'odd' ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
-                          {lesson.weekType === 'all' ? 'All' : lesson.weekType}
-                        </span>
-                      )}
+                    <div>
+                      <div className="flex justify-between items-start mb-1 gap-2">
+                        <p className="text-xs font-semibold text-gray-500 bg-white/50 px-2 py-1 rounded whitespace-nowrap">
+                          {lesson.time}
+                        </p>
+                        
+                        {lesson.isPermanent && isPermanentEditMode && (
+                          <span className={`text-[9px] px-1.5 py-0.5 font-bold uppercase rounded border ${lesson.weekType === 'even' ? 'bg-blue-50 border-blue-200 text-blue-700' : lesson.weekType === 'odd' ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
+                            {lesson.weekType === 'all' ? 'All' : lesson.weekType}
+                          </span>
+                        )}
 
-                      {!lesson.isPermanent && (
-                        <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${lesson.status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
-                          {lesson.status === 'cancelled' ? 'Cancelled' : 'Substituted'}
-                        </span>
+                        {!lesson.isPermanent && (
+                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${lesson.status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
+                            {lesson.status === 'cancelled' ? 'Cancelled' : 'Substituted'}
+                          </span>
+                        )}
+                      </div>
+
+                      <h3 className={`font-bold text-palette-pine text-lg mt-1 line-clamp-1 ${lesson.status === 'cancelled' ? 'line-through text-gray-400' : ''}`}>
+                        {lesson.subject}
+                      </h3>
+                    </div>
+                    
+                    <div className="mt-2">
+                      {lesson.status !== 'cancelled' ? (
+                        <div className="text-xs text-gray-600 space-y-0.5 bg-white/40 p-1.5 rounded-lg border border-gray-50">
+                          <p><span className="font-medium text-gray-400">Teacher:</span> {lesson.teacher}</p>
+                          <p><span className="font-medium text-gray-400">Room:</span> {lesson.room}</p>
+                          <p><span className="font-medium text-gray-400">Division:</span> <span className="font-semibold text-palette-pine">{lesson.group}</span></p>
+                        </div>
+                      ) : (
+                        <div className="bg-red-50/50 p-2 rounded-lg border border-red-100/70 text-center">
+                          <p className="text-xs font-bold text-red-500">Class has been called off.</p>
+                        </div>
                       )}
                     </div>
-
-                    <h3 className={`font-bold text-palette-pine text-lg mt-1 ${lesson.status === 'cancelled' ? 'line-through text-gray-400' : ''}`}>
-                      {lesson.subject}
-                    </h3>
-                    
-                    {lesson.status !== 'cancelled' ? (
-                      <div className="mt-2 text-xs text-gray-600 space-y-0.5 bg-white/40 p-1.5 rounded-lg border border-gray-50">
-                        <p><span className="font-medium text-gray-400">Teacher:</span> {lesson.teacher}</p>
-                        <p><span className="font-medium text-gray-400">Room:</span> {lesson.room}</p>
-                        <p><span className="font-medium text-gray-400">Division:</span> <span className="font-semibold text-palette-pine">{lesson.group}</span></p>
-                      </div>
-                    ) : (
-                      <p className="text-xs font-semibold text-red-500 mt-2">Class has been called off.</p>
-                    )}
                   </div>
                 ))}
             </div>
@@ -476,7 +477,6 @@ const ScheduleEditPage: React.FC = () => {
                 </div>
               )}
 
-              {/* Day, Time Slot, and Week Rotation settings */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Day</label>
