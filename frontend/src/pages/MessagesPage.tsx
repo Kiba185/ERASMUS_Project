@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 
 const STUDENTS = [
   'John West',
@@ -24,7 +24,7 @@ const RECEIVED_MESSAGES: Message[] = [
     id: 'received-1',
     person: 'MGR. John Doe',
     subject: 'Meeting reschedule',
-    message: 'Hey, can we reschedule our meeting?',
+    message: 'Hey, can we reschedule our meeting? I have another urgent appointment that came up at the last minute and I will not be able to make it to our scheduled time. Could we perhaps move it to Friday afternoon?',
     time: '2 hours ago',
     status: 'new',
   },
@@ -40,7 +40,7 @@ const RECEIVED_MESSAGES: Message[] = [
     id: 'received-3',
     person: 'Anna Kralova',
     subject: 'Homework question',
-    message: 'Can I send the worksheet later today?',
+    message: 'Can I send the worksheet later today? I was sick over the weekend and did not manage to finish all the exercises on time. I promise I will submit it by 8 PM tonight at the latest.',
     time: '2 days ago',
     status: 'read',
   },
@@ -74,6 +74,101 @@ const statusClassNames: Record<NonNullable<Message['status']>, string> = {
 const MessagesPage: React.FC = () => {
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
   const [recipient, setRecipient] = useState('');
+  const [subject, setSubject] = useState('');
+  const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
+
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<'all' | 'new' | 'read'>('all');
+  const [sortField, setSortField] = useState<'time' | 'person' | 'subject'>('time');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+
+  const [messageText, setMessageText] = useState('');
+  const [attachment, setAttachment] = useState<File | null>(null);
+  const [sentMessagesList, setSentMessagesList] = useState<Message[]>(SENT_MESSAGES);
+
+  const parseTime = (t: string) => {
+    if (t.includes('hour')) return parseInt(t) || 0;
+    if (t.includes('day')) return (parseInt(t) || 0) * 24;
+    return 0;
+  };
+
+  const filteredReceived = useMemo(() => {
+    let result = RECEIVED_MESSAGES;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(m => m.subject.toLowerCase().includes(q) || m.person.toLowerCase().includes(q) || m.message.toLowerCase().includes(q));
+    }
+    if (filterStatus !== 'all') {
+      result = result.filter(m => m.status === filterStatus);
+    }
+    result = [...result].sort((a, b) => {
+      if (sortField === 'time') {
+        const diff = parseTime(a.time) - parseTime(b.time);
+        return sortOrder === 'asc' ? diff : -diff;
+      }
+      const aVal = a[sortField] || '';
+      const bVal = b[sortField] || '';
+      return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    });
+    return result;
+  }, [searchQuery, filterStatus, sortField, sortOrder]);
+
+  const filteredSent = useMemo(() => {
+    let result = sentMessagesList;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
+      result = result.filter(m => m.subject.toLowerCase().includes(q) || m.person.toLowerCase().includes(q) || m.message.toLowerCase().includes(q));
+    }
+    if (filterStatus === 'new' || filterStatus === 'read') {
+      return []; // Sent messages don't have new/read status in our mock
+    }
+    result = [...result].sort((a, b) => {
+      if (sortField === 'time') {
+        const diff = parseTime(a.time) - parseTime(b.time);
+        return sortOrder === 'asc' ? diff : -diff;
+      }
+      const aVal = a[sortField] || '';
+      const bVal = b[sortField] || '';
+      return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
+    });
+    return result;
+  }, [searchQuery, filterStatus, sortField, sortOrder]);
+
+  const handleReply = (msg: Message) => {
+    setRecipient(msg.person);
+    setSubject(msg.subject.startsWith('Re:') ? msg.subject : `Re: ${msg.subject}`);
+    setMessageText('');
+    setAttachment(null);
+    setIsNewMessageOpen(true);
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+  };
+
+  const handleSendMessage = () => {
+    if (!recipient.trim() || !subject.trim() || !messageText.trim()) {
+      alert('Please fill in the recipient, subject, and message.');
+      return;
+    }
+
+    const newMessage: Message = {
+      id: `sent-${Date.now()}`,
+      person: recipient,
+      subject: subject,
+      message: messageText + (attachment ? `\n[Attachment: ${attachment.name}]` : ''),
+      time: 'Just now',
+      status: 'sent',
+    };
+
+    setSentMessagesList([newMessage, ...sentMessagesList]);
+    setIsNewMessageOpen(false);
+    setRecipient('');
+    setSubject('');
+    setMessageText('');
+    setAttachment(null);
+  };
+
+  const toggleExpand = (id: string) => {
+    setExpandedMessageId(prev => prev === id ? null : id);
+  };
 
   return (
     <section className="mx-auto max-w-7xl space-y-4 px-2 py-2 text-palette-pine">
@@ -98,13 +193,61 @@ const MessagesPage: React.FC = () => {
         </div>
       </header>
 
+      {/* TOOLBAR */}
+      <div className="flex flex-col md:flex-row gap-4 items-center bg-white p-4 rounded-lg shadow-soft border border-palette-lichen/45">
+        <div className="flex-1 w-full">
+          <input
+            type="text"
+            placeholder="Search in messages, subjects, senders..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full h-10 rounded-md border border-palette-lichen/60 bg-gray-50 px-3 text-sm font-medium text-palette-pine outline-none transition focus:bg-white focus:border-palette-leaf focus:ring-2 focus:ring-palette-leaf/20"
+          />
+        </div>
+        <div className="flex flex-wrap gap-4 w-full md:w-auto">
+          <select 
+            value={filterStatus} 
+            onChange={(e) => setFilterStatus(e.target.value as any)}
+            className="h-10 rounded-md border border-palette-lichen/60 bg-gray-50 px-3 text-sm font-bold text-palette-pine outline-none transition focus:bg-white focus:border-palette-leaf focus:ring-2 focus:ring-palette-leaf/20"
+          >
+            <option value="all">All Status</option>
+            <option value="new">Unread (New)</option>
+            <option value="read">Read</option>
+          </select>
+
+          <select 
+            value={sortField} 
+            onChange={(e) => setSortField(e.target.value as any)}
+            className="h-10 rounded-md border border-palette-lichen/60 bg-gray-50 px-3 text-sm font-bold text-palette-pine outline-none transition focus:bg-white focus:border-palette-leaf focus:ring-2 focus:ring-palette-leaf/20"
+          >
+            <option value="time">Sort by Time</option>
+            <option value="person">Sort by Person</option>
+            <option value="subject">Sort by Subject</option>
+          </select>
+          
+          <button 
+            onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
+            className="h-10 px-3 flex items-center justify-center rounded-md border border-palette-lichen/60 bg-gray-50 text-sm font-black text-palette-moss transition hover:bg-palette-mist hover:text-palette-pine"
+            title="Toggle sort order"
+          >
+            {sortOrder === 'asc' ? 'Ascending ↑' : 'Descending ↓'}
+          </button>
+        </div>
+      </div>
+
       {isNewMessageOpen && (
         <section className="rounded-lg border border-palette-leaf/35 bg-white p-5 shadow-soft">
           <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
             <h2 className="text-xl font-black text-palette-pine">New Message</h2>
             <button
               type="button"
-              onClick={() => setIsNewMessageOpen(false)}
+              onClick={() => {
+                setIsNewMessageOpen(false);
+                setRecipient('');
+                setSubject('');
+                setMessageText('');
+                setAttachment(null);
+              }}
               className="self-start rounded-md border border-palette-lichen/60 px-3 py-2 text-xs font-black text-palette-moss transition hover:border-palette-leaf hover:text-palette-pine md:self-auto"
             >
               Close
@@ -128,6 +271,8 @@ const MessagesPage: React.FC = () => {
               Subject
               <input
                 type="text"
+                value={subject}
+                onChange={e => setSubject(e.target.value)}
                 placeholder="Enter subject..."
                 className="h-11 rounded-md border border-palette-lichen/60 bg-palette-mist/40 px-3 text-sm font-semibold normal-case tracking-normal text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:bg-white focus:ring-2 focus:ring-palette-leaf/20"
               />
@@ -143,21 +288,48 @@ const MessagesPage: React.FC = () => {
           <textarea
             placeholder="Message"
             rows={5}
+            value={messageText}
+            onChange={(e) => setMessageText(e.target.value)}
             className="mt-3 w-full resize-none rounded-md border border-palette-lichen/60 bg-palette-mist/40 px-3 py-3 text-sm font-medium text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:bg-white focus:ring-2 focus:ring-palette-leaf/20"
           />
 
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <input id="message-attachment" type="file" className="hidden" />
-            <label
-              htmlFor="message-attachment"
-              aria-label="Attach file"
-              title="Attach file"
-              className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-palette-lichen/60 px-4 text-sm font-black text-palette-moss transition hover:border-palette-leaf hover:bg-palette-sage/15 hover:text-palette-pine"
-            >
-              Attach file
-            </label>
+          <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <input 
+                id="message-attachment" 
+                type="file" 
+                className="hidden" 
+                onChange={(e) => {
+                  if (e.target.files && e.target.files.length > 0) {
+                    setAttachment(e.target.files[0]);
+                  }
+                }}
+              />
+              <label
+                htmlFor="message-attachment"
+                aria-label="Attach file"
+                title="Attach file"
+                className="inline-flex h-10 cursor-pointer items-center justify-center rounded-md border border-palette-lichen/60 px-4 text-sm font-black text-palette-moss transition hover:border-palette-leaf hover:bg-palette-sage/15 hover:text-palette-pine"
+              >
+                Attach file
+              </label>
+              {attachment && (
+                <div className="flex items-center gap-2 rounded-full bg-palette-mist px-3 py-1 text-xs font-black text-palette-moss">
+                  <span>{attachment.name}</span>
+                  <button 
+                    type="button" 
+                    onClick={() => setAttachment(null)}
+                    className="text-red-500 hover:text-red-700"
+                    title="Remove attachment"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               type="button"
+              onClick={handleSendMessage}
               className="h-10 rounded-md bg-palette-fern px-5 text-sm font-black text-white shadow-soft transition hover:bg-palette-leaf focus:outline-none focus:ring-2 focus:ring-palette-leaf/30"
             >
               Send message
@@ -170,7 +342,7 @@ const MessagesPage: React.FC = () => {
         <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <h2 className="text-xl font-black text-palette-pine">Received Messages</h2>
           <span className="w-fit rounded-full bg-white px-3 py-1 text-xs font-black text-palette-moss">
-            {RECEIVED_MESSAGES.length} messages
+            {filteredReceived.length} messages
           </span>
         </div>
 
@@ -186,7 +358,10 @@ const MessagesPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-palette-lichen/35">
-              {RECEIVED_MESSAGES.map((message) => (
+              {filteredReceived.length === 0 && (
+                <tr><td colSpan={5} className="px-4 py-8 text-center text-palette-moss font-medium">No messages found.</td></tr>
+              )}
+              {filteredReceived.map((message) => (
                 <tr key={message.id} className="transition hover:bg-palette-mist/60">
                   <td className="px-4 py-3 font-black text-palette-pine">{message.person}</td>
                   <td className="px-4 py-3">
@@ -199,12 +374,27 @@ const MessagesPage: React.FC = () => {
                       )}
                     </div>
                   </td>
-                  <td className="max-w-md px-4 py-3 font-medium text-palette-moss">{message.message}</td>
+                  <td className="max-w-md px-4 py-3 font-medium text-palette-moss cursor-pointer group" onClick={() => toggleExpand(message.id)}>
+                    <div className={`transition-all duration-300 ${expandedMessageId === message.id ? "" : "line-clamp-1"}`}>
+                      {message.message}
+                    </div>
+                    {expandedMessageId === message.id && (
+                      <div className="mt-2 text-[10px] uppercase font-black tracking-wider text-palette-fern/70">
+                        Click to collapse
+                      </div>
+                    )}
+                    {expandedMessageId !== message.id && message.message.length > 50 && (
+                      <div className="mt-1 text-[10px] uppercase font-black tracking-wider text-palette-moss/50 group-hover:text-palette-fern/70 transition-colors">
+                        Click to expand
+                      </div>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 font-bold text-palette-moss">{message.time}</td>
                   <td className="px-4 py-3 text-right">
                     <button
+                      onClick={(e) => { e.stopPropagation(); handleReply(message); }}
                       type="button"
-                      className="rounded-md border border-palette-leaf/50 px-4 py-2 text-xs font-black text-palette-fern transition hover:bg-palette-sage/15"
+                      className="rounded-md border border-palette-leaf/50 px-4 py-2 text-xs font-black text-palette-fern transition hover:bg-palette-sage/15 hover:bg-palette-leaf hover:text-white"
                     >
                       Reply
                     </button>
@@ -220,7 +410,7 @@ const MessagesPage: React.FC = () => {
         <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
           <h2 className="text-xl font-black text-palette-pine">Sent Messages</h2>
           <span className="w-fit rounded-full bg-palette-mist px-3 py-1 text-xs font-black text-palette-moss">
-            {SENT_MESSAGES.length} messages
+            {filteredSent.length} messages
           </span>
         </div>
 
@@ -235,11 +425,28 @@ const MessagesPage: React.FC = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-palette-lichen/35">
-              {SENT_MESSAGES.map((message) => (
+              {filteredSent.length === 0 && (
+                <tr><td colSpan={4} className="px-4 py-8 text-center text-palette-moss font-medium">No sent messages found.</td></tr>
+              )}
+              {filteredSent.map((message) => (
                 <tr key={message.id} className="transition hover:bg-palette-mist/60">
                   <td className="px-4 py-3 font-black text-palette-pine">{message.person}</td>
                   <td className="px-4 py-3 font-bold text-palette-pine">{message.subject}</td>
-                  <td className="max-w-md px-4 py-3 font-medium text-palette-moss">{message.message}</td>
+                  <td className="max-w-md px-4 py-3 font-medium text-palette-moss cursor-pointer group" onClick={() => toggleExpand(message.id)}>
+                    <div className={`transition-all duration-300 ${expandedMessageId === message.id ? "" : "line-clamp-1"}`}>
+                      {message.message}
+                    </div>
+                    {expandedMessageId === message.id && (
+                      <div className="mt-2 text-[10px] uppercase font-black tracking-wider text-palette-fern/70">
+                        Click to collapse
+                      </div>
+                    )}
+                    {expandedMessageId !== message.id && message.message.length > 50 && (
+                      <div className="mt-1 text-[10px] uppercase font-black tracking-wider text-palette-moss/50 group-hover:text-palette-fern/70 transition-colors">
+                        Click to expand
+                      </div>
+                    )}
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 font-bold text-palette-moss">{message.time}</td>
                 </tr>
               ))}
