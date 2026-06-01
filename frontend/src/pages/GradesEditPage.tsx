@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 
 // --- TYPES ---
 type Student = { id: string; name: string; classes: string[] };
@@ -566,7 +567,7 @@ const GradesEditPage: React.FC = () => {
       </div>
 
       {/* 5. EDIT COLUMN POPUP/MODAL OVERLAY */}
-      {editingAssignment && (
+      {editingAssignment && createPortal(
         <div className="fixed inset-0 bg-black/40 backdrop-blur-sm flex items-center justify-center z-50 animate-fadeIn">
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xl max-w-md w-full mx-4 space-y-4">
             <div className="flex justify-between items-center border-b pb-2">
@@ -621,9 +622,9 @@ const GradesEditPage: React.FC = () => {
               </div>
             </form>
           </div>
-        </div>
+        </div>,
+        document.body,
       )}
-
     </div>
   );
 };
