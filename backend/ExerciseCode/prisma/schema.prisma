@@ -81,6 +81,8 @@ model Class {
   name       String
   students   User[]
   timeTables TimeTable[] // 👈 OPRAVENO: Zpětná vazba pro rozvrh
+
+  events Event[]
 }
 
 model TimeTable {
