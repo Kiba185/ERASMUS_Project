@@ -12,6 +12,11 @@ interface MockSubject {
   name: string;
 }
 
+interface MockClass {
+  id: number;
+  name: string;
+}
+
 interface MockUser {
   id: number;
   firstName: string;
@@ -32,9 +37,9 @@ const UsersPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [users, setUsers] = useState<MockUser[]>(initialUsers);
-  const [classes] = useState<MockClass[]>(initialClasses);
-  const [subjects] = useState<MockSubject[]>(initialSubjects);
+  const [users, setUsers] = useState<MockUser[]>([]);
+  const [classes, setClasses] = useState<MockClass[]>([]);
+  const [subjects] = useState<MockSubject[]>([]);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
@@ -69,7 +74,9 @@ const UsersPage: React.FC = () => {
     Promise.all([fetchUsers(), fetchClasses()]).finally(() => setLoading(false));
   }, []);
 
-  const students = useMemo(() => users.filter(u => u.role === 'student'), [users]);
+  if (!users || !classes) return <div className="p-8 text-palette-pine font-bold">Načítání...</div>;
+  const [loading, setLoading] = useState(true);
+  //const students = useMemo(() => users.filter(u => u.role === 'student'), [users]);
 
   const filteredAndSortedUsers = useMemo(() => {
     let result = users;
@@ -345,6 +352,7 @@ const UsersPage: React.FC = () => {
                       <div className="pt-2 border-t border-palette-sage/30">
                         <label className="block text-sm font-bold text-palette-pine mb-2">Assign Subjects (Teacher qualification)</label>
                         <div className="max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 space-y-1 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-1">
+                          
                           {subjects.map(subject => {
                             const isSelected = editingUser.subjectIds?.includes(subject.id);
                             return (

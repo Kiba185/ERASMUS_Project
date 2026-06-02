@@ -2,7 +2,9 @@
   // Visit https://aka.ms/tsconfig to read more about this file
   "compilerOptions": {
     // File Layout
-    "rootDir": "./src",
+    // rootDir should include all source files (e.g. project root) so files like prisma.config.ts
+    // which live at the repo root are included. Set to project root.
+    "rootDir": "./",
     "outDir": "./dist",
 
     // Environment Settings
