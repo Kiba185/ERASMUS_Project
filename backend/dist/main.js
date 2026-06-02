@@ -1,15 +1,14 @@
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
 import session from 'express-session';
 import bcrypt from 'bcrypt';
-import timetableRouter from "./timeTable.js";
-import { requireAuth } from "./auth.js";
-import userRoutes from "./users.js";
-const prisma = new PrismaClient();
+import timetableRouter from './timeTable.js';
+import { prisma } from "./prisma.js";
+import { requireAuth } from './auth.js';
+import userRoutes from './users.js';
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const privileges = {
     "student": 1,
     "parent": 2,
@@ -27,6 +26,7 @@ app.use(session({
     saveUninitialized: false,
     cookie: { secure: false }
 }));
+app.use(timetableRouter);
 app.use(userRoutes);
 //////////////////////////////////////
 //      --=== MISC STUFF ===--
@@ -297,9 +297,7 @@ app.delete('/api/gradeColumns/:id', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) {
         return;
     }
-    const gradeColumnId = Number(req.params.id);
-    if (isNaN(gradeColumnId))
-        return res.status(400).json({ success: false, message: 'Invalid ID' });
+    const gradeColumnId = parseInt(req.params.id);
     const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });
     if (!gradeColumn) {
         return res.status(404).json({ success: false, message: 'Grade column not found' });
@@ -316,9 +314,7 @@ app.put('/api/gradeColumns/:id', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) {
         return;
     }
-    const gradeColumnId = Number(req.params.id);
-    if (isNaN(gradeColumnId))
-        return res.status(400).json({ success: false, message: 'Invalid ID' });
+    const gradeColumnId = parseInt(req.params.id);
     const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });
     if (!gradeColumn) {
         return res.status(404).json({ success: false, message: 'Grade column not found' });
@@ -361,9 +357,7 @@ app.delete('/api/grades/:id', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) {
         return;
     }
-    const gradeId = Number(req.params.id);
-    if (isNaN(gradeId))
-        return res.status(400).json({ success: false, message: 'Invalid ID' });
+    const gradeId = parseInt(req.params.id);
     const grade = await prisma.grade.findUnique({ where: { id: gradeId } });
     if (!grade) {
         return res.status(404).json({ success: false, message: 'Grade not found' });
@@ -415,17 +409,14 @@ app.get('/api/mygrades', async (req, res, next) => {
 //GET SPECIFIC GRADE VIA GRADECOLUMNID AND USERID - TEACHER FOR FOREIGN, ALL FOR THEMSELVES
 app.get('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
     try {
-        const studentId = Number(req.params.studentId);
-        const gradeColumnId = Number(req.params.gradeColumnId);
-        if (isNaN(studentId) || isNaN(gradeColumnId))
-            return res.status(400).json({ success: false, message: 'Invalid ID' });
+        const { studentId, gradeColumnId } = req.params;
         // Check if grade exists
-        const grade = await prisma.grade.findFirst({ where: { userId: studentId, gColumnId: gradeColumnId } });
+        const grade = await prisma.grade.findFirst({ where: { userId: Number(studentId), gColumnId: Number(gradeColumnId) } });
         if (!grade) {
             return res.status(404).json({ success: false, message: 'Grade not found' });
         }
         /// AUTH ///
-        if (req.session.userId !== studentId) {
+        if (req.session.userId !== Number(studentId)) {
             if (await requireAuth(req, res, next, 5) !== true) {
                 return;
             }
@@ -482,11 +473,8 @@ app.delete('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
         return;
     }
     //const gradeId = parseInt(req.params.id);
-    const studentId = Number(req.params.studentId);
-    const gradeColumnId = Number(req.params.gradeColumnId);
-    if (isNaN(studentId) || isNaN(gradeColumnId))
-        return res.status(400).json({ success: false, message: 'Invalid ID' });
-    const grade = await prisma.grade.findFirst({ where: { userId: studentId, gColumnId: gradeColumnId } });
+    const { studentId, gradeColumnId } = req.params;
+    const grade = await prisma.grade.findFirst({ where: { userId: Number(studentId), gColumnId: Number(gradeColumnId) } });
     const gradeId = grade?.id;
     // Check if the grade exists
     if (!grade) {
@@ -611,9 +599,7 @@ app.delete('/api/events/:id', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) {
         return;
     }
-    const eventId = Number(req.params.id);
-    if (isNaN(eventId))
-        return res.status(400).json({ success: false, message: 'Invalid ID' });
+    const eventId = parseInt(req.params.id);
     const deletedEvent = await prisma.event.delete({
         where: { id: eventId }
     });
@@ -625,9 +611,7 @@ app.put('/api/events/:id', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) {
         return;
     }
-    const eventId = Number(req.params.id);
-    if (isNaN(eventId))
-        return res.status(400).json({ success: false, message: 'Invalid ID' });
+    const eventId = parseInt(req.params.id);
     const { title, description, startDate, endDate, type, startTime, allDay, participantIndividualIds, participantClassIds } = req.body;
     const updatedEvent = await prisma.event.update({
         where: { id: eventId },
@@ -657,11 +641,9 @@ app.put('/api/events/:id', async (req, res, next) => {
     });
     res.json(updatedEvent);
 });
-app.use(timetableRouter);
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
 function next() {
     throw new Error('Function not implemented.');
 }
-//# sourceMappingURL=main.js.map

@@ -3,7 +3,7 @@ import cors from 'cors';
 import 'dotenv/config';
 //import { PrismaClient } from '@prisma/client';
 import session from 'express-session';
-import { prisma } from "./prisma.ts";
+import { prisma } from "./prisma.js";
 
 declare module 'express-session' {
     interface SessionData {

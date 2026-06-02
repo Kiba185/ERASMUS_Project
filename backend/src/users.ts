@@ -1,7 +1,7 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import { prisma } from "./prisma.ts";
-import { requireAuth } from './auth.ts';
+import { prisma } from "./prisma.js";
+import { requireAuth } from './auth.js';
 import 'dotenv/config';
 
 const router = express.Router();

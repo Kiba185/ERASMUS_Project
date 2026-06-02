@@ -1,9 +1,8 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
-import { requireAuth } from "./auth.js";
+import { prisma } from "./prisma.js";
+import { requireAuth } from './auth.js';
 import 'dotenv/config';
-const prisma = new PrismaClient();
 const router = express.Router();
 // GET ALL USERS WITH CLASSES - ADMIN ONLY
 router.get('/api/admin/users', async (req, res, next) => {
@@ -155,4 +154,3 @@ router.delete('/api/admin/users/:id/classes/:classId', async (req, res, next) =>
     res.json({ success: true, message: 'User removed from class' });
 });
 export default router;
-//# sourceMappingURL=users.js.map

@@ -1,6 +1,5 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
-const prisma = new PrismaClient();
+import { prisma } from "./prisma.js";
 const router = express.Router();
 router.get("/api/timetables/student/:userId", async (req, res, next) => {
     const userIdentifier = req.params.userId;
@@ -59,4 +58,3 @@ router.get("/api/timetables/student/:userId", async (req, res, next) => {
     }
 });
 export default router;
-//# sourceMappingURL=timeTable.js.map
