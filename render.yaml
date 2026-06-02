@@ -15,8 +15,8 @@ services:
     name: engineers-backend
     runtime: node
     rootDir: backend/ExerciseCode
-    buildCommand: npm install && npm run prisma:generate && npm run build
-    startCommand: npx prisma migrate deploy && npm start
+    buildCommand: npm install && node ./node_modules/prisma/build/index.js generate && npm run build
+    startCommand: node ./node_modules/prisma/build/index.js migrate deploy && npm start
     plan: free
     envVars:
       - key: DATABASE_URL
