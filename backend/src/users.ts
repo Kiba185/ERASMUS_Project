@@ -1,29 +1,26 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './prisma.ts'; // 👈 Změněno: taháme sdílenou instanci
 import { requireAuth } from './auth.ts';
 import 'dotenv/config';
 
-const prisma = new PrismaClient();
 const router = express.Router();
-
 
 // GET ALL USERS WITH CLASSES - ADMIN ONLY
 router.get('/api/admin/users', async (req, res, next) => {
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
-    const users = await prisma.user.findMany({
+    const users = await (prisma.user as any).findMany({
         include: { classes: true }
     });
 
-    const saveUsers = users.map(({ password, ...u }) => ({
+    const saveUsers = users.map(({ password, ...u }: any) => ({
         ...u,
-        classes: u.classes.map(c => ({ id: c.id, name: c.name }))
+        classes: u.classes.map((c: any) => ({ id: c.id, name: c.name }))
     }));
 
     res.json(saveUsers);
 });
-
 
 // UPDATE USER - ADMIN ONLY (Edit → Save)
 router.put('/api/admin/users/:id', async (req, res, next) => {
@@ -33,7 +30,7 @@ router.put('/api/admin/users/:id', async (req, res, next) => {
     const { firstName, lastName, email, phone, adress, role, birthday, username } = req.body;
 
     if (username) {
-        const existing = await prisma.user.findFirst({
+        const existing = await (prisma.user as any).findFirst({
             where: { username, NOT: { id: userId } }
         });
         if (existing) {
@@ -41,24 +38,23 @@ router.put('/api/admin/users/:id', async (req, res, next) => {
         }
     }
 
-    const updatedUser = await prisma.user.update({
-    where: { id: userId },
-    data: {
-        ...(firstName && { firstName }),
-        ...(lastName  && { lastName }),
-        ...(email     && { email }),
-        ...(phone     && { phone }),
-        ...(adress    && { adress }),
-        ...(role      && { role }),
-        ...(birthday  && { birthday: new Date(birthday) }),
-        ...(username  && { username }),
-    }
-});
+    const updatedUser = await (prisma.user as any).update({
+        where: { id: userId },
+        data: {
+            ...(firstName && { firstName }),
+            ...(lastName && { lastName }),
+            ...(email && { email }),
+            ...(phone && { phone }),
+            ...(adress && { adress }),
+            ...(role && { role }),
+            ...(birthday && { birthday: new Date(birthday) }),
+            ...(username && { username }),
+        }
+    });
 
     const { password: _, ...saveUser } = updatedUser;
     res.json({ success: true, user: saveUser });
 });
-
 
 // CREATE USER - ADMIN ONLY (Add New User)
 router.post('/api/admin/users', async (req, res, next) => {
@@ -70,26 +66,25 @@ router.post('/api/admin/users', async (req, res, next) => {
         return res.status(400).json({ success: false, message: 'Username and password are required' });
     }
 
-    if (await prisma.user.findFirst({ where: { username } })) {
+    if (await (prisma.user as any).findFirst({ where: { username } })) {
         return res.status(400).json({ success: false, message: 'Username already exists' });
     }
 
     const hashedPassword = await bcrypt.hash(password, 10);
 
-    const newUser = await prisma.user.create({
-    data: {
-        firstName, lastName,
-        birthday: new Date(birthday),  // ← přidej new Date()
-        username, email, phone, adress,
-        role: role ?? 'student',
-        password: hashedPassword
-    }
-});
+    const newUser = await (prisma.user as any).create({
+        data: {
+            firstName, lastName,
+            birthday: new Date(birthday),
+            username, email, phone, adress,
+            role: role ?? 'student',
+            password: hashedPassword
+        }
+    });
 
     const { password: _, ...saveUser } = newUser;
     res.status(201).json({ success: true, user: saveUser });
 });
-
 
 // DELETE USER - ADMIN ONLY
 router.delete('/api/admin/users/:id', async (req, res, next) => {
@@ -98,21 +93,28 @@ router.delete('/api/admin/users/:id', async (req, res, next) => {
     try {
         const userId = parseInt(req.params.id);
 
-        const user = await prisma.user.findUnique({ where: { id: userId } });
+        const user = await (prisma.user as any).findUnique({ where: { id: userId } });
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
 
-        // Smaž všechny navázané záznamy v správném pořadí
-        await prisma.grade.deleteMany({ where: { userId } });
-        await prisma.timeTable.deleteMany({ where: { teacherId: userId } });
-        await prisma.user.update({
+        // Smaž všechny navázané záznamy v správném pořadí s obranou proti typování
+        if ((prisma as any).grade) await (prisma as any).grade.deleteMany({ where: { userId } });
+
+        // Smazání rozvrhu (ošetřeno pro model lesson i timetable)
+        if ((prisma as any).lesson) {
+            await (prisma as any).lesson.deleteMany({ where: { teacherId: userId } });
+        } else if ((prisma as any).timeTable) {
+            await (prisma as any).timeTable.deleteMany({ where: { teacherId: userId } });
+        }
+
+        await (prisma as any).user.update({
             where: { id: userId },
             data: { classes: { set: [] } }
         });
 
         // Pak smaž uživatele
-        await prisma.user.delete({ where: { id: userId } });
+        await (prisma as any).user.delete({ where: { id: userId } });
         res.json({ success: true, message: 'User deleted' });
 
     } catch (error: any) {
@@ -120,7 +122,6 @@ router.delete('/api/admin/users/:id', async (req, res, next) => {
         res.status(500).json({ success: false, message: error.message });
     }
 });
-
 
 // CHANGE PASSWORD - ADMIN ONLY
 router.put('/api/admin/users/:id/password', async (req, res, next) => {
@@ -134,14 +135,13 @@ router.put('/api/admin/users/:id/password', async (req, res, next) => {
     }
 
     const hashed = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({
+    await (prisma.user as any).update({
         where: { id: userId },
         data: { password: hashed }
     });
 
     res.json({ success: true, message: 'Password updated' });
 });
-
 
 // UPDATE USER CLASS - ADMIN ONLY
 router.put('/api/admin/users/:id/classes', async (req, res, next) => {
@@ -152,7 +152,7 @@ router.put('/api/admin/users/:id/classes', async (req, res, next) => {
 
     console.log('CLASSES UPDATE - userId:', userId, 'classId:', classId);
 
-    const result = await prisma.user.update({
+    const result = await (prisma.user as any).update({
         where: { id: userId },
         data: {
             classes: classId
@@ -166,15 +166,14 @@ router.put('/api/admin/users/:id/classes', async (req, res, next) => {
     res.json({ success: true, message: 'Class updated' });
 });
 
-
 // REMOVE USER FROM CLASS - ADMIN ONLY
 router.delete('/api/admin/users/:id/classes/:classId', async (req, res, next) => {
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
-    const userId  = parseInt(req.params.id);
+    const userId = parseInt(req.params.id);
     const classId = parseInt(req.params.classId);
 
-    await prisma.user.update({
+    await (prisma.user as any).update({
         where: { id: userId },
         data: {
             classes: { disconnect: { id: classId } }
@@ -183,6 +182,5 @@ router.delete('/api/admin/users/:id/classes/:classId', async (req, res, next) =>
 
     res.json({ success: true, message: 'User removed from class' });
 });
-
 
 export default router;

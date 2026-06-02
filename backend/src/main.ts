@@ -1,7 +1,7 @@
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './prisma.ts'; // 👈 KROK 4: Taháme sdíleného klienta z jednoho místa
 import session from 'express-session';
 import bcrypt from 'bcrypt';
 import timetableRouter from './timeTable.ts';
@@ -14,9 +14,6 @@ declare module 'express-session' {
         userId?: number;
     }
 }
-
-// Čistá inicializace podle standardu Prisma 7
-const prisma = new PrismaClient();
 
 const app = express();
 const PORT = 3000;
@@ -220,11 +217,11 @@ app.get('/api/users/:role', async (req, res, next) => {
     }
 
     const users = await prisma.user.findMany({ where: { role: req.params.role } });
-    const usersToClassesRelations = await prisma.user.findMany({ where: { role: req.params.role }, include: { classes: true } });
+    const usersToClassesRelations = await prisma.user.findMany({ where: { role: req.params.role }, include: { classes: true } as any });
 
     const userInfoWithClasses = users.map(u => {
         const classes = usersToClassesRelations.find(uc => uc.id === u.id)?.classes || [];
-        return { ...u, classes: classes.map(c => ({ id: c.id, name: c.name })) };
+        return { ...u, classes: classes.map((c: any) => ({ id: c.id, name: c.name })) };
     });
     res.json(userInfoWithClasses);
 });
@@ -255,7 +252,7 @@ app.get('/api/user', async (req, res, next) => {
         if (!id) {
             return res.status(401).json({ success: false, message: 'Not authenticated' });
         }
-        const user = await prisma.user.findUnique({ where: { id } }); 
+        const user = await prisma.user.findUnique({ where: { id } });
 
         res.json(user);
     } catch (error) {
@@ -503,9 +500,9 @@ app.get('/api/classes', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 5) !== true) { return; }
 
-    const classToUserRelagtions = await prisma.class.findMany({ include: { students: true } });
+    const classToUserRelagtions = await prisma.class.findMany({ include: { students: true } as any });
 
-    const classToUser = classToUserRelagtions.map(c => ({ id: c.id, name: c.name, students: c.students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })) }));
+    const classToUser = classToUserRelagtions.map((c: any) => ({ id: c.id, name: c.name, students: c.students.map((s: any) => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })) }));
     res.json(classToUser);
 });
 
@@ -549,16 +546,16 @@ app.get('/api/events', async (req, res, next) => {
                     students: true
                 }
             }
-        }
+        } as any
     });
 
     const currentUser = req.session.userId ? await prisma.user.findUnique({ where: { id: req.session.userId } }) : null;
     const currentRole = currentUser?.role ?? '';
     const currentPrivilege = privileges[currentRole as keyof typeof privileges] ?? 0;
 
-    const filteredEvents = events.filter(event => {
-        const isParticipant = event.participantsIndividuals.some(u => u.id === req.session.userId) ||
-            event.participantsClasses.some(c => c.students?.some(s => s.id === req.session.userId));
+    const filteredEvents = events.filter((event: any) => {
+        const isParticipant = event.participantsIndividuals.some((u: any) => u.id === req.session.userId) ||
+            event.participantsClasses.some((c: any) => c.students?.some((s: any) => s.id === req.session.userId));
 
         if (isParticipant) {
             return true;
@@ -598,7 +595,7 @@ app.post('/api/events', async (req, res, next) => {
                     students: true
                 }
             }
-        }
+        } as any
     });
     res.status(201).json(newEvent);
 });
@@ -648,7 +645,7 @@ app.put('/api/events/:id', async (req, res, next) => {
                     students: true
                 }
             }
-        }
+        } as any
     });
     res.json(updatedEvent);
 });
