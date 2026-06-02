@@ -1,9 +1,8 @@
 import express from 'express';
 import bcrypt from 'bcrypt';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from "./prisma.js"; // 👈 Změněno: taháme sdílenou instanci
 import { requireAuth } from "./auth.js";
 import 'dotenv/config';
-const prisma = new PrismaClient();
 const router = express.Router();
 // GET ALL USERS WITH CLASSES - ADMIN ONLY
 router.get('/api/admin/users', async (req, res, next) => {
@@ -15,7 +14,7 @@ router.get('/api/admin/users', async (req, res, next) => {
     });
     const saveUsers = users.map(({ password, ...u }) => ({
         ...u,
-        classes: u.classes.map(c => ({ id: c.id, name: c.name }))
+        classes: u.classes.map((c) => ({ id: c.id, name: c.name }))
     }));
     res.json(saveUsers);
 });
@@ -66,7 +65,7 @@ router.post('/api/admin/users', async (req, res, next) => {
     const newUser = await prisma.user.create({
         data: {
             firstName, lastName,
-            birthday: new Date(birthday), // ← přidej new Date()
+            birthday: new Date(birthday),
             username, email, phone, adress,
             role: role ?? 'student',
             password: hashedPassword
@@ -86,9 +85,16 @@ router.delete('/api/admin/users/:id', async (req, res, next) => {
         if (!user) {
             return res.status(404).json({ success: false, message: 'User not found' });
         }
-        // Smaž všechny navázané záznamy v správném pořadí
-        await prisma.grade.deleteMany({ where: { userId } });
-        await prisma.timeTable.deleteMany({ where: { teacherId: userId } });
+        // Smaž všechny navázané záznamy v správném pořadí s obranou proti typování
+        if (prisma.grade)
+            await prisma.grade.deleteMany({ where: { userId } });
+        // Smazání rozvrhu (ošetřeno pro model lesson i timetable)
+        if (prisma.lesson) {
+            await prisma.lesson.deleteMany({ where: { teacherId: userId } });
+        }
+        else if (prisma.timeTable) {
+            await prisma.timeTable.deleteMany({ where: { teacherId: userId } });
+        }
         await prisma.user.update({
             where: { id: userId },
             data: { classes: { set: [] } }

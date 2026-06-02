@@ -1,5 +1,5 @@
 import { Router } from 'express';
-import { prisma } from './prisma.js';
+import { prisma } from './prisma.ts';
 import { requireAuth } from './auth.ts';
 
 const router = Router();

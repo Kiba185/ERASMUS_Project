@@ -1,9 +1,8 @@
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from "./prisma.js"; // 👈 Změněno: taháme sdílenou instanci
 import session from 'express-session';
-const prisma = new PrismaClient();
 const app = express();
 const PORT = 3000;
 const privileges = {
@@ -13,7 +12,7 @@ const privileges = {
     "admin": 10
 };
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     credentials: true
 }));
 app.use(express.json());
@@ -42,7 +41,6 @@ export async function requireAuth(req, res, next, permissionLevel) {
         return false;
     }
     return true;
-    //next(); // ✅ they're logged in, let them through
 }
 export function roleAuthority(requiredRole) {
     return privileges[requiredRole] ?? 0; // default to 0 if role not found
