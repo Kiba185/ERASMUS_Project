@@ -15,7 +15,15 @@ declare module 'express-session' {
     }
 }
 
-const prisma = new PrismaClient();
+// Inicializace Prisma 7 klienta s explicitním předáním DATABASE_URL pro Render
+const prisma = new PrismaClient({
+    datasources: {
+        db: {
+            url: process.env.DATABASE_URL,
+        },
+    },
+});
+
 const app = express();
 const PORT = 3000;
 
@@ -26,12 +34,12 @@ const privileges = {
     "admin": 10
 };
 
-
-
+// CORS upravený tak, aby akceptoval jak localhost, tak produkční doménu z Renderu
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     credentials: true
 }));
+
 app.use(express.json());
 app.use(session({
     secret: 'cisco',
@@ -40,9 +48,7 @@ app.use(session({
     cookie: { secure: false }
 }));
 
-
 app.use(userRoutes);
-
 
 //////////////////////////////////////
 //      --=== MISC STUFF ===--
@@ -51,9 +57,6 @@ async function userIdFromUsername(username: string) {
     const user = await prisma.user.findFirst({ where: { username } });
     return user?.id ?? 0;
 }
-
-
-
 
 ////////////////////////////////////////
 //      --=== ADMIN STUFF ===--
@@ -83,12 +86,7 @@ async function adminsetuser(req: express.Request, res: express.Response, next: e
 }
 app.post('/api/admin/setuser', async (req, res, next) => {
     await adminsetuser(req, res, next);
-})
-
-
-
-
-
+});
 
 //LOGIN
 async function login(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -111,8 +109,7 @@ async function login(req: express.Request, res: express.Response, next: express.
 }
 app.post('/api/login', async (req, res, next) => {
     await login(req, res, next);
-})
-
+});
 
 //REGISTER
 async function register(req: express.Request, res: express.Response, next: express.NextFunction) {
@@ -126,12 +123,10 @@ async function register(req: express.Request, res: express.Response, next: expre
 
     if (!newUser) { return res.status(400).json({ success: false, message: 'User creation failed' }); }
     res.status(201).json({ success: true, user: newUser });
-    //await login(req, res, next);
 }
 app.post('/api/register', async (req, res, next) => {
     await register(req, res, next);
-})
-
+});
 
 //CREATE USER - ADMIN ONLY
 app.post('/api/admin/createuser', async (req, res, next) => {
@@ -148,8 +143,7 @@ app.post('/api/admin/createuser', async (req, res, next) => {
     res.status(201).json({ success: true, user: newUser });
 });
 
-
-//INITIALIZE CLEAN DATABASE - WHEN FIRED, REISGTER 4 USERS - ADMIN, TEACHER, STUDENT, PARENT WITH USERNAME = ROLE AND PASSWORD = ROLE
+//INITIALIZE CLEAN DATABASE
 app.get('/api/initialize', async (req, res, next) => {
     const users = await prisma.user.findMany();
     if (users.length > 0) {
@@ -173,9 +167,6 @@ app.get('/api/initialize', async (req, res, next) => {
         });
     }
 
-    // Create other users (teacher, student, parent) with their respective roles
-    // ...
-
     res.json({ success: true, message: 'Database initialized successfully' });
 });
 
@@ -189,7 +180,7 @@ async function logout(req: express.Request, res: express.Response, next: express
         try {
             return res.json({ success: true, message: 'Logged out successfully' });
         } catch (err) {
-            return
+            return;
         }
     });
 }
@@ -217,17 +208,8 @@ app.post('/api/setUserRole', async (req, res, next) => {
     await setUserRole(req, res, next);
 });
 
-
-
-
-
-
-
-
-
 ///////////////////////////////////////
 //      --=== USER STUFF ===--
-
 
 //GET ALL USERS - ADMIN ONLY
 app.get('/api/users', async (req, res, next) => {
@@ -240,7 +222,6 @@ app.get('/api/users', async (req, res, next) => {
 
 //GET ALL USERS OF ROLE - ADMIN ONLY
 app.get('/api/users/:role', async (req, res, next) => {
-    /// AUTH - if requesting all of STUDENT or all of PARENT then TEACHER and ADMIN can access ///
     if (req.params.role === 'student' || req.params.role === 'parent' || req.params.role === 'teacher') {
         if (await requireAuth(req, res, next, 5) !== true) { return; }
     } else {
@@ -249,7 +230,6 @@ app.get('/api/users/:role', async (req, res, next) => {
 
     const users = await prisma.user.findMany({ where: { role: req.params.role } });
     const usersToClassesRelations = await prisma.user.findMany({ where: { role: req.params.role }, include: { classes: true } });
-    //const classes = usersToClassesRelations.find(uc => uc.id === u.id)?.classes || [];
 
     const userInfoWithClasses = users.map(u => {
         const classes = usersToClassesRelations.find(uc => uc.id === u.id)?.classes || [];
@@ -258,7 +238,7 @@ app.get('/api/users/:role', async (req, res, next) => {
     res.json(userInfoWithClasses);
 });
 
-//GET SPECIFIC USER - ADMIN FOR FOREIGN, ALL FOR THEMSELVES
+//GET SPECIFIC USER
 app.get('/api/user/:username', async (req, res, next) => {
     try {
         const username = req.params.username;
@@ -292,11 +272,6 @@ app.get('/api/user', async (req, res, next) => {
     }
 });
 
-
-
-
-
-
 ///////////////////////////////////////
 //      --=== GRADE STUFF ===--
 
@@ -317,7 +292,7 @@ app.post('/api/gradeColumns', async (req, res, next) => {
     const newGradeColumn = await prisma.gradeColumn.create({
         data: {
             name,
-            subjectId: Number(subjectId), // 👈 make sure it's an Int
+            subjectId: Number(subjectId),
             weight: Number(weight),
             date: new Date(date),
             TeacherId: req.session.userId!
@@ -367,10 +342,7 @@ app.put('/api/gradeColumns/:id', async (req, res, next) => {
     res.json(updatedGradeColumn);
 });
 
-
 async function formatGradeResponse(grade: any) {
-    // Add a subjectId and String subjectName to the grade for easier frontend handling and also add a date, weight and column name for better frontend handling
-
     const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: grade.gColumnId } });
     const subject = gradeColumn?.subjectId ? await prisma.subject.findUnique({ where: { id: gradeColumn.subjectId } }) : null;
 
@@ -383,8 +355,6 @@ async function formatGradeResponse(grade: any) {
         gColumnName: gradeColumn?.name
     };
 }
-
-
 
 //GET ALL GRADES - TEACHER ONLY
 app.get('/api/grades', async (req, res, next) => {
@@ -418,7 +388,6 @@ async function getUserGrades(req: express.Request, res: express.Response, next: 
         const allGrades = await prisma.grade.findMany();
         const userGrades = allGrades.filter(grade => grade.userId === userId);
 
-        //format each grade with formatGradeResponse for easier frontend handling
         const formattedGrades = [];
         for (const grade of userGrades) {
             formattedGrades.push(await formatGradeResponse(grade));
@@ -430,7 +399,7 @@ async function getUserGrades(req: express.Request, res: express.Response, next: 
     }
 }
 
-//GET SPECIFIC USER GRADES - ADMIN FOR FOREIGN, ALL FOR THEMSELVES
+//GET SPECIFIC USER GRADES
 app.get('/api/grades/:username', async (req, res, next) => {
     try {
         const userId = await userIdFromUsername(req.params.username);
@@ -449,15 +418,13 @@ app.get('/api/mygrades', async (req, res, next) => {
     }
 });
 
-
-//GET SPECIFIC GRADE VIA GRADECOLUMNID AND USERID - TEACHER FOR FOREIGN, ALL FOR THEMSELVES
+//GET SPECIFIC GRADE VIA GRADECOLUMNID AND USERID
 app.get('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
     try {
         const studentId = Number(req.params.studentId);
         const gradeColumnId = Number(req.params.gradeColumnId);
         if (isNaN(studentId) || isNaN(gradeColumnId)) return res.status(400).json({ success: false, message: 'Invalid ID' });
 
-        // Check if grade exists
         const grade = await prisma.grade.findFirst({ where: { userId: studentId, gColumnId: gradeColumnId } });
         if (!grade) {
             return res.status(404).json({ success: false, message: 'Grade not found' });
@@ -478,7 +445,6 @@ app.post('/api/grades', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) { return; }
     const { value, userId, gradeColumnId } = req.body;
 
-    // Check if the grade column exists and belongs to the teacher
     const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: Number(gradeColumnId) } });
     if (!gradeColumn) {
         return res.status(404).json({ success: false, message: 'Grade column not found' });
@@ -487,13 +453,11 @@ app.post('/api/grades', async (req, res, next) => {
         return res.status(403).json({ success: false, message: 'You can only add grades to your own grade columns' });
     }
 
-    // Check if the user exists
     const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
     if (!user) {
         return res.status(404).json({ success: false, message: 'User not found' });
     }
 
-    // Check if there is not already a grade for this user and grade column
     const existingGrade = await prisma.grade.findFirst({
         where: {
             userId: Number(userId),
@@ -518,19 +482,16 @@ app.post('/api/grades', async (req, res, next) => {
 app.delete('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 5) !== true) { return; }
-    //const gradeId = parseInt(req.params.id);
     const studentId = Number(req.params.studentId);
     const gradeColumnId = Number(req.params.gradeColumnId);
     if (isNaN(studentId) || isNaN(gradeColumnId)) return res.status(400).json({ success: false, message: 'Invalid ID' });
     const grade = await prisma.grade.findFirst({ where: { userId: studentId, gColumnId: gradeColumnId } });
     const gradeId = grade?.id;
 
-    // Check if the grade exists
     if (!grade) {
         return res.status(404).json({ success: false, message: 'Grade not found' });
     }
 
-    // Check if the grade column belongs to the teacher
     const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: grade.gColumnId } });
     if (gradeColumn?.TeacherId !== req.session.userId && await requireAuth(req, res, next, 5) !== true) {
         return res.status(403).json({ success: false, message: 'You can only delete grades from your own grade columns' });
@@ -543,12 +504,6 @@ app.delete('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
     res.json({ success: true, message: 'Grade deleted' });
 });
 
-
-
-
-
-
-
 ///////////////////////////////////////
 //      --=== CLASSES STUFF ===--
 
@@ -557,17 +512,11 @@ app.get('/api/classes', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 5) !== true) { return; }
 
-    const classes = await prisma.class.findMany();
     const classToUserRelagtions = await prisma.class.findMany({ include: { students: true } });
 
     const classToUser = classToUserRelagtions.map(c => ({ id: c.id, name: c.name, students: c.students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` })) }));
     res.json(classToUser);
 });
-
-
-
-
-
 
 ///////////////////////////////////////
 //      --=== SUBJECTS STUFF ===--
@@ -581,14 +530,6 @@ app.get('/api/subjects', async (req, res, next) => {
     res.json(subjects);
 });
 
-
-
-
-
-
-
-
-
 ///////////////////////////////////////
 //      --=== LESSONS STUFF ===--
 
@@ -601,17 +542,10 @@ app.get('/api/lessons', async (req, res, next) => {
     res.json(lessons);
 });
 
-
-
-
-
-
-
-
 ///////////////////////////////////////
 //      --=== EVENTS STUFF ===--
 
-//GET ALL EVENTS - ALL ROLES IF THEY ARE PARTICIPATING IN THEM, OTHERWISE ONLY ADMIN AND TEACHER
+//GET ALL EVENTS
 app.get('/api/events', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 1) !== true) { return; }
@@ -631,16 +565,14 @@ app.get('/api/events', async (req, res, next) => {
     const currentRole = currentUser?.role ?? '';
     const currentPrivilege = privileges[currentRole as keyof typeof privileges] ?? 0;
 
-    // Filter events based on participation
     const filteredEvents = events.filter(event => {
         const isParticipant = event.participantsIndividuals.some(u => u.id === req.session.userId) ||
             event.participantsClasses.some(c => c.students?.some(s => s.id === req.session.userId));
 
         if (isParticipant) {
-            return true; // User is a participant, include the event
+            return true;
         }
 
-        // If not a participant, only include if user is admin or teacher
         return currentPrivilege >= 5;
     });
     res.json(filteredEvents);
@@ -730,18 +662,8 @@ app.put('/api/events/:id', async (req, res, next) => {
     res.json(updatedEvent);
 });
 
-
-
-
-
-
 app.use(timetableRouter);
 
 app.listen(PORT, () => {
-    console.log(`Server running on http://localhost:${PORT}`);
+    console.log(`Server running on port ${PORT}`);
 });
-
-function next(): express.NextFunction {
-    throw new Error('Function not implemented.');
-}
-
