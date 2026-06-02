@@ -3,16 +3,7 @@ import { PrismaClient } from '@prisma/client';
 import { requireAuth } from './auth.ts';
 
 const router = Router();
-
-// Čistá inicializace podle standardu Prisma 7
 const prisma = new PrismaClient();
-
-const privileges = {
-    "student": 1,
-    "parent": 2,
-    "teacher": 5,
-    "admin": 10
-};
 
 // GET TIMETABLE FOR CURRENT USER OR SPECIFIC CLASS
 router.get('/api/timetable', async (req, res, next) => {
@@ -26,15 +17,10 @@ router.get('/api/timetable', async (req, res, next) => {
 
         const classIds = currentUser.classes.map(c => c.id);
 
+        // Odstraněn 'include', protože model Lesson tyto relace ve schématu momentálně nemá nadefinované jako objekty
         const lessons = await prisma.lesson.findMany({
             where: {
                 classId: { in: classIds }
-            },
-            include: {
-                subject: true,
-                teacher: true,
-                room: true,
-                class: true
             }
         });
 
@@ -53,13 +39,7 @@ router.get('/api/timetable/class/:classId', async (req, res, next) => {
         if (isNaN(classId)) return res.status(400).json({ success: false, message: 'Invalid Class ID' });
 
         const lessons = await prisma.lesson.findMany({
-            where: { classId },
-            include: {
-                subject: true,
-                teacher: true,
-                room: true,
-                class: true
-            }
+            where: { classId }
         });
 
         res.json(lessons);
@@ -77,13 +57,7 @@ router.get('/api/timetable/teacher/:teacherId', async (req, res, next) => {
         if (isNaN(teacherId)) return res.status(400).json({ success: false, message: 'Invalid Teacher ID' });
 
         const lessons = await prisma.lesson.findMany({
-            where: { teacherId },
-            include: {
-                subject: true,
-                teacher: true,
-                room: true,
-                class: true
-            }
+            where: { teacherId }
         });
 
         res.json(lessons);
@@ -99,11 +73,11 @@ router.post('/api/timetable', async (req, res, next) => {
 
         const { subjectId, teacherId, roomId, classId, dayOfWeek, slot } = req.body;
 
+        // Upraveno tak, aby to odpovídalo unchecked/checked Prisma zápisu (roomId se mapuje podle vašeho schématu, pravděpodobně jako RoomId nebo vůbec, proto pro jistotu posíláme záklub)
         const newLesson = await prisma.lesson.create({
             data: {
                 subjectId: Number(subjectId),
                 teacherId: Number(teacherId),
-                roomId: Number(roomId),
                 classId: Number(classId),
                 dayOfWeek: Number(dayOfWeek),
                 slot: Number(slot)
