@@ -1,3 +1,4 @@
+import API_URL from '../config/config.tsx';
 import React, { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
@@ -21,7 +22,7 @@ const Login: React.FC = () => {
 
     const formattedUsername = username.toLowerCase().trim();
     try {
-      const response = await fetch("http://localhost:3000/api/login", {
+      const response = await fetch(`${API_URL}/api/login`, {
         method: "POST",
         credentials: 'include',
         headers: { "Content-Type": "application/json" },

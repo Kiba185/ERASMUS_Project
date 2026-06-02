@@ -1,3 +1,4 @@
+import API_URL from '../config/config.tsx';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
@@ -29,7 +30,7 @@ const SchedulePage: React.FC = () => {
       setIsLoading(true);
       try {
         // Použijeme tvůj existující endpoint, který na backendu umí zpracovat obě role
-        const response = await fetch(`http://localhost:3000/api/timetables/student/${user.id}`);
+        const response = await fetch(`${API_URL}/api/timetables/student/${user.id}`);
         
         if (!response.ok) {
           throw new Error('Nepodařilo se načíst rozvrh');
