@@ -1,9 +1,8 @@
 import { Router } from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from './prisma.js';
 import { requireAuth } from './auth.ts';
 
 const router = Router();
-const prisma = new PrismaClient();
 
 // GET TIMETABLE FOR CURRENT USER OR SPECIFIC CLASS
 router.get('/api/timetable', async (req, res, next) => {
