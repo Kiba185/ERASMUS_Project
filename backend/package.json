@@ -7,7 +7,9 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon --exec ts-node src/main.ts",
     "build": "tsc",
-    "start": "node dist/main.js"
+    "start": "node dist/main.js",
+    "postinstall": "prisma generate",
+    "start:prod": "prisma migrate deploy && node dist/main.js"
   },
   "keywords": [],
   "author": "",
