@@ -1,3 +1,4 @@
+import API_URL from '../config/config.tsx';
 import React, { createContext, useContext, useState } from 'react';
 import type { ReactNode } from 'react';
 import type { User } from '../types';
@@ -40,7 +41,7 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
 
   const logout = () => {
     try {
-      fetch("http://localhost:3000/api/logout", {
+      fetch(`${API_URL}/api/logout`, {
         method: "POST",
         credentials: 'include',
         headers: { "Content-Type": "application/json" },
