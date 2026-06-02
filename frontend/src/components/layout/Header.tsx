@@ -12,7 +12,6 @@ const Header = () => {
   const [isPopupOpen, setIsPopupOpen] = useState(false);
 
   // Zkontrolujeme, že jsme na /user nebo /user/..., nikoliv na /users
-  const isUserRoute = location.pathname === '/user' || location.pathname.startsWith('/user/');
 
   const handleProfileClick = () => {
     setIsPopupOpen(!isPopupOpen);

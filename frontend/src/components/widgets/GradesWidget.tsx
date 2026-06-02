@@ -54,14 +54,7 @@ const GradesWidget: React.FC = () => {
     }, []);
 
     // 2. REAKTOVÉ STAVY A LOGIKA FILTROVÁNÍ
-    const [selectedSubject, setSelectedSubject] = useState('All');
-
-    const subjects = ['All', ...Array.from(new Set(grades.map(g => g.subjectName)))];
-
-    // Filtruje známky podle vybraného dropdownu
-    const filteredGrades = selectedSubject === 'All'
-        ? grades
-        : grades.filter(g => g.subjectName === selectedSubject);
+    const filteredGrades = grades;
 
     // 3. POMOCNÁ FUNKCE PRO DYNAMICKÉ BARVY KOLEČEK SE ZNÁMKAMI
     const getGradeBadgeColor = (gradeValue: string) => {
@@ -77,12 +70,12 @@ const GradesWidget: React.FC = () => {
     };
 
     //Calculate overall average for the currently filtered grades with weights and minuses taken into account
-    const overallAverage = filteredGrades.reduce((acc, grade) => {
+    /* const overallAverage = filteredGrades.reduce((acc, grade) => {
         let numericGrade = parseFloat(grade.grade.replace('-', '.5'));
         if (isNaN(numericGrade)) return acc; // skip if grade is not a number
         const weight = grade.weight || 1;
         return acc + numericGrade * weight;
-    }, 0) / filteredGrades.reduce((acc, grade) => acc + (grade.weight || 1), 0);
+    }, 0) / filteredGrades.reduce((acc, grade) => acc + (grade.weight || 1), 0); */
 
     const newestGrades = filteredGrades.slice(3);
     return (

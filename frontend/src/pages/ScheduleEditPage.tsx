@@ -141,10 +141,10 @@ const ScheduleEditPage: React.FC = () => {
   const [isPermanentEditMode, setIsPermanentEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Partial<Lesson> | null>(null);
-  const availableSubjectOptions = mergeUniqueOptions(
+  /* const availableSubjectOptions = mergeUniqueOptions(
     [...availableSubjects, ...lessons.map((lesson) => lesson.subject)],
     setupMockData.subjects.map((subject) => subject.subject),
-  );
+  ); */
   const availableRoomOptions = mergeUniqueOptions(availableRooms, setupMockData.rooms);
 
   const currentWeekDates = getWeekDatesStrings(weekOffset);
