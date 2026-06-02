@@ -331,7 +331,8 @@ app.delete('/api/gradeColumns/:id', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 5) !== true) { return; }
 
-    const gradeColumnId = parseInt(req.params.id);
+    const gradeColumnId = Number(req.params.id);
+    if (isNaN(gradeColumnId)) return res.status(400).json({ success: false, message: 'Invalid ID' });
     const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });
     if (!gradeColumn) {
         return res.status(404).json({ success: false, message: 'Grade column not found' });
@@ -348,7 +349,8 @@ app.delete('/api/gradeColumns/:id', async (req, res, next) => {
 app.put('/api/gradeColumns/:id', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 5) !== true) { return; }
-    const gradeColumnId = parseInt(req.params.id);
+    const gradeColumnId = Number(req.params.id);
+    if (isNaN(gradeColumnId)) return res.status(400).json({ success: false, message: 'Invalid ID' });
     const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });
     if (!gradeColumn) {
         return res.status(404).json({ success: false, message: 'Grade column not found' });
@@ -397,7 +399,8 @@ app.get('/api/grades', async (req, res, next) => {
 app.delete('/api/grades/:id', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 5) !== true) { return; }
-    const gradeId = parseInt(req.params.id);
+    const gradeId = Number(req.params.id);
+    if (isNaN(gradeId)) return res.status(400).json({ success: false, message: 'Invalid ID' });
     const grade = await prisma.grade.findUnique({ where: { id: gradeId } });
     if (!grade) {
         return res.status(404).json({ success: false, message: 'Grade not found' });
@@ -450,16 +453,18 @@ app.get('/api/mygrades', async (req, res, next) => {
 //GET SPECIFIC GRADE VIA GRADECOLUMNID AND USERID - TEACHER FOR FOREIGN, ALL FOR THEMSELVES
 app.get('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
     try {
-        const { studentId, gradeColumnId } = req.params;
+        const studentId = Number(req.params.studentId);
+        const gradeColumnId = Number(req.params.gradeColumnId);
+        if (isNaN(studentId) || isNaN(gradeColumnId)) return res.status(400).json({ success: false, message: 'Invalid ID' });
 
         // Check if grade exists
-        const grade = await prisma.grade.findFirst({ where: { userId: Number(studentId), gColumnId: Number(gradeColumnId) } });
+        const grade = await prisma.grade.findFirst({ where: { userId: studentId, gColumnId: gradeColumnId } });
         if (!grade) {
             return res.status(404).json({ success: false, message: 'Grade not found' });
         }
 
         /// AUTH ///
-        if (req.session.userId !== Number(studentId)) { if (await requireAuth(req, res, next, 5) !== true) { return; } }
+        if (req.session.userId !== studentId) { if (await requireAuth(req, res, next, 5) !== true) { return; } }
 
         const formattedGrade = await formatGradeResponse(grade);
         res.json(formattedGrade);
@@ -514,8 +519,10 @@ app.delete('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 5) !== true) { return; }
     //const gradeId = parseInt(req.params.id);
-    const { studentId, gradeColumnId } = req.params;
-    const grade = await prisma.grade.findFirst({ where: { userId: Number(studentId), gColumnId: Number(gradeColumnId) } });
+    const studentId = Number(req.params.studentId);
+    const gradeColumnId = Number(req.params.gradeColumnId);
+    if (isNaN(studentId) || isNaN(gradeColumnId)) return res.status(400).json({ success: false, message: 'Invalid ID' });
+    const grade = await prisma.grade.findFirst({ where: { userId: studentId, gColumnId: gradeColumnId } });
     const gradeId = grade?.id;
 
     // Check if the grade exists
@@ -678,7 +685,8 @@ app.delete('/api/events/:id', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 5) !== true) { return; }
 
-    const eventId = parseInt(req.params.id);
+    const eventId = Number(req.params.id);
+    if (isNaN(eventId)) return res.status(400).json({ success: false, message: 'Invalid ID' });
     const deletedEvent = await prisma.event.delete({
         where: { id: eventId }
     });
@@ -689,7 +697,8 @@ app.delete('/api/events/:id', async (req, res, next) => {
 app.put('/api/events/:id', async (req, res, next) => {
     /// AUTH ///
     if (await requireAuth(req, res, next, 5) !== true) { return; }
-    const eventId = parseInt(req.params.id);
+    const eventId = Number(req.params.id);
+    if (isNaN(eventId)) return res.status(400).json({ success: false, message: 'Invalid ID' });
     const { title, description, startDate, endDate, type, startTime, allDay, participantIndividualIds, participantClassIds } = req.body;
 
     const updatedEvent = await prisma.event.update({
