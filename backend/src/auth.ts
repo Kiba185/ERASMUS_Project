@@ -1,8 +1,9 @@
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+//import { PrismaClient } from '@prisma/client';
 import session from 'express-session';
+import { prisma } from "./prisma.ts";
 
 declare module 'express-session' {
     interface SessionData {
@@ -10,7 +11,6 @@ declare module 'express-session' {
     }
 }
 
-const prisma = new PrismaClient();
 const app = express();
 const PORT = 3000;
 

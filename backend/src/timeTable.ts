@@ -1,7 +1,6 @@
 import express from 'express';
-import { PrismaClient } from '@prisma/client';
+import { prisma } from "./prisma.ts";
 
-const prisma = new PrismaClient();
 const router = express.Router();
 
 router.get("/api/timetables/student/:userId", async (req, res, next) => {

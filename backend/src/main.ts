@@ -1,10 +1,10 @@
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
 import session from 'express-session';
 import bcrypt from 'bcrypt';
 import timetableRouter from './timeTable.ts';
+import { prisma } from "./prisma.ts";
 
 import { requireAuth } from './auth.ts';
 import userRoutes from './users.ts';
@@ -15,7 +15,6 @@ declare module 'express-session' {
     }
 }
 
-const prisma = new PrismaClient();
 const app = express();
 const PORT = 3000;
 
@@ -40,7 +39,7 @@ app.use(session({
     cookie: { secure: false }
 }));
 
-
+app.use(timetableRouter);
 app.use(userRoutes);
 
 
@@ -725,8 +724,6 @@ app.put('/api/events/:id', async (req, res, next) => {
 
 
 
-
-app.use(timetableRouter);
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
