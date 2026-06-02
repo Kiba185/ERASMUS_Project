@@ -12,6 +12,11 @@ interface MockSubject {
   name: string;
 }
 
+interface MockClass {
+  id: number;
+  name: string;
+}
+
 interface MockUser {
   id: number;
   firstName: string;
@@ -27,97 +32,14 @@ interface MockUser {
   subjectIds?: number[];
 }
 
-interface MockClass {
-  id: number;
-  name: string;
-}
-
-const initialSubjects: MockSubject[] = [
-  { id: 1, name: 'Matematika' },
-  { id: 2, name: 'Čeština' },
-  { id: 3, name: 'Angličtina' },
-  { id: 4, name: 'Fyzika' },
-  { id: 5, name: 'Dějepis' },
-];
-
-const initialClasses: MockClass[] = [
-  { id: 1, name: '1.A' },
-  { id: 2, name: '2.A' },
-  { id: 3, name: '3.B' },
-];
-
-const initialUsers: MockUser[] = [
-  {
-    id: 1,
-    firstName: 'Jan',
-    lastName: 'Novák',
-    username: 'jan.novak',
-    email: 'jan@novak.cz',
-    phone: '123456789',
-    adress: 'Praha 1',
-    birthday: '2010-01-01',
-    role: 'student',
-    classId: 1,
-  },
-  {
-    id: 2,
-    firstName: 'Karel',
-    lastName: 'Učitel',
-    username: 'karel.ucitel',
-    email: 'karel@ucitel.cz',
-    phone: '987654321',
-    adress: 'Praha 2',
-    birthday: '1980-01-01',
-    role: 'teacher',
-    classId: 1,
-    subjectIds: [1, 4],
-  },
-  {
-    id: 3,
-    firstName: 'Admin',
-    lastName: 'Admin',
-    username: 'admin',
-    email: 'admin@admin.cz',
-    phone: '111222333',
-    adress: 'Praha 3',
-    birthday: '1990-01-01',
-    role: 'admin',
-  },
-  {
-    id: 4,
-    firstName: 'Petr',
-    lastName: 'Svoboda',
-    username: 'petr.svoboda',
-    email: 'petr@svoboda.cz',
-    phone: '222333444',
-    adress: 'Brno',
-    birthday: '2011-02-02',
-    role: 'student',
-    classId: 2,
-  },
-  {
-    id: 5,
-    firstName: 'Rodič',
-    lastName: 'Novák',
-    username: 'parent',
-    email: 'rodic@novak.cz',
-    phone: '555666777',
-    adress: 'Praha 1',
-    birthday: '1975-01-01',
-    role: 'parent',
-    childrenIds: [1, 4],
-  }
-];
-
 // --- COMPONENT ---
 const UsersPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [users, setUsers] = useState<MockUser[]>(initialUsers);
-  const [classes, setClasses] = useState<MockClass[]>(initialClasses);
-  const [subjects] = useState<MockSubject[]>(initialSubjects);
-  const [loading, setLoading] = useState(false);
+  const [users, setUsers] = useState<MockUser[]>([]);
+  const [classes, setClasses] = useState<MockClass[]>([]);
+  const [subjects] = useState<MockSubject[]>([]);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
@@ -152,7 +74,9 @@ const UsersPage: React.FC = () => {
     Promise.all([fetchUsers(), fetchClasses()]).finally(() => setLoading(false));
   }, []);
 
-  const students = useMemo(() => users.filter(u => u.role === 'student'), [users]);
+  if (!users || !classes) return <div className="p-8 text-palette-pine font-bold">Načítání...</div>;
+  const [loading, setLoading] = useState(true);
+  //const students = useMemo(() => users.filter(u => u.role === 'student'), [users]);
 
   const filteredAndSortedUsers = useMemo(() => {
     let result = users;
@@ -428,6 +352,7 @@ const UsersPage: React.FC = () => {
                       <div className="pt-2 border-t border-palette-sage/30">
                         <label className="block text-sm font-bold text-palette-pine mb-2">Assign Subjects (Teacher qualification)</label>
                         <div className="max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 space-y-1 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-1">
+                          
                           {subjects.map(subject => {
                             const isSelected = editingUser.subjectIds?.includes(subject.id);
                             return (
