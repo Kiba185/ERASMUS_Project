@@ -9,7 +9,7 @@
     "build": "tsc",
     "start": "node dist/main.js",
     "postinstall": "node node_modules/prisma/build/index.js generate",
-    "start:prod": "prisma migrate deploy && node dist/main.js"
+    "start:prod": "node node_modules/prisma/build/index.js migrate deploy && node dist/main.js"
   },
   "keywords": [],
   "author": "",
