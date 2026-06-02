@@ -7,7 +7,6 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
 model Todo {
@@ -80,7 +79,7 @@ model Class {
   id         Int         @id @default(autoincrement())
   name       String
   students   User[]
-  timeTables TimeTable[] // 👈 OPRAVENO: Zpětná vazba pro rozvrh
+  timeTables TimeTable[]
 
   events Event[]
 }
@@ -93,7 +92,6 @@ model TimeTable {
   periodNumber Int
   room         String
 
-  // 👈 OPRAVENO: Tady jsou konečně vysvětlené vztahy pro tvůj backend!
   subjectId Int
   subject   Subject @relation(fields: [subjectId], references: [id])
 
