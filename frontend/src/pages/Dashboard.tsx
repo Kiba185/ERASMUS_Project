@@ -7,9 +7,7 @@ import StatisticsWidget from '../components/widgets/StatisticsWidget';
 import EventsWidget from '../components/widgets/EventsWidget';
 import AbsenceWidget from '../components/widgets/AbsenceWidget';
 import MessagesWidget from '../components/widgets/MessagesWidget';
-import { useState, useEffect } from 'react';
 
-type Grade = { id: string; gColumnId: string; userId: string; grade: string, subjectName: string; subjectId: number; date: string; gColumnName?: string; weight?: number };
 
 const Dashboard: React.FC = () => {
   const { user } = useAuth();

@@ -27,14 +27,97 @@ interface MockUser {
   subjectIds?: number[];
 }
 
+interface MockClass {
+  id: number;
+  name: string;
+}
+
+const initialSubjects: MockSubject[] = [
+  { id: 1, name: 'Matematika' },
+  { id: 2, name: 'Čeština' },
+  { id: 3, name: 'Angličtina' },
+  { id: 4, name: 'Fyzika' },
+  { id: 5, name: 'Dějepis' },
+];
+
+const initialClasses: MockClass[] = [
+  { id: 1, name: '1.A' },
+  { id: 2, name: '2.A' },
+  { id: 3, name: '3.B' },
+];
+
+const initialUsers: MockUser[] = [
+  {
+    id: 1,
+    firstName: 'Jan',
+    lastName: 'Novák',
+    username: 'jan.novak',
+    email: 'jan@novak.cz',
+    phone: '123456789',
+    adress: 'Praha 1',
+    birthday: '2010-01-01',
+    role: 'student',
+    classId: 1,
+  },
+  {
+    id: 2,
+    firstName: 'Karel',
+    lastName: 'Učitel',
+    username: 'karel.ucitel',
+    email: 'karel@ucitel.cz',
+    phone: '987654321',
+    adress: 'Praha 2',
+    birthday: '1980-01-01',
+    role: 'teacher',
+    classId: 1,
+    subjectIds: [1, 4],
+  },
+  {
+    id: 3,
+    firstName: 'Admin',
+    lastName: 'Admin',
+    username: 'admin',
+    email: 'admin@admin.cz',
+    phone: '111222333',
+    adress: 'Praha 3',
+    birthday: '1990-01-01',
+    role: 'admin',
+  },
+  {
+    id: 4,
+    firstName: 'Petr',
+    lastName: 'Svoboda',
+    username: 'petr.svoboda',
+    email: 'petr@svoboda.cz',
+    phone: '222333444',
+    adress: 'Brno',
+    birthday: '2011-02-02',
+    role: 'student',
+    classId: 2,
+  },
+  {
+    id: 5,
+    firstName: 'Rodič',
+    lastName: 'Novák',
+    username: 'parent',
+    email: 'rodic@novak.cz',
+    phone: '555666777',
+    adress: 'Praha 1',
+    birthday: '1975-01-01',
+    role: 'parent',
+    childrenIds: [1, 4],
+  }
+];
+
 // --- COMPONENT ---
 const UsersPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const [users, setUsers] = useState<MockUser[]>(initialUsers);
-  const [classes] = useState<MockClass[]>(initialClasses);
+  const [classes, setClasses] = useState<MockClass[]>(initialClasses);
   const [subjects] = useState<MockSubject[]>(initialSubjects);
+  const [loading, setLoading] = useState(false);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
