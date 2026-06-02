@@ -15,14 +15,8 @@ declare module 'express-session' {
     }
 }
 
-// Inicializace Prisma 7 klienta s explicitním předáním DATABASE_URL pro Render
-const prisma = new PrismaClient({
-    datasources: {
-        db: {
-            url: process.env.DATABASE_URL,
-        },
-    },
-});
+// Čistá inicializace podle standardu Prisma 7
+const prisma = new PrismaClient();
 
 const app = express();
 const PORT = 3000;
@@ -34,7 +28,6 @@ const privileges = {
     "admin": 10
 };
 
-// CORS upravený tak, aby akceptoval jak localhost, tak produkční doménu z Renderu
 app.use(cors({
     origin: process.env.CORS_ORIGIN || 'http://localhost:5173',
     credentials: true
@@ -93,17 +86,15 @@ async function login(req: express.Request, res: express.Response, next: express.
     const { username, password } = req.body;
     const user = await prisma.user.findFirst({ where: { username } });
     if (user && await bcrypt.compare(password, user.password)) {
-        req.session.userId = user.id; // store user ID in session
+        req.session.userId = user.id;
         req.session.save((err) => {
             if (err) return res.status(500).json({ success: false });
 
-            // Don't send the password back in the response
             const { password: _, ...safeUser } = user;
             res.json({ success: true, user: safeUser });
         });
     } else {
         res.status(401).json({ success: false, message: 'Invalid credentials' });
-        // Timeout to prevent brute-force attacks
         setTimeout(() => { logout(req, res, next); }, 1000);
     }
 }
@@ -116,7 +107,7 @@ async function register(req: express.Request, res: express.Response, next: expre
     const { firstName, lastName, birthday, username, password, email, phone, adress } = req.body;
     const hashedPassword = await bcrypt.hash(password, 10);
     if (await prisma.user.findFirst({ where: { username } })) { return res.status(400).json({ success: false, message: 'Username already exists' }) };
-    const userRole = username === 'admin' ? 'admin' : 'student'; // default role for new users
+    const userRole = username === 'admin' ? 'admin' : 'student';
     const newUser = await prisma.user.create({
         data: { password: hashedPassword, firstName, lastName, birthday, username, email, phone, adress, role: userRole }
     });
