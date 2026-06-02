@@ -3,11 +3,11 @@ import cors from 'cors';
 import 'dotenv/config';
 import session from 'express-session';
 import bcrypt from 'bcrypt';
-import timetableRouter from './timeTable.ts';
-import { prisma } from "./prisma.ts";
+import timetableRouter from './timeTable.js';
+import { prisma } from "./prisma.js";
 
-import { requireAuth } from './auth.ts';
-import userRoutes from './users.ts';
+import { requireAuth } from './auth.js';
+import userRoutes from './users.js';
 
 declare module 'express-session' {
     interface SessionData {

@@ -1,11 +1,11 @@
 import express from 'express';
 import cors from 'cors';
 import 'dotenv/config';
-import { PrismaClient } from '@prisma/client';
+//import { PrismaClient } from '@prisma/client';
 import session from 'express-session';
-const prisma = new PrismaClient();
+import { prisma } from "./prisma.js";
 const app = express();
-const PORT = 3000;
+const PORT = process.env.PORT || 3000;
 const privileges = {
     "student": 1,
     "parent": 2,
@@ -47,4 +47,3 @@ export async function requireAuth(req, res, next, permissionLevel) {
 export function roleAuthority(requiredRole) {
     return privileges[requiredRole] ?? 0; // default to 0 if role not found
 }
-//# sourceMappingURL=auth.js.map
