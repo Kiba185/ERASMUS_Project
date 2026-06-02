@@ -14,9 +14,9 @@ services:
   - type: web
     name: engineers-backend
     runtime: node
-    rootDir: backend/ExerciseCode
+    rootDir: backend
     buildCommand: npm install && node ./node_modules/prisma/build/index.js generate && npm run build
-    startCommand: node ./node_modules/prisma/build/index.js migrate deploy && node --loader ts-node/esm main.ts
+    startCommand: node ./node_modules/prisma/build/index.js migrate deploy && npm start
     plan: free
     envVars:
       - key: DATABASE_URL
