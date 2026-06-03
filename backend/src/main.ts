@@ -28,15 +28,30 @@ const privileges = {
 
 
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: (origin, callback) => {
+        // Allow: no origin (curl, mobile), localhost, any *.onrender.com subdomain
+        if (!origin) return callback(null, true);
+        if (
+            origin.startsWith('http://localhost') ||
+            origin.endsWith('.onrender.com') ||
+            origin === process.env.CORS_ORIGIN
+        ) {
+            return callback(null, true);
+        }
+        return callback(new Error(`CORS blocked: ${origin}`));
+    },
     credentials: true
 }));
 app.use(express.json());
 app.use(session({
-    secret: 'cisco',
+    secret: process.env.SESSION_SECRET ?? 'cisco',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        httpOnly: true,
+    }
 }));
 
 app.use(timetableRouter);

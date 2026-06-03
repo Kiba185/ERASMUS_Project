@@ -1,3 +1,4 @@
+import API_URL from '../../config/config.tsx';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
@@ -13,7 +14,7 @@ const GradesWidget: React.FC = () => {
     useEffect(() => {
         const loadGrades = async () => {
             try {
-                const response = await fetch('http://localhost:3000/api/mygrades', {
+                const response = await fetch('${API_URL}/api/mygrades', {
                     credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',

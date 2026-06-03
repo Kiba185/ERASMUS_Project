@@ -1,3 +1,4 @@
+import API_URL from '../config/config.tsx';
 import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
@@ -84,7 +85,7 @@ const EventsPage: React.FC = () => {
   useEffect(() => {
     const loadEvents = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/events', {
+        const response = await fetch('${API_URL}/api/events', {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -119,7 +120,7 @@ const EventsPage: React.FC = () => {
       }
     };
     const loadClasses = async () => {
-      const res = await fetch('http://localhost:3000/api/classes', { credentials: 'include' });
+      const res = await fetch('${API_URL}/api/classes', { credentials: 'include' });
       const data = await res.json();
       setClassAudienceOptions(
         data.map((c: any) => ({
@@ -131,7 +132,7 @@ const EventsPage: React.FC = () => {
     };
 
     const loadStudents = async () => {
-      const res = await fetch('http://localhost:3000/api/users/student', { credentials: 'include' });
+      const res = await fetch('${API_URL}/api/users/student', { credentials: 'include' });
       const data = await res.json();
       setStudentAudienceOptions(
         data.map((u: any) => ({
@@ -142,7 +143,7 @@ const EventsPage: React.FC = () => {
       );
     };
     const loadTeachers = async () => {
-      const res = await fetch('http://localhost:3000/api/users/teacher', { credentials: 'include' });
+      const res = await fetch('${API_URL}/api/users/teacher', { credentials: 'include' });
       const data = await res.json();
       setTeacherAudienceOptions(
         data.map((u: any) => ({
@@ -355,7 +356,7 @@ const EventsPage: React.FC = () => {
 
     if (modalView === 'create') {
       try {
-        const response = await fetch('http://localhost:3000/api/events', {
+        const response = await fetch('${API_URL}/api/events', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -384,7 +385,7 @@ const EventsPage: React.FC = () => {
 
     } else if (modalView === 'edit' && selectedEventId) {
       try {
-        const response = await fetch(`http://localhost:3000/api/events/${selectedEventId}`, {
+        const response = await fetch(`${API_URL}/api/events/${selectedEventId}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
@@ -415,7 +416,7 @@ const EventsPage: React.FC = () => {
   const handleDeleteEvent = async (id: string) => {
     if (!canManageEvents) return;
     try {
-      const response = await fetch(`http://localhost:3000/api/events/${id}`, {
+      const response = await fetch(`${API_URL}/api/events/${id}`, {
         method: 'DELETE',
         credentials: 'include',
       });
