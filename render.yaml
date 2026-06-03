@@ -1,22 +1,26 @@
 services:
   # ── Frontend: React Static Site ──────────────────────────────
   - type: web
-    name: engineers-frontend
+    name: engineers
     runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: "https://engineers-backend.onrender.com"
+        value: "https://engineers-backend-7kv2.onrender.com"
 
   # ── Backend: Node.js Web Service ─────────────────────────────
   - type: web
     name: engineers-backend
     runtime: node
     rootDir: backend
-    buildCommand: npm install && node ./node_modules/prisma/build/index.js generate && npm run build
-    startCommand: node ./node_modules/prisma/build/index.js migrate deploy && npm start
+    buildCommand: npm install --include=dev && npx prisma generate && npm run build
+    startCommand: npx prisma migrate deploy && npm start
     plan: free
     envVars:
       - key: DATABASE_URL
@@ -24,9 +28,11 @@ services:
           name: engineers-db
           property: connectionString
       - key: CORS_ORIGIN
-        value: "https://engineers-frontend.onrender.com"
+        value: "https://engineers-dz0o.onrender.com"
       - key: NODE_VERSION
-        value: "20"
+        value: "22"
+      - key: NODE_ENV
+        value: "production"
 
 # ── Databáze: PostgreSQL ───────────────────────────────────────
 databases:

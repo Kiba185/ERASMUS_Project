@@ -1,3 +1,4 @@
+import API_URL from '../config/config.tsx';
 import React, { useEffect, useState } from 'react';
 
 type Grade = { id: string; gColumnId: string; userId: string; grade: string, subjectName: string; subjectId: number; date: string; gColumnName?: string; weight?: number };
@@ -10,7 +11,7 @@ const GradesPage: React.FC = () => {
     useEffect(() => {
         const loadGrades = async () => {
             try {
-                const response = await fetch('http://localhost:3000/api/mygrades', {
+                const response = await fetch('${API_URL}/api/mygrades', {
                     credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
