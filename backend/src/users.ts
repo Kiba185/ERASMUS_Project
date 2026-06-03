@@ -15,9 +15,9 @@ router.get('/api/admin/users', async (req, res, next) => {
         include: { classes: true }
     });
 
-    const saveUsers = users.map(({ password, ...u }) => ({
+    const saveUsers = users.map(({ password, ...u }: any) => ({
         ...u,
-        classes: u.classes.map(c => ({ id: c.id, name: c.name }))
+        classes: u.classes.map((c: any) => ({ id: c.id, name: c.name }))
     }));
 
     res.json(saveUsers);

@@ -11,7 +11,7 @@ const GradesPage: React.FC = () => {
     useEffect(() => {
         const loadGrades = async () => {
             try {
-                const response = await fetch('${API_URL}/api/mygrades', {
+                const response = await fetch(`${API_URL}/api/mygrades`, {
                     credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
