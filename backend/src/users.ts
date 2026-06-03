@@ -12,12 +12,13 @@ router.get('/api/admin/users', async (req, res, next) => {
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
     const users = await prisma.user.findMany({
-        include: { classes: true }
+        include: { classes: true, subjects: true }
     });
 
     const saveUsers = users.map(({ password, ...u }: any) => ({
         ...u,
-        classes: u.classes.map((c: any) => ({ id: c.id, name: c.name }))
+        classes: u.classes.map(c => ({ id: c.id, name: c.name })),
+        subjects: u.subjects.map(s => ({ id: s.id, name: s.name }))
     }));
 
     res.json(saveUsers);
@@ -183,5 +184,24 @@ router.delete('/api/admin/users/:id/classes/:classId', async (req, res, next) =>
     res.json({ success: true, message: 'User removed from class' });
 });
 
+// UPDATE TEACHER SUBJECTS - ADMIN ONLY
+router.put('/api/admin/users/:id/subjects', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const userId = parseInt(req.params.id);
+    const { subjectIds } = req.body; // pole čísel [1, 2, 3]
+
+    const result = await prisma.user.update({
+        where: { id: userId },
+        data: {
+            subjects: {
+                set: subjectIds.map((id: number) => ({ id }))
+            }
+        },
+        include: { subjects: true }
+    });
+
+    res.json({ success: true, subjects: result.subjects });
+});
 
 export default router;
