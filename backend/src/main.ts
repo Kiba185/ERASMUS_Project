@@ -571,7 +571,95 @@ app.get('/api/classes', async (req, res, next) => {
     res.json(classToUser);
 });
 
+//CREATE CLASS - TEACHER ONLY
+app.post('/api/classes', async (req, res, next) => {
+  if (await requireAuth(req, res, next, 5) !== true) { return; }
+  
+  console.log('POST /api/classes body:', JSON.stringify(req.body)); // 👈 log it
+  
+  const { name, studentIds } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: 'name is required' });
+  }
 
+  try {
+    const newClass = await prisma.class.create({
+      data: {
+        name,
+        students: studentIds?.length
+          ? { connect: studentIds.map((id: any) => ({ id: Number(id) })) }
+          : undefined,
+      },
+      include: { students: true },
+    });
+    res.status(201).json(newClass);
+  } catch (e: any) {
+    console.error('Prisma error:', e);
+    res.status(500).json({ error: e.message }); // 👈 send error back
+  }
+});
+
+//DELETE CLASS - TEACHER ONLY
+app.delete('/api/classes/:id', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+
+    const classId = parseInt(req.params.id);
+    const deletedClass = await prisma.class.delete({
+        where: { id: classId }
+    });
+    res.json(deletedClass);
+});
+
+//UPDATE CLASS - TEACHER ONLY
+app.put('/api/classes/:id', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    const classId = parseInt(req.params.id);
+    const { name, studentIds } = req.body;
+    const updatedClass = await prisma.class.update({
+        where: { id: classId },
+        data: {
+            name,
+            students: {
+                set: studentIds.map((id: number) => ({ id }))
+            }
+        },
+        include: {
+            students: true
+        }
+    });
+    res.json(updatedClass);
+});
+
+//GET CLASS OFF OF STUDENT ID - STUDENT AND TEACHER ONLY
+app.get('/api/class/studentId/:studentId', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 1) !== true) { return; }
+
+    const studentId = parseInt(req.params.studentId);
+    const classInfo = await prisma.class.findFirst({
+        where: {
+            students: {
+                some: {
+                    id: studentId
+                }
+            }
+        },
+        include: {
+            students: true
+        }
+    });
+
+    // If not a class the user is a part of, require teahcer or admin auth
+    if (!classInfo) {
+        if (await requireAuth(req, res, next, 5) !== true) { return; }
+        return res.status(404).json({ success: false, message: 'Class not found for this student' });
+    }
+
+    res.json(classInfo);
+});
 
 
 
