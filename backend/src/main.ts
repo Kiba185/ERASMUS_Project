@@ -27,16 +27,31 @@ const privileges = {
 
 
 
+const allowedOrigins = [
+    'http://localhost:5173',
+    'https://engineers-frontend.onrender.com',
+    process.env.CORS_ORIGIN,
+].filter(Boolean) as string[];
+
 app.use(cors({
-    origin: 'http://localhost:5173',
+    origin: (origin, callback) => {
+        // Allow requests with no origin (e.g. curl, mobile apps)
+        if (!origin) return callback(null, true);
+        if (allowedOrigins.includes(origin)) return callback(null, true);
+        return callback(new Error(`CORS blocked: ${origin}`));
+    },
     credentials: true
 }));
 app.use(express.json());
 app.use(session({
-    secret: 'cisco',
+    secret: process.env.SESSION_SECRET ?? 'cisco',
     resave: false,
     saveUninitialized: false,
-    cookie: { secure: false }
+    cookie: {
+        secure: process.env.NODE_ENV === 'production',
+        sameSite: process.env.NODE_ENV === 'production' ? 'none' : 'lax',
+        httpOnly: true,
+    }
 }));
 
 app.use(timetableRouter);

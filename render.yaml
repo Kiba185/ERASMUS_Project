@@ -6,6 +6,10 @@ services:
     rootDir: frontend
     buildCommand: npm install && npm run build
     staticPublishPath: ./dist
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
     envVars:
       - key: VITE_API_URL
         value: "https://engineers-backend.onrender.com"
@@ -27,6 +31,8 @@ services:
         value: "https://engineers-frontend.onrender.com"
       - key: NODE_VERSION
         value: "22"
+      - key: NODE_ENV
+        value: "production"
 
 # ── Databáze: PostgreSQL ───────────────────────────────────────
 databases:
