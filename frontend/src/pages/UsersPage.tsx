@@ -1,13 +1,17 @@
+import API_URL from '../config/config.tsx';
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../context/AuthContext';
 
-const API = 'http://localhost:3000';
-
 type Role = 'student' | 'teacher' | 'parent' | 'admin';
 
 interface MockSubject {
+  id: number;
+  name: string;
+}
+
+interface MockClass {
   id: number;
   name: string;
 }
@@ -32,9 +36,9 @@ const UsersPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [users, setUsers] = useState<MockUser[]>(initialUsers);
-  const [classes] = useState<MockClass[]>(initialClasses);
-  const [subjects] = useState<MockSubject[]>(initialSubjects);
+  const [users, setUsers] = useState<MockUser[]>([]);
+  const [classes, setClasses] = useState<MockClass[]>([]);
+  const [subjects] = useState<MockSubject[]>([]);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
@@ -49,7 +53,7 @@ const UsersPage: React.FC = () => {
 
   // --- NAČTENÍ DAT Z BACKENDU ---
   const fetchUsers = async () => {
-    const res = await fetch(`${API}/api/admin/users`, { credentials: 'include' });
+    const res = await fetch(`${API_URL}/api/admin/users`, { credentials: 'include' });
     const data = await res.json();
     // Přemapuj classes array na classId pro kompatibilitu
     const mapped = data.map((u: any) => ({
@@ -60,7 +64,7 @@ const UsersPage: React.FC = () => {
   };
 
   const fetchClasses = async () => {
-    const res = await fetch(`${API}/api/classes`, { credentials: 'include' });
+    const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
     const data = await res.json();
     setClasses(data);
   };
@@ -69,7 +73,9 @@ const UsersPage: React.FC = () => {
     Promise.all([fetchUsers(), fetchClasses()]).finally(() => setLoading(false));
   }, []);
 
-  const students = useMemo(() => users.filter(u => u.role === 'student'), [users]);
+  if (!users || !classes) return <div className="p-8 text-palette-pine font-bold">Načítání...</div>;
+  const [loading, setLoading] = useState(true);
+  //const students = useMemo(() => users.filter(u => u.role === 'student'), [users]);
 
   const filteredAndSortedUsers = useMemo(() => {
     let result = users;
@@ -138,7 +144,7 @@ const UsersPage: React.FC = () => {
     if (!editingUser) return;
 
     if (isNew) {
-        const res = await fetch(`${API}/api/admin/users`, {
+        const res = await fetch(`${API_URL}/api/admin/users`, {
             method: 'POST',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -146,7 +152,7 @@ const UsersPage: React.FC = () => {
         });
         if (!res.ok) { const err = await res.json(); alert(err.message); return; }
     } else {
-        const res = await fetch(`${API}/api/admin/users/${editingUser.id}`, {
+        const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
             method: 'PUT',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -155,7 +161,7 @@ const UsersPage: React.FC = () => {
         if (!res.ok) { const err = await res.json(); alert(err.message); return; }
 
         if (newPassword.length >= 6) {
-            await fetch(`${API}/api/admin/users/${editingUser.id}/password`, {
+            await fetch(`${API_URL}/api/admin/users/${editingUser.id}/password`, {
                 method: 'PUT',
                 credentials: 'include',
                 headers: { 'Content-Type': 'application/json' },
@@ -165,7 +171,7 @@ const UsersPage: React.FC = () => {
 
         // Přepíše třídu (nebo odebere pokud žádná)
         console.log('Sending classId:', editingUser.classId);
-        await fetch(`${API}/api/admin/users/${editingUser.id}/classes`, {
+        await fetch(`${API_URL}/api/admin/users/${editingUser.id}/classes`, {
             method: 'PUT',
             credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
@@ -180,7 +186,7 @@ const UsersPage: React.FC = () => {
   // --- SMAZÁNÍ ---
   const handleDelete = async (id: number) => {
     if (!confirm('Opravdu smazat uživatele?')) return;
-    await fetch(`${API}/api/admin/users/${id}`, {
+    await fetch(`${API_URL}/api/admin/users/${id}`, {
       method: 'DELETE',
       credentials: 'include'
     });
@@ -345,6 +351,7 @@ const UsersPage: React.FC = () => {
                       <div className="pt-2 border-t border-palette-sage/30">
                         <label className="block text-sm font-bold text-palette-pine mb-2">Assign Subjects (Teacher qualification)</label>
                         <div className="max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 space-y-1 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-1">
+                          
                           {subjects.map(subject => {
                             const isSelected = editingUser.subjectIds?.includes(subject.id);
                             return (

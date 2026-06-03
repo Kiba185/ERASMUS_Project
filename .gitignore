@@ -1,1 +1,7 @@
-backend/ExerciseCode/prisma/dev.db
+backend/node_modules/
+backend/dist/
+backend/generated/
+backend/.env
+frontend/node_modules/
+frontend/dist/
+frontend/.env

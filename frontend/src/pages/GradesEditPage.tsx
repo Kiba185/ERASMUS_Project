@@ -1,3 +1,4 @@
+import API_URL from '../config/config.tsx';
 import React, { useState, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 
@@ -17,7 +18,7 @@ const GradesEditPage: React.FC = () => {
   useEffect(() => {
     const loadStudents = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/users/student', {
+        const response = await fetch('${API_URL}/api/users/student', {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
@@ -45,7 +46,7 @@ const GradesEditPage: React.FC = () => {
 
     const loadAssignments = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/gradeColumns', {
+        const response = await fetch('${API_URL}/api/gradeColumns', {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
@@ -71,7 +72,7 @@ const GradesEditPage: React.FC = () => {
 
     const loadGrades = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/grades', {
+        const response = await fetch('${API_URL}/api/grades', {
           credentials: 'include',
           headers: {
             'Content-Type': 'application/json',
@@ -106,7 +107,7 @@ const GradesEditPage: React.FC = () => {
     // inside your useEffect, add:
     const loadSubjects = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/subjects', {
+        const response = await fetch('${API_URL}/api/subjects', {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -122,7 +123,7 @@ const GradesEditPage: React.FC = () => {
 
     const loadClasses = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/classes', {
+        const response = await fetch('${API_URL}/api/classes', {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -172,7 +173,7 @@ const GradesEditPage: React.FC = () => {
     e.preventDefault();
     if (!newColTitle || newColWeight === '') return;
 
-    fetch('http://localhost:3000/api/gradeColumns', {
+    fetch('${API_URL}/api/gradeColumns', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -197,7 +198,7 @@ const GradesEditPage: React.FC = () => {
     if (!window.confirm(`Delete column "${assignmentName}" and all its grades?`)) return;
 
     try {
-      const res = await fetch(`http://localhost:3000/api/gradeColumns/${assignmentId}`, {
+      const res = await fetch(`${API_URL}/api/gradeColumns/${assignmentId}`, {
         method: 'DELETE',
         credentials: 'include',
       });
@@ -236,7 +237,7 @@ const GradesEditPage: React.FC = () => {
 
     const assignmentId = editingAssignment.id;
     try {
-      const res = await fetch(`http://localhost:3000/api/gradeColumns/${assignmentId}`, {
+      const res = await fetch(`${API_URL}/api/gradeColumns/${assignmentId}`, {
         method: 'PUT',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -294,7 +295,7 @@ const GradesEditPage: React.FC = () => {
     if (val === '') {
       setGrades(prev => prev.filter(g => !(g.userId === studentId && g.gColumnId === assignmentId)));
 
-      fetch(`http://localhost:3000/api/grades/${studentId}/${assignmentId}`, {
+      fetch(`${API_URL}/api/grades/${studentId}/${assignmentId}`, {
         method: 'DELETE',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -324,7 +325,7 @@ const GradesEditPage: React.FC = () => {
         return [...filtered, { id: `${studentId}-${assignmentId}`, userId: studentId, gColumnId: assignmentId, grade: val }];
       });
 
-      fetch('http://localhost:3000/api/grades', {
+      fetch('${API_URL}/api/grades', {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
@@ -342,7 +343,7 @@ const GradesEditPage: React.FC = () => {
   const handleClearCell = (studentId: string, assignmentId: string) => {
     setGrades(grades.filter(g => !(g.userId === studentId && g.gColumnId === assignmentId)));
 
-    fetch(`http://localhost:3000/api/grades/${studentId}/${assignmentId}`, {
+    fetch(`${API_URL}/api/grades/${studentId}/${assignmentId}`, {
       method: 'DELETE',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
@@ -457,9 +458,9 @@ const GradesEditPage: React.FC = () => {
       </div>
 
       {/* 2. ADD NEW COLUMN */}
-      <div className="bg-green-50 p-4 rounded-xl border border-green-200 flex items-end gap-4">
-        <form onSubmit={handleAddColumn} className="flex items-end gap-4 w-full">
-          <div className="flex-1">
+      <div className="bg-green-50 p-4 rounded-xl border border-green-200 flex flex-col md:flex-row md:items-end gap-4">
+        <form onSubmit={handleAddColumn} className="flex flex-col md:flex-row md:items-end gap-4 w-full">
+          <div className="w-full md:flex-1">
             <label className="block text-sm font-semibold text-green-800 mb-1">New Column Title (Max 75 chars)</label>
             <input
               type="text"
@@ -471,7 +472,7 @@ const GradesEditPage: React.FC = () => {
               required
             />
           </div>
-          <div className="w-32">
+          <div className="w-full md:w-32">
             <label className="block text-sm font-semibold text-green-800 mb-1">Weight</label>
             <input
               type="number"
@@ -495,7 +496,7 @@ const GradesEditPage: React.FC = () => {
               required
             />
           </div>
-          <div className="w-32">
+          <div className="w-full md:w-32">
             <label className="block text-sm font-semibold text-green-800 mb-1">Date</label>
             <input
               type="date"
@@ -505,7 +506,7 @@ const GradesEditPage: React.FC = () => {
               required
             />
           </div>
-          <button type="submit" className="py-2.5 px-6 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition h-[46px]">
+          <button type="submit" className="w-full md:w-auto py-2.5 px-6 bg-green-600 text-white font-bold rounded-lg hover:bg-green-700 transition h-[46px]">
             + Add Column
           </button>
         </form>

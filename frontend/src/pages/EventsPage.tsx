@@ -1,4 +1,5 @@
-import React, { useState, useMemo } from 'react';
+import API_URL from '../config/config.tsx';
+import React, { useEffect, useState, useMemo } from 'react';
 import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 
@@ -22,97 +23,142 @@ type SchoolEvent = {
 interface AudienceOption {
   value: string;
   label: string;
+  id?: number;
 }
-
-const CLASS_AUDIENCE_OPTIONS: AudienceOption[] = ['4.A', '4.B', '4.C', '4.D'].map((className) => ({
-  value: `@${className}`,
-  label: `@${className}`,
-}));
-
-const STUDENT_AUDIENCE_OPTIONS: AudienceOption[] = [
-  'John Doe',
-  'Marek Kalach',
-  'Jane Doe',
-  'Linda Brown',
-  'Tomas Benes',
-].map((studentName) => {
-  const handle = `@${studentName.toLowerCase().replace(/\s+/g, '-')}`;
-
-  return {
-    value: handle,
-    label: `${handle} (${studentName})`,
-  };
-});
-
-const EVERYONE_AUDIENCE_OPTIONS: AudienceOption[] = [
-  { value: '@everyone-students', label: '@everyone-students' },
-  { value: '@everyone-teachers', label: '@everyone-teachers' },
-];
-
-const ALL_AUDIENCE_OPTIONS = [
-  ...CLASS_AUDIENCE_OPTIONS,
-  ...STUDENT_AUDIENCE_OPTIONS,
-  ...EVERYONE_AUDIENCE_OPTIONS,
-];
-
-const normalizeAudienceTag = (value: string) => {
-  const trimmedValue = value.trim();
-
-  if (!trimmedValue) {
-    return '';
-  }
-
-  return trimmedValue.startsWith('@') ? trimmedValue : `@${trimmedValue}`;
-};
-
-const getAudienceOptionsForType = (type: AudienceType) => {
-  if (type === 'class') {
-    return CLASS_AUDIENCE_OPTIONS;
-  }
-
-  if (type === 'student') {
-    return STUDENT_AUDIENCE_OPTIONS;
-  }
-
-  return EVERYONE_AUDIENCE_OPTIONS.filter((option) =>
-    type === 'everyoneStudents' ? option.value === '@everyone-students' : option.value === '@everyone-teachers',
-  );
-};
-
-const getAudienceTagsFromEvent = (event: SchoolEvent) => {
-  if (event.audienceTags?.length) {
-    return event.audienceTags;
-  }
-
-  if (event.audienceTag) {
-    return event.audienceTag.split(',').map((tag) => tag.trim()).filter(Boolean);
-  }
-
-  if (event.className) {
-    return [`@${event.className}`];
-  }
-
-  return ['@everyone-students'];
-};
-
-const getAudienceTypeFromTags = (tags: string[]): AudienceType => {
-  if (tags.some((tag) => CLASS_AUDIENCE_OPTIONS.some((option) => option.value === tag))) {
-    return 'class';
-  }
-
-  if (tags.some((tag) => STUDENT_AUDIENCE_OPTIONS.some((option) => option.value === tag))) {
-    return 'student';
-  }
-
-  if (tags.includes('@everyone-teachers')) {
-    return 'everyoneTeachers';
-  }
-
-  return 'everyoneStudents';
-};
 
 const EventsPage: React.FC = () => {
   const { user: currentUser } = useAuth();
+
+  const EVERYONE_AUDIENCE_OPTIONS: AudienceOption[] = [
+    { value: '@everyone-students', label: '@everyone-students' },
+    { value: '@everyone-teachers', label: '@everyone-teachers' },
+  ];
+
+  const [classAudienceOptions, setClassAudienceOptions] = useState<AudienceOption[]>([]);
+  const [studentAudienceOptions, setStudentAudienceOptions] = useState<AudienceOption[]>([]);
+  const [teacherAudienceOptions, setTeacherAudienceOptions] = useState<AudienceOption[]>([]);
+  const allAudienceOptions = [...classAudienceOptions, ...studentAudienceOptions, ...EVERYONE_AUDIENCE_OPTIONS];
+
+  const normalizeAudienceTag = (value: string) => {
+    const trimmedValue = value.trim();
+
+    if (!trimmedValue) {
+      return '';
+    }
+
+    return trimmedValue.startsWith('@') ? trimmedValue : `@${trimmedValue}`;
+  };
+
+  const getAudienceOptionsForType = (type: AudienceType) => {
+    if (type === 'class') return classAudienceOptions;
+    if (type === 'student') return studentAudienceOptions;
+    return EVERYONE_AUDIENCE_OPTIONS.filter(o =>
+      type === 'everyoneStudents'
+        ? o.value === '@everyone-students'
+        : o.value === '@everyone-teachers'
+    );
+  };
+
+  const getAudienceTagsFromEvent = (event: SchoolEvent) => {
+    if (event.audienceTags?.length) {
+      return event.audienceTags;
+    }
+
+    if (event.audienceTag) {
+      return event.audienceTag.split(',').map((tag) => tag.trim()).filter(Boolean);
+    }
+
+    if (event.className) {
+      return [`@${event.className}`];
+    }
+
+    return ['@everyone-students'];
+  };
+
+  const getAudienceTypeFromTags = (tags: string[]): AudienceType => {
+    if (tags.some(tag => classAudienceOptions.some(o => o.value === tag))) return 'class';
+    if (tags.some(tag => studentAudienceOptions.some(o => o.value === tag))) return 'student';
+    if (tags.includes('@everyone-teachers')) return 'everyoneTeachers';
+    return 'everyoneStudents';
+  };
+
+  useEffect(() => {
+    const loadEvents = async () => {
+      try {
+        const response = await fetch('${API_URL}/api/events', {
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' }
+        });
+        if (!response.ok) throw new Error('Failed to load events');
+
+
+
+        const data = await response.json();
+        const mapped: SchoolEvent[] = data.map((e: any) => ({
+          id: String(e.id),
+          title: e.title,
+          description: e.description,
+          startDate: String(e.startDate).split('T')[0],  // strip time
+          endDate: String(e.endDate).split('T')[0],
+          time: e.startTime ? String(e.startTime).split('T')[1]?.slice(0, 5) : '',
+          isAllDay: Boolean(e.allDay),
+          type: e.type,
+          audienceTags: (() => {
+            const tags: string[] = [];
+            if (e.participantsClasses?.length) {
+              e.participantsClasses.forEach((c: any) => tags.push(`@${c.name}`));
+            }
+            if (e.participantsIndividuals?.length) {
+              e.participantsIndividuals.forEach((u: any) => tags.push(`@${u.username}`));
+            }
+            return tags.length > 0 ? tags : ['@everyone-students'];
+          })(),
+        }));
+        setEvents(mapped);
+      } catch (error) {
+        console.error(error);
+      }
+    };
+    const loadClasses = async () => {
+      const res = await fetch('${API_URL}/api/classes', { credentials: 'include' });
+      const data = await res.json();
+      setClassAudienceOptions(
+        data.map((c: any) => ({
+          value: `@${c.name}`,
+          label: `@${c.name}`,
+          id: c.id,
+        }))
+      );
+    };
+
+    const loadStudents = async () => {
+      const res = await fetch('${API_URL}/api/users/student', { credentials: 'include' });
+      const data = await res.json();
+      setStudentAudienceOptions(
+        data.map((u: any) => ({
+          value: `@${u.username}`,
+          label: `@${u.username} (${u.firstName} ${u.lastName})`,
+          id: u.id,
+        }))
+      );
+    };
+    const loadTeachers = async () => {
+      const res = await fetch('${API_URL}/api/users/teacher', { credentials: 'include' });
+      const data = await res.json();
+      setTeacherAudienceOptions(
+        data.map((u: any) => ({
+          value: `@${u.username}`,
+          label: `@${u.username} (${u.firstName} ${u.lastName})`,
+          id: u.id,
+        }))
+      );
+    };
+
+    loadTeachers();
+    loadClasses();
+    loadStudents();
+    loadEvents();
+  }, []);
 
   // --- AUTOMATICKÉ URČENÍ PRÁV PODLE PROFILU ---
   const userRole = currentUser?.role || 'student';
@@ -132,7 +178,7 @@ const EventsPage: React.FC = () => {
   const [modalView, setModalView] = useState<'details' | 'create' | 'edit'>('details');
   const [selectedDateStr, setSelectedDateStr] = useState('');
   const [selectedEventId, setSelectedEventId] = useState<string | null>(null);
-  
+
   // --- FORM STATES ---
   const [eventTitle, setEventTitle] = useState('');
   const [eventStartDate, setEventStartDate] = useState('');
@@ -140,7 +186,7 @@ const EventsPage: React.FC = () => {
   const [eventTime, setEventTime] = useState('08:00');
   const [isAllDay, setIsAllDay] = useState(false);
   const [eventType, setEventType] = useState<EventType>('exam');
-  const [customType, setCustomType] = useState(''); 
+  const [customType, setCustomType] = useState('');
   const [audienceType, setAudienceType] = useState<AudienceType>('everyoneStudents');
   const [audienceSearch, setAudienceSearch] = useState('');
   const [selectedAudienceTags, setSelectedAudienceTags] = useState<string[]>(['@everyone-students']);
@@ -154,14 +200,14 @@ const EventsPage: React.FC = () => {
   const calendarCells = useMemo(() => {
     const firstDay = new Date(year, month, 1);
     let startDayOfWeek = firstDay.getDay() - 1;
-    if (startDayOfWeek === -1) startDayOfWeek = 6; 
-    
+    if (startDayOfWeek === -1) startDayOfWeek = 6;
+
     const totalDays = new Date(year, month + 1, 0).getDate();
     const cells: (Date | null)[] = [];
-    
+
     for (let i = 0; i < startDayOfWeek; i++) cells.push(null);
     for (let day = 1; day <= totalDays; day++) cells.push(new Date(year, month, day));
-    
+
     return cells;
   }, [year, month]);
 
@@ -173,17 +219,14 @@ const EventsPage: React.FC = () => {
   const audienceOptions = useMemo(() => {
     const searchValue = audienceSearch.trim().toLowerCase();
     const sourceOptions = audienceSearch.trim().startsWith('@')
-      ? ALL_AUDIENCE_OPTIONS
+      ? allAudienceOptions                      // 👈 was ALL_AUDIENCE_OPTIONS
       : getAudienceOptionsForType(audienceType);
 
-    if (!searchValue) {
-      return sourceOptions;
-    }
-
-    return sourceOptions.filter((option) =>
-      option.value.toLowerCase().includes(searchValue) || option.label.toLowerCase().includes(searchValue),
+    if (!searchValue) return sourceOptions;
+    return sourceOptions.filter(o =>
+      o.value.toLowerCase().includes(searchValue) || o.label.toLowerCase().includes(searchValue)
     );
-  }, [audienceSearch, audienceType]);
+  }, [audienceSearch, audienceType, classAudienceOptions, studentAudienceOptions, teacherAudienceOptions]);
 
   const addAudienceTag = (tag: string) => {
     const normalizedTag = normalizeAudienceTag(tag);
@@ -219,7 +262,7 @@ const EventsPage: React.FC = () => {
   const handleDayClick = (dateStr: string) => {
     setSelectedDateStr(dateStr);
     const dayEvents = events.filter(e => isEventOnDate(e, dateStr));
-    
+
     if (dayEvents.length > 0) {
       setModalView('details');
       setIsModalOpen(true);
@@ -257,7 +300,7 @@ const EventsPage: React.FC = () => {
     setAudienceSearch('');
     setSelectedAudienceTags(eventAudienceTags);
     setEventDesc(event.description || '');
-    
+
     if (['exam', 'excursion', 'meeting', 'holiday'].includes(event.type)) {
       setEventType(event.type);
       setCustomType('');
@@ -268,67 +311,127 @@ const EventsPage: React.FC = () => {
     setModalView('edit');
   };
 
-  const handleFormSubmit = (e: React.FormEvent) => {
+  const handleFormSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!canManageEvents || !eventTitle.trim()) return;
 
     const finalType = (isAdmin && eventType === 'custom') ? (customType.trim().toLowerCase() || 'other') : eventType;
-
-    // Bezpečná validace datumu (aby konec nebyl před začátkem)
     const finalEndDate = eventEndDate < eventStartDate ? eventStartDate : eventEndDate;
     const finalAudienceTags = selectedAudienceTags.length > 0 ? selectedAudienceTags : ['@everyone-students'];
     const finalAudienceTag = finalAudienceTags.join(', ');
-    const firstClassTag = finalAudienceTags.find((tag) =>
-      CLASS_AUDIENCE_OPTIONS.some((option) => option.value === tag),
-    );
+    const firstClassTag = finalAudienceTags.find(tag => classAudienceOptions.some(o => o.value === tag));
     const finalClassName = firstClassTag?.replace(/^@/, '');
 
+    const isEveryoneStudents = finalAudienceTags.includes('@everyone-students');
+    const isEveryoneTeachers = finalAudienceTags.includes('@everyone-teachers');
+
+    const everyoneIds: number[] = [
+      ...(isEveryoneStudents ? studentAudienceOptions.map(o => o.id!) : []),
+      ...(isEveryoneTeachers ? teacherAudienceOptions.map(o => o.id!) : []),
+    ];
+
+    const specificIds = finalAudienceTags
+      .filter(tag => tag !== '@everyone-students' && tag !== '@everyone-teachers') // skip the wildcards
+      .map(tag => [...studentAudienceOptions, ...teacherAudienceOptions].find(o => o.value === tag)?.id)
+      .filter((id): id is number => id !== undefined);
+
+    // Merge and deduplicate
+    const participantIndividualIds = [...new Set([...everyoneIds, ...specificIds])];
+
+    const participantClassIds = finalAudienceTags
+      .map(tag => classAudienceOptions.find(o => o.value === tag)?.id)
+      .filter((id): id is number => id !== undefined);
+
+    const payload = {
+      title: eventTitle,
+      description: eventDesc || '',
+      startDate: eventStartDate,
+      endDate: finalEndDate,
+      startTime: isAllDay ? null : `${eventStartDate}T${eventTime}:00.000Z`,
+      allDay: isAllDay,
+      type: finalType,
+      participantIndividualIds,
+      participantClassIds,
+    };
+
     if (modalView === 'create') {
-      const created: SchoolEvent = {
-        id: `e${Date.now()}`,
-        title: eventTitle,
-        startDate: eventStartDate,
-        endDate: finalEndDate,
-        time: isAllDay ? '' : eventTime,
-        isAllDay,
-        type: finalType,
-        className: finalClassName,
-        audienceTag: finalAudienceTag,
-        audienceTags: finalAudienceTags,
-        description: eventDesc || undefined,
-      };
-      setEvents(prev => [...prev, created]);
-      setIsModalOpen(false);
+      try {
+        const response = await fetch('${API_URL}/api/events', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Failed to create');
+        const saved = await response.json();
+
+        setEvents(prev => [...prev, {
+          id: String(saved.id),
+          title: eventTitle,
+          startDate: eventStartDate,
+          endDate: finalEndDate,
+          time: isAllDay ? '' : eventTime,
+          isAllDay,
+          type: finalType,
+          className: finalClassName,
+          audienceTag: finalAudienceTag,
+          audienceTags: finalAudienceTags,
+          description: eventDesc || undefined,
+        }]);
+        setIsModalOpen(false);
+      } catch (err) {
+        console.error('Failed to create event:', err);
+      }
+
     } else if (modalView === 'edit' && selectedEventId) {
-      setEvents(prev => prev.map(ev => ev.id === selectedEventId ? {
-        ...ev,
-        title: eventTitle,
-        startDate: eventStartDate,
-        endDate: finalEndDate,
-        time: isAllDay ? '' : eventTime,
-        isAllDay,
-        type: finalType,
-        className: finalClassName,
-        audienceTag: finalAudienceTag,
-        audienceTags: finalAudienceTags,
-        description: eventDesc || undefined,
-      } : ev));
-      setModalView('details');
+      try {
+        const response = await fetch(`${API_URL}/api/events/${selectedEventId}`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          credentials: 'include',
+          body: JSON.stringify(payload)
+        });
+        if (!response.ok) throw new Error('Failed to update');
+
+        setEvents(prev => prev.map(ev => ev.id === selectedEventId ? {
+          ...ev,
+          title: eventTitle,
+          startDate: eventStartDate,
+          endDate: finalEndDate,
+          time: isAllDay ? '' : eventTime,
+          isAllDay,
+          type: finalType,
+          className: finalClassName,
+          audienceTag: finalAudienceTag,
+          audienceTags: finalAudienceTags,
+          description: eventDesc || undefined,
+        } : ev));
+        setModalView('details');
+      } catch (err) {
+        console.error('Failed to update event:', err);
+      }
     }
   };
 
-  const handleDeleteEvent = (id: string) => {
+  const handleDeleteEvent = async (id: string) => {
     if (!canManageEvents) return;
-    setEvents(prev => {
-      const updated = prev.filter(ev => ev.id !== id);
-      const remainingForDay = updated.filter(e => isEventOnDate(e, selectedDateStr));
-      if (remainingForDay.length > 0) {
-        setModalView('details');
-      } else {
-        setIsModalOpen(false);
-      }
-      return updated;
-    });
+    try {
+      const response = await fetch(`${API_URL}/api/events/${id}`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      if (!response.ok) throw new Error('Failed to delete');
+
+      setEvents(prev => {
+        const updated = prev.filter(ev => ev.id !== id);
+        const remainingForDay = updated.filter(e => isEventOnDate(e, selectedDateStr));
+        if (remainingForDay.length > 0) setModalView('details');
+        else setIsModalOpen(false);
+        return updated;
+      });
+    } catch (err) {
+      console.error('Failed to delete event:', err);
+    }
   };
 
   const activeDayEvents = useMemo(() => {
@@ -344,42 +447,42 @@ const EventsPage: React.FC = () => {
   // --- ZELENÝ DESIGN SYSTEM (Diferencovaný podle typů aktivit) ---
   const getStyle = (type: string) => {
     const styles: Record<string, { badge: string; border: string; bg: string; text: string }> = {
-      exam: { 
-        badge: 'bg-emerald-100 text-emerald-800 border-emerald-300', 
-        border: 'border-l-emerald-600', 
-        bg: 'bg-emerald-50/80 hover:bg-emerald-100/60', 
-        text: 'text-emerald-900' 
+      exam: {
+        badge: 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        border: 'border-l-emerald-600',
+        bg: 'bg-emerald-50/80 hover:bg-emerald-100/60',
+        text: 'text-emerald-900'
       },
-      excursion: { 
-        badge: 'bg-green-100 text-green-800 border-green-300', 
-        border: 'border-l-green-600', 
-        bg: 'bg-green-50/80 hover:bg-green-100/60', 
-        text: 'text-green-900' 
+      excursion: {
+        badge: 'bg-green-100 text-green-800 border-green-300',
+        border: 'border-l-green-600',
+        bg: 'bg-green-50/80 hover:bg-green-100/60',
+        text: 'text-green-900'
       },
-      meeting: { 
-        badge: 'bg-teal-100 text-teal-800 border-teal-300', 
-        border: 'border-l-teal-600', 
-        bg: 'bg-teal-50/80 hover:bg-teal-100/60', 
-        text: 'text-teal-900' 
+      meeting: {
+        badge: 'bg-teal-100 text-teal-800 border-teal-300',
+        border: 'border-l-teal-600',
+        bg: 'bg-teal-50/80 hover:bg-teal-100/60',
+        text: 'text-teal-900'
       },
-      holiday: { 
-        badge: 'bg-lime-100 text-lime-800 border-lime-300', 
-        border: 'border-l-lime-600', 
-        bg: 'bg-lime-50/60 hover:bg-lime-100/50', 
-        text: 'text-lime-900' 
+      holiday: {
+        badge: 'bg-lime-100 text-lime-800 border-lime-300',
+        border: 'border-l-lime-600',
+        bg: 'bg-lime-50/60 hover:bg-lime-100/50',
+        text: 'text-lime-900'
       },
     };
-    return styles[type] || { 
-      badge: 'bg-slate-100 text-slate-700 border-slate-300', 
-      border: 'border-l-slate-500', 
-      bg: 'bg-slate-50 hover:bg-slate-100', 
-      text: 'text-slate-900' 
+    return styles[type] || {
+      badge: 'bg-slate-100 text-slate-700 border-slate-300',
+      border: 'border-l-slate-500',
+      bg: 'bg-slate-50 hover:bg-slate-100',
+      text: 'text-slate-900'
     };
   };
 
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 antialiased text-slate-800">
-      
+
       {/* HEADER */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-2xs">
         <div>
@@ -402,7 +505,7 @@ const EventsPage: React.FC = () => {
 
       {/* WORKSPACE GRID */}
       <div className="grid grid-cols-1 lg:grid-cols-4 gap-6 items-start">
-        
+
         {/* CALENDAR BLOCK */}
         <div className="lg:col-span-3 bg-white rounded-2xl border border-slate-200 shadow-2xs overflow-hidden">
           <div className="p-4 bg-slate-50 border-b border-slate-200 flex justify-between items-center">
@@ -422,7 +525,7 @@ const EventsPage: React.FC = () => {
           <div className="grid grid-cols-7 auto-rows-[120px] bg-slate-100 gap-[1px]">
             {calendarCells.map((cellDate, index) => {
               if (!cellDate) return <div key={`empty-${index}`} className="bg-slate-50/40" />;
-              
+
               const localDateStr = `${cellDate.getFullYear()}-${String(cellDate.getMonth() + 1).padStart(2, '0')}-${String(cellDate.getDate()).padStart(2, '0')}`;
               const dayEvents = events.filter(e => isEventOnDate(e, localDateStr)).sort((a, b) => a.time.localeCompare(b.time));
 
@@ -435,7 +538,7 @@ const EventsPage: React.FC = () => {
                   <span className="text-xs font-bold text-slate-600 group-hover:text-emerald-600 transition-colors">{cellDate.getDate()}</span>
                   <div className="flex flex-col gap-1 overflow-y-auto flex-1 pr-0.5">
                     {dayEvents.map(event => (
-                      <div 
+                      <div
                         key={event.id}
                         className={`text-[10px] leading-tight font-semibold rounded-md px-2 py-1 border flex flex-col gap-0.5 truncate transition-all ${getStyle(event.type).bg} ${getStyle(event.type).text}`}
                         style={{ borderLeftWidth: '3px' }}
@@ -493,12 +596,12 @@ const EventsPage: React.FC = () => {
 
       {/* --- MODÁLNÍ OKNO FIXNUTÉ PROTI MEZERÁM --- */}
       {isModalOpen && createPortal(
-        <div 
+        <div
           className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto bg-palette-sage/45 px-4 py-6 backdrop-blur-[1px]"
         >
-          
+
           <div className="bg-white rounded-xl border border-gray-200 p-6 shadow-xl max-w-md w-full space-y-4 max-h-[90vh] overflow-y-auto animate-in fade-in zoom-in-95 duration-150">
-            
+
             {/* Modal Header */}
             <div className="flex justify-between items-center border-b border-slate-100 pb-3">
               <div>
@@ -533,7 +636,7 @@ const EventsPage: React.FC = () => {
                         )}
                       </div>
                       <h4 className="font-bold text-slate-900 text-sm break-words leading-tight">{event.title}</h4>
-                      
+
                       <div className="flex gap-1.5 items-center flex-wrap">
                         <span className={`text-[9px] font-bold px-1.5 py-0.5 rounded border uppercase ${getStyle(event.type).badge}`}>{event.type}</span>
                         {getAudienceTagsFromEvent(event).map((tag) => (
@@ -566,7 +669,7 @@ const EventsPage: React.FC = () => {
             {/* VIEW: FORM (CREATE & EDIT) */}
             {(modalView === 'create' || modalView === 'edit') && canManageEvents && (
               <form onSubmit={handleFormSubmit} className="space-y-4 text-xs font-medium text-slate-700">
-                
+
                 {/* DATE SELECTOR (MULTIPLE DAYS) */}
                 <div className="grid grid-cols-2 gap-3">
                   <div>
@@ -588,11 +691,11 @@ const EventsPage: React.FC = () => {
                       <span className="block text-[10px] text-slate-400 font-normal">Holidays, field trips, custom notes</span>
                     </div>
                   </div>
-                  <input 
-                    type="checkbox" 
-                    checked={isAllDay} 
+                  <input
+                    type="checkbox"
+                    checked={isAllDay}
                     onChange={(e) => setIsAllDay(e.target.checked)}
-                    className="w-4 h-4 text-emerald-600 bg-slate-100 border-slate-300 rounded-sm focus:ring-emerald-500" 
+                    className="w-4 h-4 text-emerald-600 bg-slate-100 border-slate-300 rounded-sm focus:ring-emerald-500"
                   />
                 </div>
 
@@ -641,14 +744,14 @@ const EventsPage: React.FC = () => {
                       </button>
                     )}
                   </div>
-                  
+
                   {isAdmin && eventType === 'custom' && (
                     <div className="mt-2 animate-in fade-in duration-150">
-                      <input 
-                        type="text" 
-                        placeholder="Write custom category (workshop, tournament...)" 
-                        value={customType} 
-                        onChange={(e) => setCustomType(e.target.value)} 
+                      <input
+                        type="text"
+                        placeholder="Write custom category (workshop, tournament...)"
+                        value={customType}
+                        onChange={(e) => setCustomType(e.target.value)}
                         className="w-full p-2 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500"
                         required
                       />
@@ -680,11 +783,10 @@ const EventsPage: React.FC = () => {
                             toggleAudienceTag('@everyone-teachers');
                           }
                         }}
-                        className={`p-2 rounded-xl border text-left transition-all ${
-                          audienceType === option.type
-                            ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500 font-bold'
-                            : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
-                        }`}
+                        className={`p-2 rounded-xl border text-left transition-all ${audienceType === option.type
+                          ? 'bg-emerald-50 border-emerald-500 text-emerald-700 ring-1 ring-emerald-500 font-bold'
+                          : 'bg-white border-slate-200 text-slate-600 hover:bg-slate-50'
+                          }`}
                       >
                         {option.label}
                       </button>
