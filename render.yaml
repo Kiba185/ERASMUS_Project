@@ -1,7 +1,7 @@
 services:
   # ── Frontend: React Static Site ──────────────────────────────
   - type: web
-    name: engineers-frontend
+    name: engineers
     runtime: static
     rootDir: frontend
     buildCommand: npm install && npm run build
@@ -28,7 +28,7 @@ services:
           name: engineers-db
           property: connectionString
       - key: CORS_ORIGIN
-        value: "https://engineers-frontend.onrender.com"
+        value: "https://engineers.onrender.com"
       - key: NODE_VERSION
         value: "22"
       - key: NODE_ENV
