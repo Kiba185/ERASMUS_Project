@@ -42,7 +42,7 @@ const Sidebar: React.FC = () => {
 
   return (
     <aside className="w-full shrink-0 bg-palette-pine text-palette-mist md:w-64 border-b md:border-b-0 md:border-r border-palette-fern">
-      <nav className="max-h-[50vh] overflow-y-auto px-4 py-6 space-y-2 md:max-h-[calc(100vh-4rem)] md:sticky md:top-0">
+      <nav className="max-h-[50vh] overflow-y-auto px-4 py-6 space-y-2 md:max-h-[calc(100vh-4rem)] md:sticky md:top-0" style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}>
         {isUserRoute && (
           <div className="mb-6">
             <button
