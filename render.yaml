@@ -12,7 +12,7 @@ services:
         destination: /index.html
     envVars:
       - key: VITE_API_URL
-        value: "https://engineers-backend.onrender.com"
+        value: "https://engineers-backend-7kv2.onrender.com"
 
   # ── Backend: Node.js Web Service ─────────────────────────────
   - type: web
