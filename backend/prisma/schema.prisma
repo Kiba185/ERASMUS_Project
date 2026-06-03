@@ -40,6 +40,7 @@ model User {
 
   // Other relations
   events Event[]
+  subjects   Subject[]
 }
 
 model Subject {
@@ -48,6 +49,7 @@ model Subject {
   code       String
   color      String
   timeTables TimeTable[]
+  teachers   User[]
 }
 
 model Lesson {
