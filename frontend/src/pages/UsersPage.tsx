@@ -39,6 +39,7 @@ const UsersPage: React.FC = () => {
   const [users, setUsers] = useState<MockUser[]>([]);
   const [classes, setClasses] = useState<MockClass[]>([]);
   const [subjects] = useState<MockSubject[]>([]);
+  const [loading, setLoading] = useState(true);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
@@ -53,28 +54,38 @@ const UsersPage: React.FC = () => {
 
   // --- NAČTENÍ DAT Z BACKENDU ---
   const fetchUsers = async () => {
-    const res = await fetch(`${API_URL}/api/admin/users`, { credentials: 'include' });
-    const data = await res.json();
-    // Přemapuj classes array na classId pro kompatibilitu
-    const mapped = data.map((u: any) => ({
-      ...u,
-      classId: u.classes?.[0]?.id ?? null,
-    }));
-    setUsers(mapped);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users`, { credentials: 'include' });
+      if (!res.ok) { console.error('fetchUsers failed:', res.status); return; }
+      const data = await res.json();
+      if (!Array.isArray(data)) { console.error('fetchUsers: expected array, got:', data); return; }
+      const mapped = data.map((u: any) => ({
+        ...u,
+        classId: u.classes?.[0]?.id ?? null,
+      }));
+      setUsers(mapped);
+    } catch (err) {
+      console.error('fetchUsers error:', err);
+    }
   };
 
   const fetchClasses = async () => {
-    const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
-    const data = await res.json();
-    setClasses(data);
+    try {
+      const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
+      if (!res.ok) { console.error('fetchClasses failed:', res.status); return; }
+      const data = await res.json();
+      if (!Array.isArray(data)) { console.error('fetchClasses: expected array, got:', data); return; }
+      setClasses(data);
+    } catch (err) {
+      console.error('fetchClasses error:', err);
+    }
   };
 
   useEffect(() => {
     Promise.all([fetchUsers(), fetchClasses()]).finally(() => setLoading(false));
   }, []);
 
-  if (!users || !classes) return <div className="p-8 text-palette-pine font-bold">Načítání...</div>;
-  const [loading, setLoading] = useState(true);
+  if (loading) return <div className="p-8 text-palette-pine font-bold">Načítání...</div>;
   //const students = useMemo(() => users.filter(u => u.role === 'student'), [users]);
 
   const filteredAndSortedUsers = useMemo(() => {
