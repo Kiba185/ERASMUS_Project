@@ -27,18 +27,17 @@ const privileges = {
 
 
 
-const allowedOrigins = [
-    'http://localhost:5173',
-    'https://engineers.onrender.com',
-    'https://engineers-dz0o.onrender.com',
-    process.env.CORS_ORIGIN,
-].filter(Boolean) as string[];
-
 app.use(cors({
     origin: (origin, callback) => {
-        // Allow requests with no origin (e.g. curl, mobile apps)
+        // Allow: no origin (curl, mobile), localhost, any *.onrender.com subdomain
         if (!origin) return callback(null, true);
-        if (allowedOrigins.includes(origin)) return callback(null, true);
+        if (
+            origin.startsWith('http://localhost') ||
+            origin.endsWith('.onrender.com') ||
+            origin === process.env.CORS_ORIGIN
+        ) {
+            return callback(null, true);
+        }
         return callback(new Error(`CORS blocked: ${origin}`));
     },
     credentials: true
