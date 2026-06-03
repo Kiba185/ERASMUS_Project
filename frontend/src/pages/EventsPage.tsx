@@ -85,7 +85,7 @@ const EventsPage: React.FC = () => {
   useEffect(() => {
     const loadEvents = async () => {
       try {
-        const response = await fetch('${API_URL}/api/events', {
+        const response = await fetch(`${API_URL}/api/events`, {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -120,7 +120,7 @@ const EventsPage: React.FC = () => {
       }
     };
     const loadClasses = async () => {
-      const res = await fetch('${API_URL}/api/classes', { credentials: 'include' });
+      const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
       const data = await res.json();
       setClassAudienceOptions(
         data.map((c: any) => ({
@@ -132,7 +132,7 @@ const EventsPage: React.FC = () => {
     };
 
     const loadStudents = async () => {
-      const res = await fetch('${API_URL}/api/users/student', { credentials: 'include' });
+      const res = await fetch(`${API_URL}/api/users/student`, { credentials: 'include' });
       const data = await res.json();
       setStudentAudienceOptions(
         data.map((u: any) => ({
@@ -143,7 +143,7 @@ const EventsPage: React.FC = () => {
       );
     };
     const loadTeachers = async () => {
-      const res = await fetch('${API_URL}/api/users/teacher', { credentials: 'include' });
+      const res = await fetch(`${API_URL}/api/users/teacher`, { credentials: 'include' });
       const data = await res.json();
       setTeacherAudienceOptions(
         data.map((u: any) => ({
@@ -356,7 +356,7 @@ const EventsPage: React.FC = () => {
 
     if (modalView === 'create') {
       try {
-        const response = await fetch('${API_URL}/api/events', {
+        const response = await fetch(`${API_URL}/api/events`, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           credentials: 'include',
