@@ -4,23 +4,21 @@ import { ALL_FILTER_VALUE, Filter, type FilterOption } from '../components/ui/Fi
 import { useAuth } from '../context/AuthContext';
 
 const CLASSES = ['4.B', '4.C', '4.D'] as const;
-const SUBJECTS = [
-  'Maths',
-  'Physics',
-  'Chemistry',
-  'Biology',
-  'History',
-  'Geography',
-  'English',
-  'PE',
-  'Art',
-  'Computer Science',
-  'Music',
-] as const;
 
 type AttendanceStatus = 'present' | 'absent';
 type ClassName = (typeof CLASSES)[number];
-type Subject = (typeof SUBJECTS)[number];
+type Subject =
+  | 'Maths'
+  | 'Physics'
+  | 'Chemistry'
+  | 'Biology'
+  | 'History'
+  | 'Geography'
+  | 'English'
+  | 'PE'
+  | 'Art'
+  | 'Computer Science'
+  | 'Music';
 
 interface StudentProfile {
   id: string;
@@ -37,6 +35,25 @@ interface PendingAbsence {
   studentName: string;
   subject: Subject;
 }
+
+interface LessonTopicPayload {
+  date: string;
+  className: string;
+  subject: string;
+  topic: string;
+}
+
+const lessonTopicStorage = {
+  async load(filters: Pick<LessonTopicPayload, 'date' | 'className'>): Promise<LessonTopicPayload[]> {
+    void filters;
+    // TODO for database hookup: replace this with API/DB loading and return saved lesson topics.
+    return [];
+  },
+  async save(lessonTopic: LessonTopicPayload): Promise<LessonTopicPayload> {
+    // TODO for database hookup: replace this with API/DB saving and return the saved lesson topic.
+    return lessonTopic;
+  },
+};
 
 const CLASS_SCHEDULES: Record<ClassName, Subject[]> = {
   '4.B': ['Maths', 'Chemistry', 'History', 'English', 'PE', 'Art'],
@@ -190,6 +207,9 @@ const loadMockAttendanceForDate = (date: string): AttendanceStudent[] =>
     ) as Partial<Record<Subject, AttendanceStatus>>,
   }));
 
+const getLessonTopicKeyForValues = (date: string, className: string, subject: string) =>
+  `${date}-${className}-${subject}`;
+
 const AttendancePage = () => {
   const { user } = useAuth();
   const [dateFilter, setDateFilter] = useState(DATE_OPTIONS[0].value);
@@ -199,31 +219,73 @@ const AttendancePage = () => {
   const [absenceReasons, setAbsenceReasons] = useState<Record<string, string>>({});
   const [lessonTopics, setLessonTopics] = useState<Record<string, string>>({});
   const [lessonTopicDrafts, setLessonTopicDrafts] = useState<Record<string, string>>({});
+  const [editingLessonTopics, setEditingLessonTopics] = useState<Record<string, boolean>>({});
   const [studentsByDate, setStudentsByDate] = useState<Record<string, AttendanceStudent[]>>(() => ({
     [DATE_OPTIONS[0].value]: loadMockAttendanceForDate(DATE_OPTIONS[0].value),
   }));
 
   const canEditAttendance = user?.role === 'teacher' || user?.role === 'admin';
   const availableSubjects = CLASS_SCHEDULES[classFilter];
-  const students = studentsByDate[dateFilter] ?? loadMockAttendanceForDate(dateFilter);
+  const activeSubjectFilter =
+    subjectFilter !== ALL_FILTER_VALUE && availableSubjects.includes(subjectFilter as Subject)
+      ? (subjectFilter as Subject)
+      : ALL_FILTER_VALUE;
+  const students = useMemo(
+    () => studentsByDate[dateFilter] ?? loadMockAttendanceForDate(dateFilter),
+    [dateFilter, studentsByDate],
+  );
   const selectedDateLabel = DATE_OPTIONS.find((option) => option.value === dateFilter)?.label ?? dateFilter;
 
   useEffect(() => {
-    setStudentsByDate((currentStudentsByDate) =>
-      currentStudentsByDate[dateFilter]
-        ? currentStudentsByDate
-        : {
-            ...currentStudentsByDate,
-            [dateFilter]: loadMockAttendanceForDate(dateFilter),
-          },
-    );
-  }, [dateFilter]);
+    let ignoreResponse = false;
 
-  useEffect(() => {
-    if (subjectFilter !== ALL_FILTER_VALUE && !availableSubjects.includes(subjectFilter as Subject)) {
-      setSubjectFilter(ALL_FILTER_VALUE);
-    }
-  }, [availableSubjects, subjectFilter]);
+    const loadLessonTopics = async () => {
+      try {
+        const loadedTopics = await lessonTopicStorage.load({
+          date: dateFilter,
+          className: classFilter,
+        });
+
+        if (ignoreResponse) {
+          return;
+        }
+
+        const loadedTopicEntries = Object.fromEntries(
+          loadedTopics.map((lessonTopic) => [
+            getLessonTopicKeyForValues(lessonTopic.date, lessonTopic.className, lessonTopic.subject),
+            lessonTopic.topic,
+          ]),
+        );
+        const loadedEditEntries = Object.fromEntries(
+          loadedTopics.map((lessonTopic) => [
+            getLessonTopicKeyForValues(lessonTopic.date, lessonTopic.className, lessonTopic.subject),
+            false,
+          ]),
+        );
+
+        setLessonTopics((currentTopics) => ({
+          ...currentTopics,
+          ...loadedTopicEntries,
+        }));
+        setLessonTopicDrafts((currentDrafts) => ({
+          ...currentDrafts,
+          ...loadedTopicEntries,
+        }));
+        setEditingLessonTopics((currentTopics) => ({
+          ...currentTopics,
+          ...loadedEditEntries,
+        }));
+      } catch (error) {
+        console.error('Failed to load lesson topics', error);
+      }
+    };
+
+    void loadLessonTopics();
+
+    return () => {
+      ignoreResponse = true;
+    };
+  }, [classFilter, dateFilter]);
 
   const subjectOptions = useMemo<FilterOption[]>(
     () => [
@@ -237,8 +299,8 @@ const AttendancePage = () => {
   );
 
   const subjectsToShow = useMemo(
-    () => (subjectFilter === ALL_FILTER_VALUE ? availableSubjects : [subjectFilter as Subject]),
-    [availableSubjects, subjectFilter],
+    () => (activeSubjectFilter === ALL_FILTER_VALUE ? availableSubjects : [activeSubjectFilter]),
+    [activeSubjectFilter, availableSubjects],
   );
 
   const studentsToShow = useMemo(
@@ -247,7 +309,7 @@ const AttendancePage = () => {
   );
 
   const getAbsenceKey = (studentId: string, subject: Subject) => `${dateFilter}-${studentId}-${subject}`;
-  const getLessonTopicKey = (subject: Subject) => `${dateFilter}-${classFilter}-${subject}`;
+  const getLessonTopicKey = (subject: Subject) => getLessonTopicKeyForValues(dateFilter, classFilter, subject);
 
   const getLessonTopicDraftValue = (subject: Subject) => {
     const topicKey = getLessonTopicKey(subject);
@@ -255,24 +317,58 @@ const AttendancePage = () => {
   };
 
   const updateLessonTopicDraft = (subject: Subject, topic: string) => {
+    const topicKey = getLessonTopicKey(subject);
+
     setLessonTopicDrafts((currentDrafts) => ({
       ...currentDrafts,
-      [getLessonTopicKey(subject)]: topic,
+      [topicKey]: topic,
     }));
   };
 
-  const saveLessonTopic = (subject: Subject) => {
+  const saveLessonTopic = async (subject: Subject) => {
     const topicKey = getLessonTopicKey(subject);
     const savedTopic = getLessonTopicDraftValue(subject).trim();
 
-    setLessonTopics((currentTopics) => ({
-      ...currentTopics,
-      [topicKey]: savedTopic,
-    }));
+    try {
+      const savedLessonTopic = await lessonTopicStorage.save({
+        date: dateFilter,
+        className: classFilter,
+        subject,
+        topic: savedTopic,
+      });
+      const savedTopicFromDatabase = savedLessonTopic.topic;
+
+      setLessonTopics((currentTopics) => ({
+        ...currentTopics,
+        [topicKey]: savedTopicFromDatabase,
+      }));
+
+      setLessonTopicDrafts((currentDrafts) => ({
+        ...currentDrafts,
+        [topicKey]: savedTopicFromDatabase,
+      }));
+
+      setEditingLessonTopics((currentTopics) => ({
+        ...currentTopics,
+        [topicKey]: false,
+      }));
+    } catch (error) {
+      console.error('Failed to save lesson topic', error);
+      window.alert('Topic could not be saved.');
+    }
+  };
+
+  const editLessonTopic = (subject: Subject) => {
+    const topicKey = getLessonTopicKey(subject);
 
     setLessonTopicDrafts((currentDrafts) => ({
       ...currentDrafts,
-      [topicKey]: savedTopic,
+      [topicKey]: currentDrafts[topicKey] ?? lessonTopics[topicKey] ?? '',
+    }));
+
+    setEditingLessonTopics((currentTopics) => ({
+      ...currentTopics,
+      [topicKey]: true,
     }));
   };
 
@@ -297,7 +393,8 @@ const AttendancePage = () => {
       const absenceKey = getAbsenceKey(studentId, subject);
 
       setAbsenceReasons((currentReasons) => {
-        const { [absenceKey]: _removedReason, ...remainingReasons } = currentReasons;
+        const remainingReasons = { ...currentReasons };
+        delete remainingReasons[absenceKey];
         return remainingReasons;
       });
     }
@@ -348,7 +445,7 @@ const AttendancePage = () => {
           <div className="grid gap-4 md:grid-cols-3">
             <Filter label="Date" value={dateFilter} onChange={setDateFilter} options={DATE_OPTIONS} />
             <Filter label="Class" value={classFilter} onChange={setClassFilter} options={CLASS_OPTIONS} />
-            <Filter label="Subject" value={subjectFilter} onChange={setSubjectFilter} options={subjectOptions} />
+            <Filter label="Subject" value={activeSubjectFilter} onChange={setSubjectFilter} options={subjectOptions} />
           </div>
 
         </div>
@@ -359,33 +456,63 @@ const AttendancePage = () => {
               <tr className="border-b border-palette-lichen/60 text-palette-pine">
                 <th className="w-56 px-4 py-3 font-semibold">Student</th>
                 <th className="w-24 px-4 py-3 font-semibold">Class</th>
-                {subjectsToShow.map((subject) => (
-                  <th key={subject} className="min-w-64 px-4 py-3 align-top font-semibold">
-                    <span className="block">{getLessonLabel(classFilter, subject)}</span>
-                    {canEditAttendance ? (
-                      <div className="mt-2 flex gap-2">
-                        <input
-                          type="text"
-                          value={getLessonTopicDraftValue(subject)}
-                          onChange={(event) => updateLessonTopicDraft(subject, event.target.value)}
-                          placeholder="Topic..."
-                          className="h-9 min-w-0 flex-1 rounded-md border border-palette-lichen/60 bg-white px-2 text-xs font-semibold text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:ring-2 focus:ring-palette-leaf/20"
-                        />
-                        <button
-                          type="button"
-                          onClick={() => saveLessonTopic(subject)}
-                          className="h-9 rounded-md bg-palette-fern px-3 text-xs font-black text-white transition hover:bg-palette-leaf"
-                        >
-                          Save
-                        </button>
-                      </div>
-                    ) : lessonTopics[getLessonTopicKey(subject)] ? (
-                      <span className="mt-1 block max-w-56 truncate text-xs font-medium text-palette-moss">
-                        {lessonTopics[getLessonTopicKey(subject)]}
-                      </span>
-                    ) : null}
-                  </th>
-                ))}
+                {subjectsToShow.map((subject) => {
+                  const topicKey = getLessonTopicKey(subject);
+                  const savedTopic = lessonTopics[topicKey];
+                  const isEditingTopic = editingLessonTopics[topicKey] ?? true;
+
+                  return (
+                    <th key={subject} className="min-w-64 px-4 py-3 align-top font-semibold">
+                      <span className="block">{getLessonLabel(classFilter, subject)}</span>
+                      {canEditAttendance ? (
+                        <div className="mt-2">
+                          {isEditingTopic ? (
+                            <div className="flex gap-2">
+                              <input
+                                type="text"
+                                value={getLessonTopicDraftValue(subject)}
+                                onChange={(event) => updateLessonTopicDraft(subject, event.target.value)}
+                                placeholder="Topic..."
+                                className="h-9 min-w-0 flex-1 rounded-md border border-palette-lichen/60 bg-white px-2 text-xs font-semibold text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:ring-2 focus:ring-palette-leaf/20"
+                              />
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  void saveLessonTopic(subject);
+                                }}
+                                className="h-9 rounded-md bg-palette-fern px-3 text-xs font-black text-white transition hover:bg-palette-leaf"
+                              >
+                                Save
+                              </button>
+                            </div>
+                          ) : (
+                            <div className="flex min-h-9 items-center gap-2">
+                              <span
+                                className="min-w-0 flex-1 truncate text-xs font-medium text-palette-moss"
+                                title={savedTopic || 'No topic'}
+                              >
+                                {savedTopic || 'No topic'}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => editLessonTopic(subject)}
+                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-palette-moss transition hover:bg-palette-sage/15 hover:text-palette-pine"
+                                aria-label={`Edit topic for ${subject}`}
+                                title="Edit topic"
+                              >
+                                <i className="fa-solid fa-pencil text-xs" aria-hidden="true" />
+                              </button>
+                            </div>
+                          )}
+                        </div>
+                      ) : savedTopic ? (
+                        <span className="mt-1 block max-w-56 truncate text-xs font-medium text-palette-moss">
+                          {savedTopic}
+                        </span>
+                      ) : null}
+                    </th>
+                  );
+                })}
               </tr>
             </thead>
             <tbody className="divide-y divide-palette-lichen/35 text-palette-moss">
