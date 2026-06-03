@@ -63,9 +63,15 @@ const UsersPage: React.FC = () => {
   };
 
   const fetchClasses = async () => {
-    const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
-    const data = await res.json();
-    setClasses(data);
+    try {
+      const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
+      if (!res.ok) { console.error('fetchClasses failed:', res.status); return; }
+      const data = await res.json();
+      if (!Array.isArray(data)) { console.error('fetchClasses: expected array, got:', data); return; }
+      setClasses(data);
+    } catch (err) {
+      console.error('fetchClasses error:', err);
+    }
   };
 
   const fetchSubjects = async () => {
