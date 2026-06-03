@@ -28,7 +28,7 @@ services:
           name: engineers-db
           property: connectionString
       - key: CORS_ORIGIN
-        value: "https://engineers.onrender.com"
+        value: "https://engineers-dz0o.onrender.com"
       - key: NODE_VERSION
         value: "22"
       - key: NODE_ENV

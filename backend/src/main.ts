@@ -30,6 +30,7 @@ const privileges = {
 const allowedOrigins = [
     'http://localhost:5173',
     'https://engineers.onrender.com',
+    'https://engineers-dz0o.onrender.com',
     process.env.CORS_ORIGIN,
 ].filter(Boolean) as string[];
 
