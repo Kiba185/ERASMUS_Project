@@ -12,13 +12,12 @@ router.get('/api/admin/users', async (req, res, next) => {
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
     const users = await prisma.user.findMany({
-        include: { classes: true, subjects: true }
+        include: { classes: true }
     });
 
     const saveUsers = users.map(({ password, ...u }: any) => ({
         ...u,
-        classes: u.classes.map(c => ({ id: c.id, name: c.name })),
-        subjects: u.subjects.map(s => ({ id: s.id, name: s.name }))
+        classes: u.classes.map(c => ({ id: c.id, name: c.name }))
     }));
 
     res.json(saveUsers);
