@@ -204,4 +204,24 @@ router.put('/api/admin/users/:id/subjects', async (req, res, next) => {
     res.json({ success: true, subjects: result.subjects });
 });
 
+// LOGIN AS - ADMIN ONLY
+router.post('/api/admin/loginas/:id', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const userId = parseInt(req.params.id);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Přepíše session na tohoto uživatele
+    req.session.userId = userId;
+    req.session.save((err) => {
+        if (err) return res.status(500).json({ success: false });
+        const { password: _, ...safeUser } = user;
+        res.json({ success: true, user: safeUser });
+    });
+});
+
 export default router;
