@@ -39,6 +39,7 @@ const UsersPage: React.FC = () => {
   const [classes, setClasses] = useState<MockClass[]>([]);
   const [subjects, setSubjects] = useState<MockSubject[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
@@ -63,15 +64,9 @@ const UsersPage: React.FC = () => {
   };
 
   const fetchClasses = async () => {
-    try {
-      const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
-      if (!res.ok) { console.error('fetchClasses failed:', res.status); return; }
-      const data = await res.json();
-      if (!Array.isArray(data)) { console.error('fetchClasses: expected array, got:', data); return; }
-      setClasses(data);
-    } catch (err) {
-      console.error('fetchClasses error:', err);
-    }
+    const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
+    const data = await res.json();
+    setClasses(data);
   };
 
   const fetchSubjects = async () => {
@@ -133,6 +128,9 @@ const UsersPage: React.FC = () => {
       return;
     }
 
+    setIsModalOpen(false);
+    setSaving(true);
+
     if (isNew) {
       const res = await fetch(`${API_URL}/api/admin/users`, {
         method: 'POST',
@@ -140,7 +138,7 @@ const UsersPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ ...editingUser, password: newPassword })
       });
-      if (!res.ok) { const err = await res.json(); alert(err.message); return; }
+      if (!res.ok) { const err = await res.json(); alert(err.message); setSaving(false); return; }
     } else {
       const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
         method: 'PUT',
@@ -148,7 +146,7 @@ const UsersPage: React.FC = () => {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(editingUser)
       });
-      if (!res.ok) { const err = await res.json(); alert(err.message); return; }
+      if (!res.ok) { const err = await res.json(); alert(err.message); setSaving(false); return; }
 
       if (newPassword.length >= 6) {
         await fetch(`${API_URL}/api/admin/users/${editingUser.id}/password`, {
@@ -177,17 +175,24 @@ const UsersPage: React.FC = () => {
     }
 
     await fetchUsers();
-    setIsModalOpen(false);
+    setSaving(false);
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('Opravdu smazat uživatele?')) return;
+    setSaving(true);
     await fetch(`${API_URL}/api/admin/users/${id}`, { method: 'DELETE', credentials: 'include' });
     await fetchUsers();
+    setSaving(false);
   };
 
-  const handleLoginAs = (user: MockUser) => {
-    login(String(user.id), { ...user, id: String(user.id) } as any);
+  const handleLoginAs = async (user: MockUser) => {
+    await fetch(`${API_URL}/api/admin/loginas/${user.id}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    login(String(user.id), { ...user, id: String(user.id), children: [] } as any);
     navigate('/dashboard');
   };
 
@@ -202,10 +207,22 @@ const UsersPage: React.FC = () => {
     return <span className="text-gray-400">-</span>;
   };
 
-  if (loading) return <div className="p-8 text-palette-pine font-bold">Načítání...</div>;
+  if (loading) return <div className="p-8 text-palette-pine font-bold">Loading...</div>;
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+
+      {/* Saving overlay */}
+      {saving && createPortal(
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-palette-pine font-bold text-lg">Saving...</p>
+          </div>
+        </div>,
+        document.body
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold text-palette-pine">User Management</h1>
         <button onClick={openAddModal} className="px-5 py-2.5 bg-palette-fern text-white font-semibold rounded-xl shadow-soft hover:bg-palette-leaf hover:-translate-y-0.5 transition-all flex items-center gap-2">
