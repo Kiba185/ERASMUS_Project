@@ -496,8 +496,8 @@ const EventsPage: React.FC = () => {
               setModalView('create');
               setIsModalOpen(true);
             }}
-            className="py-2 px-4 bg-emerald-600 text-white font-semibold text-sm rounded-xl hover:bg-emerald-700 transition shadow-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-          >
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-palette-fern px-5 text-sm font-black text-white shadow-soft transition hover:bg-palette-leaf focus:outline-none focus:ring-2 focus:ring-palette-leaf/30"
+              >
             + New Event
           </button>
         )}
@@ -674,11 +674,30 @@ const EventsPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Start Date</label>
-                    <input type="date" value={eventStartDate} onChange={(e) => setEventStartDate(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-hidden" required />
+                    <input
+                      type="date"
+                      value={eventStartDate}
+                      onChange={(e) => {
+                        const newStartDate = e.target.value;
+                        setEventStartDate(newStartDate);
+                        if (eventEndDate < newStartDate) {
+                          setEventEndDate(newStartDate);
+                        }
+                      }}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+                      required
+                    />
                   </div>
                   <div>
                     <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">End Date</label>
-                    <input type="date" value={eventEndDate} min={eventStartDate} onChange={(e) => setEventEndDate(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-hidden" required />
+                    <input
+                      type="date"
+                      value={eventEndDate}
+                      min={eventStartDate}
+                      onChange={(e) => setEventEndDate(e.target.value)}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+                      required
+                    />
                   </div>
                 </div>
 

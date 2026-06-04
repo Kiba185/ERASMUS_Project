@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
-import { loadSetupMockData, mergeUniqueOptions } from '../data/setupMockData';
+
+// Můžeš smazat import loadSetupMockData, už to nepotřebujeme
+// import { loadSetupMockData, mergeUniqueOptions } from '../data/setupMockData';
 
 interface Lesson {
   id: string | number;
@@ -19,12 +21,6 @@ interface Lesson {
   status?: 'active' | 'cancelled' | 'substituted' | 'regular';
 }
 
-const availableTeachers = [
-  'Mr. Novak', 'Mrs. Smith', 'Mr. Johnson', 'Mr. Green',
-  'Mr. White', 'Ms. Davis', 'Mr. Wilson', 'Mrs. Thompson',
-  'Mr. Garcia', 'Mr. Lopez'
-];
-
 const subjectTeachersMap: Record<string, string[]> = {
   'Mathematics': ['Mr. Novak', 'Mrs. Smith'],
   'Information Tech': ['Mr. Green', 'Ms. Davis'],
@@ -34,71 +30,9 @@ const subjectTeachersMap: Record<string, string[]> = {
   'Biology': ['Mr. Garcia']
 };
 
-const availableClasses = ['7.C', '8.A', '8.B', '9.B', '9.C'];
-const availableSubjects = ['Mathematics', 'Information Tech.', 'Gymnastics', 'Laboratory Physics'];
-const availableRooms = ['A10', 'A12', 'A15', 'B05', 'B11', 'B15', 'B20', 'B35', 'C21', 'D05', 'E10', 'Gym'];
 const availableGroups = ['Whole Class', 'Group 1', 'Group 2', 'Boys', 'Girls'];
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 const timeSlots = ['08:00 - 08:45', '08:55 - 09:40', '10:00 - 10:45', '10:55 - 11:40', '11:50 - 12:35', '12:45 - 13:30'];
-
-const initialMockLessons: Lesson[] = [
-  {
-    id: 1,
-    day: 'Monday',
-    time: '08:00 - 08:45',
-    subject: 'Mathematics',
-    teacher: 'Mr. Novak',
-    className: '9.B',
-    room: 'A12',
-    color: 'border-blue-500 bg-blue-50',
-    isPermanent: true,
-    weekType: 'all',
-    group: 'Whole Class',
-    status: 'active',
-  },
-  {
-    id: 2,
-    day: 'Monday',
-    time: '08:55 - 09:40',
-    subject: 'Information Tech.',
-    teacher: 'Mr. Green',
-    className: '9.B',
-    room: 'E10',
-    color: 'border-emerald-500 bg-emerald-50',
-    isPermanent: true,
-    weekType: 'all',
-    group: 'Group 1',
-    status: 'active',
-  },
-  {
-    id: 3,
-    day: 'Monday',
-    time: '08:55 - 09:40',
-    subject: 'Gymnastics',
-    teacher: 'Mr. Wilson',
-    className: '9.B',
-    room: 'Gym',
-    color: 'border-orange-500 bg-orange-50',
-    isPermanent: true,
-    weekType: 'all',
-    group: 'Group 2',
-    status: 'active',
-  },
-  {
-    id: 4,
-    day: 'Tuesday',
-    time: '10:00 - 10:45',
-    subject: 'Laboratory Physics',
-    teacher: 'Mr. Johnson',
-    className: '9.B',
-    room: 'B11',
-    color: 'border-purple-500 bg-purple-50',
-    isPermanent: true,
-    weekType: 'even',
-    group: 'Whole Class',
-    status: 'active',
-  }
-];
 
 const getISOWeekDetails = (date: Date) => {
   const target = new Date(date.valueOf());
@@ -132,25 +66,87 @@ const getWeekDatesStrings = (weekOffset: number): string[] => {
 
 const ScheduleEditPage: React.FC = () => {
   const { user } = useAuth();
-  const [setupMockData] = useState(loadSetupMockData);
 
-  const [selectedClass, setSelectedClass] = useState<string>(availableClasses[3]);
+  // --- STAVY PRO DATA Z DATABÁZE ---
+  const [dbClasses, setDbClasses] = useState<{id: number, name: string}[]>([]);
+  const [dbSubjects, setDbSubjects] = useState<{id: number, name: string}[]>([]);
+  const [dbTeachers, setDbTeachers] = useState<{id: number, firstName: string, lastName: string}[]>([]);
+  const [dbRooms, setDbRooms] = useState<{id: number, name: string}[]>([]);
+
+  const [selectedClass, setSelectedClass] = useState<string>('');
   const [weekOffset, setWeekOffset] = useState<number>(0);
 
-  const [lessons, setLessons] = useState<Lesson[]>(initialMockLessons);
+  // 🌟 OPRAVA: Počáteční stav rozvrhu je prázdný, žádná mock data
+  const [lessons, setLessons] = useState<Lesson[]>([]);
   const [isPermanentEditMode, setIsPermanentEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Partial<Lesson> | null>(null);
-  /* const availableSubjectOptions = mergeUniqueOptions(
-    [...availableSubjects, ...lessons.map((lesson) => lesson.subject)],
-    setupMockData.subjects.map((subject) => subject.subject),
-  ); */
-  const availableRoomOptions = mergeUniqueOptions(availableRooms, setupMockData.rooms);
 
   const currentWeekDates = getWeekDatesStrings(weekOffset);
   const viewedMondayDate = getMondayOfOffsetWeek(weekOffset);
   const { weekNumber: currentWeekNo, isEven: isCurrentWeekEven } = getISOWeekDetails(viewedMondayDate);
   const activeWeekParity: 'even' | 'odd' = isCurrentWeekEven ? 'even' : 'odd';
+
+  // --- NAČTENÍ ROLETEK Z DATABÁZE PŘI STARTU ---
+  useEffect(() => {
+    const fetchSetupOptions = async () => {
+      try {
+        const response = await fetch('http://localhost:3000/api/setup-data');
+        const result = await response.json();
+        
+        if (result.success) {
+          setDbClasses(result.data.classes);
+          setDbSubjects(result.data.subjects);
+          setDbTeachers(result.data.teachers);
+          setDbRooms(result.data.rooms || []);
+          
+          if (result.data.classes.length > 0) {
+            setSelectedClass(result.data.classes[0].name);
+          }
+        }
+      } catch (error) {
+        console.error("Nepodařilo se načíst nastavení z databáze", error);
+      }
+    };
+
+    fetchSetupOptions();
+  }, []);
+
+  // 🌟 NOVÉ: STAHOVÁNÍ ROZVRHU PODLE VYBRANÉ TŘÍDY
+  useEffect(() => {
+    if (!selectedClass) return;
+
+    const fetchClassTimetable = async () => {
+      try {
+        // Zde voláme API backendu pro stažení hodin podle názvu třídy
+        const response = await fetch(`http://localhost:3000/api/timetables/class/${selectedClass}`);
+        if (!response.ok) throw new Error('Chyba při načítání rozvrhu');
+        
+        const data = await response.json();
+        
+        const mappedLessons: Lesson[] = data.map((item: any) => ({
+          id: item.id,
+          day: item.day,
+          time: `${item.startTime} - ${item.endTime}`,
+          subject: item.subject?.name || 'Neznámý předmět',
+          teacher: `Mr. ${item.teacher?.lastName || ''}`,
+          className: item.class?.name || '',
+          room: item.room?.name || 'Neznámá místnost',
+          weekType: item.week || 'all',
+          color: item.subject?.color || 'border-blue-500 bg-blue-50', // Výchozí barva
+          isPermanent: true, // Prozatím předpokládáme, že vše z DB je permanentní
+          group: item.group || 'Whole Class',
+          status: 'active'
+        }));
+
+        setLessons(mappedLessons);
+      } catch (error) {
+        console.error("Chyba při stahování rozvrhu pro třídu:", error);
+      }
+    };
+
+    fetchClassTimetable();
+  }, [selectedClass]); // Tento useEffect se spustí vždy, když se změní vybraná třída
 
   if (user?.role !== 'admin') {
     return (
@@ -165,10 +161,7 @@ const ScheduleEditPage: React.FC = () => {
 
   const getVisibleLessons = () => {
     const classLessons = lessons.filter(l => l.className === selectedClass);
-
-    if (isPermanentEditMode) {
-      return classLessons.filter(l => l.isPermanent);
-    }
+    if (isPermanentEditMode) return classLessons.filter(l => l.isPermanent);
 
     const permanentLessons = classLessons.filter(l =>
       l.isPermanent && (l.weekType === 'all' || l.weekType === activeWeekParity)
@@ -182,7 +175,6 @@ const ScheduleEditPage: React.FC = () => {
     const filteredPermanents = permanentLessons.filter(p => {
       const dayIndex = days.indexOf(p.day);
       const associatedCalendarDate = currentWeekDates[dayIndex];
-
       const hasOverrideThisWeek = currentWeekExceptions.some(
         e => e.templateId === p.id && e.exceptionDate === associatedCalendarDate
       );
@@ -201,7 +193,6 @@ const ScheduleEditPage: React.FC = () => {
       } else {
         const dayIndex = days.indexOf(lesson.day);
         const targetedCalendarDate = currentWeekDates[dayIndex];
-
         setEditingLesson({
           ...lesson,
           id: Date.now(),
@@ -216,85 +207,25 @@ const ScheduleEditPage: React.FC = () => {
   };
 
   const handleAddNewPermanentLesson = () => {
-    const defaultSubject = availableSubjects[0];
-    const defaultTeacher = (subjectTeachersMap[defaultSubject] || [])[0] || availableTeachers[0];
+    const defaultSubject = dbSubjects.length > 0 ? dbSubjects[0].name : '';
+    const defaultTeacher = dbTeachers.length > 0 ? `Mr. ${dbTeachers[0].lastName}` : '';
+    const defaultRoom = dbRooms.length > 0 ? dbRooms[0].name : '';
 
     setEditingLesson({
-      id: Date.now(),
+      id: Date.now(), // Dočasné ID pro novou lekci
       day: 'Monday',
       time: timeSlots[0],
       subject: defaultSubject,
       teacher: defaultTeacher,
       className: selectedClass,
-      room: availableRoomOptions[0],
+      room: defaultRoom,
       weekType: 'all',
       group: 'Whole Class',
-      color: 'border-gray-500 bg-gray-50',
+      color: 'border-gray-500 bg-gray-900/5',
       isPermanent: true,
       status: 'active'
     });
     setIsModalOpen(true);
-  };
-
-  const handleSaveLesson = () => {
-    if (!editingLesson) return;
-
-    if (!isPermanentEditMode && editingLesson.status === 'regular') {
-      handleDeleteLesson(editingLesson.id!);
-      return;
-    }
-
-    const hasConflict = lessons.some(l => {
-      if (l.id === editingLesson.id) return false;
-
-      const groupsOverlap = l.group === 'Whole Class' ||
-        editingLesson.group === 'Whole Class' ||
-        l.group === editingLesson.group;
-
-      if (isPermanentEditMode && l.isPermanent) {
-        const weeksOverlap = l.weekType === 'all' ||
-          editingLesson.weekType === 'all' ||
-          l.weekType === editingLesson.weekType;
-
-        return l.day === editingLesson.day &&
-          l.time === editingLesson.time &&
-          l.className === selectedClass &&
-          weeksOverlap &&
-          groupsOverlap;
-      }
-
-      if (!isPermanentEditMode && !l.isPermanent) {
-        return l.exceptionDate === editingLesson.exceptionDate &&
-          l.time === editingLesson.time &&
-          l.className === selectedClass &&
-          l.status !== 'cancelled' &&
-          groupsOverlap;
-      }
-
-      return false;
-    });
-
-    if (hasConflict) {
-      alert(`Conflict Error: A group tracking assignment collision occurred for Class ${selectedClass} at this time slot.`);
-      return;
-    }
-
-    setLessons((prev) => {
-      const exists = prev.find((l) => l.id === editingLesson.id);
-      if (exists) {
-        return prev.map((l) => (l.id === editingLesson.id ? { ...l, ...editingLesson } as Lesson : l));
-      }
-      return [...prev, editingLesson as Lesson];
-    });
-
-    setIsModalOpen(false);
-    setEditingLesson(null);
-  };
-
-  const handleDeleteLesson = (id: string | number) => {
-    setLessons((prev) => prev.filter((l) => l.id !== id));
-    setIsModalOpen(false);
-    setEditingLesson(null);
   };
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement>) => {
@@ -302,58 +233,117 @@ const ScheduleEditPage: React.FC = () => {
     setEditingLesson((prev) => prev ? { ...prev, [name]: value } : null);
   };
 
-  // Specifický handler pro změnu předmětu (validuje/přenastavuje učitele)
+  const handleSaveLesson = async () => {
+    if (!editingLesson) return;
+
+    const isNewLesson = !editingLesson.id || editingLesson.id.toString().length > 10;
+    
+    // Testovací admin nastavený natvrdo, dokud nefunguje správně AuthContext
+    const testAdminName = "admin";
+    
+    const url = isNewLesson 
+      ? `http://localhost:3000/api/timetables/edit/${testAdminName}` 
+      : `http://localhost:3000/api/timetables/edit/${testAdminName}/${editingLesson.id}`;
+    
+    const method = isNewLesson ? 'POST' : 'PUT';
+
+    try {
+      const response = await fetch(url, {
+        method: method,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingLesson)
+      });
+
+      const result = await response.json();
+
+      if (!result.success) {
+        throw new Error(result.message || 'Chyba při ukládání');
+      }
+
+      const dbData = result.data;
+      const mappedLesson: Lesson = {
+        id: dbData.id,
+        day: dbData.day,
+        time: `${dbData.startTime} - ${dbData.endTime}`,
+        subject: dbData.subject.name,
+        teacher: `Mr. ${dbData.teacher.lastName}`, 
+        className: dbData.class.name,
+        room: dbData.room?.name || 'Neznámá třída',
+        weekType: dbData.week as any,
+        color: editingLesson.color || 'border-blue-500 bg-blue-50', 
+        isPermanent: editingLesson.isPermanent || true,
+        group: dbData.group || editingLesson.group || 'Whole Class',
+        status: editingLesson.status || 'active'
+      };
+
+      setLessons((prev) => {
+        if (isNewLesson) {
+          const filtered = prev.filter(l => l.id !== editingLesson.id);
+          return [...filtered, mappedLesson];
+        } else {
+          return prev.map((l) => (l.id === editingLesson.id ? mappedLesson : l));
+        }
+      });
+
+      setIsModalOpen(false);
+      setEditingLesson(null);
+    } catch (error) {
+      console.error("Chyba:", error);
+      alert("Nepodařilo se uložit data na server.");
+    }
+  };
+
+  const handleDeleteLesson = async (id: string | number) => {
+    if (id.toString().length > 10) { 
+      setLessons((prev) => prev.filter((l) => l.id !== id));
+      setIsModalOpen(false);
+      return;
+    }
+
+    try {
+      const testAdminName = "admin";
+      const url = `http://localhost:3000/api/timetables/edit/${testAdminName}/${id}`;
+      const response = await fetch(url, { method: 'DELETE' });
+      const result = await response.json();
+
+      if (result.success) {
+        setLessons((prev) => prev.filter((l) => l.id !== id));
+        setIsModalOpen(false);
+        setEditingLesson(null);
+      } else {
+        alert("Nepodařilo se smazat z databáze.");
+      }
+    } catch (error) {
+      console.error("Chyba při mazání:", error);
+    }
+  };
+
   const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextSubject = e.target.value;
     setEditingLesson((prev) => {
       if (!prev) return null;
-
       const allowedTeachers = subjectTeachersMap[nextSubject] || [];
       const isSubstituted = prev.status === 'substituted';
-
       let nextTeacher = prev.teacher || '';
-      // Pokud to není suplování a učitel neučí nový předmět, vybereme prvního validního
       if (!isSubstituted && nextSubject && !allowedTeachers.includes(nextTeacher)) {
         nextTeacher = allowedTeachers[0] || '';
       }
-
-      return {
-        ...prev,
-        subject: nextSubject,
-        teacher: nextTeacher
-      };
+      return { ...prev, subject: nextSubject, teacher: nextTeacher };
     });
   };
 
-  // Specifický handler pro změnu stavu hodiny (při změně na/ze suplování hlídá učitele)
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextStatus = e.target.value as any;
     setEditingLesson((prev) => {
       if (!prev) return null;
-
       let nextTeacher = prev.teacher || '';
       const isSubstituted = nextStatus === 'substituted';
       const allowedTeachers = subjectTeachersMap[prev.subject || ''] || [];
-
       if (!isSubstituted && prev.subject && !allowedTeachers.includes(nextTeacher)) {
         nextTeacher = allowedTeachers[0] || '';
       }
-
-      return {
-        ...prev,
-        status: nextStatus,
-        teacher: nextTeacher
-      };
+      return { ...prev, status: nextStatus, teacher: nextTeacher };
     });
-  };
-
-  // Pomocná funkce pro získání seznamu učitelů na základě kontextu
-  const getFilteredTeachers = () => {
-    if (!editingLesson) return [];
-    if (editingLesson.status === 'substituted') {
-      return availableTeachers; // Suplování -> všichni učitelé školy k dispozici
-    }
-    return subjectTeachersMap[editingLesson.subject || ''] || [];
   };
 
   return (
@@ -369,7 +359,8 @@ const ScheduleEditPage: React.FC = () => {
               disabled={isPermanentEditMode}
               className="border border-gray-200 rounded-xl px-4 py-2.5 font-bold text-palette-pine bg-gray-50 outline-none focus:bg-white transition disabled:opacity-50"
             >
-              {availableClasses.map(c => <option key={c} value={c}>Class {c}</option>)}
+              {dbClasses.length === 0 && <option value="">Načítám třídy...</option>}
+              {dbClasses.map(c => <option key={c.id} value={c.name}>Class {c.name}</option>)}
             </select>
           </div>
 
@@ -378,7 +369,7 @@ const ScheduleEditPage: React.FC = () => {
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Calendar Range Tracker</label>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setWeekOffset(prev => prev - 1)}
+                  onClick={() => setWeekOffset(-1)}
                   className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === -1 ? 'bg-palette-pine text-white border-transparent' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
                 >
                   Previous Week
@@ -390,7 +381,7 @@ const ScheduleEditPage: React.FC = () => {
                   Current Week
                 </button>
                 <button
-                  onClick={() => setWeekOffset(prev => prev + 1)}
+                  onClick={() => setWeekOffset(1)}
                   className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === 1 ? 'bg-palette-pine text-white border-transparent' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
                 >
                   Next Week
@@ -577,7 +568,6 @@ const ScheduleEditPage: React.FC = () => {
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                {/* Změněno z textového inputu na Select předmětů */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Subject Name</label>
                   <select
@@ -587,8 +577,9 @@ const ScheduleEditPage: React.FC = () => {
                     disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'}
                     className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60 font-medium"
                   >
-                    <option value="" disabled>Select subject...</option>
-                    {availableSubjects.map(s => <option key={s} value={s}>{s}</option>)}
+                    {dbSubjects.length === 0 && <option value="" disabled>Načítám předměty...</option>}
+                    {dbSubjects.length > 0 && <option value="" disabled>Select subject...</option>}
+                    {dbSubjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                   </select>
                 </div>
                 <div>
@@ -599,7 +590,6 @@ const ScheduleEditPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Dynamicky filtrovaný výběr učitelů */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">
                   Assigned Teacher {editingLesson.status === 'substituted' && <span className="text-xs text-amber-600 font-normal">(Substitution Mode: All options opened)</span>}
@@ -611,18 +601,19 @@ const ScheduleEditPage: React.FC = () => {
                   disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular' || !editingLesson.subject}
                   className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60"
                 >
-                  {getFilteredTeachers().length === 0 ? (
-                    <option value="">-- No teachers available for this subject --</option>
-                  ) : (
-                    getFilteredTeachers().map(t => <option key={t} value={t}>{t}</option>)
-                  )}
+                  {dbTeachers.length === 0 && <option value="" disabled>Načítám učitele...</option>}
+                  {dbTeachers.length > 0 && <option value="" disabled>Select teacher...</option>}
+                  {getFilteredTeachers().map((teacherName) => (
+                    <option key={teacherName} value={teacherName}>{teacherName}</option>
+                  ))}
                 </select>
               </div>
 
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">Assigned Room</label>
                 <select name="room" value={editingLesson.room} onChange={handleChange} disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'} className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60">
-                  {availableRoomOptions.map(r => <option key={r} value={r}>{r}</option>)}
+                  {dbRooms.length === 0 && <option value="" disabled>Načítám místnosti...</option>}
+                  {dbRooms.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
                 </select>
               </div>
             </div>

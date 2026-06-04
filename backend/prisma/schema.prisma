@@ -33,9 +33,9 @@ model User {
   classes    Class[]
   timeTables TimeTable[]
 
-// Messaging relations
-sentMessages     Message[] @relation("SentMessages")
-receivedMessages Message[] @relation("ReceivedMessages")
+  // Messaging relations
+  sentMessages     Message[] @relation("SentMessages")
+  receivedMessages Message[] @relation("ReceivedMessages")
 
   // Parent-child relationship
   parentId Int?
@@ -43,17 +43,21 @@ receivedMessages Message[] @relation("ReceivedMessages")
   children User[] @relation("ParentChild")
 
   // Other relations
-  events Event[]
-  subjects   Subject[]
+  events   Event[]
+  subjects Subject[]
+
+  attendances Attendance[] @relation("StudentAttendance")
 }
 
 model Subject {
-  id         Int         @id @default(autoincrement())
-  name       String
-  code       String
-  color      String
-  timeTables TimeTable[]
-  teachers   User[]
+  id           Int           @id @default(autoincrement())
+  name         String
+  code         String
+  color        String
+  timeTables   TimeTable[]
+  teachers     User[]
+  attendances  Attendance[]
+  lessonTopics LessonTopic[]
 }
 
 model Lesson {
@@ -81,22 +85,61 @@ model Grade {
   grade     Decimal
 }
 
-model Class {
-  id         Int         @id @default(autoincrement())
-  name       String
-  students   User[]
-  timeTables TimeTable[]
+model Attendance {
+  id            Int      @id @default(autoincrement())
+  date          DateTime
+  studentId     Int
+  student       User     @relation("StudentAttendance", fields: [studentId], references: [id])
+  subjectId     Int
+  subject       Subject  @relation(fields: [subjectId], references: [id])
+  classId       Int
+  class         Class    @relation(fields: [classId], references: [id])
+  status        String // "present" | "absent"
+  absenceReason String? // "Late: ..." | "Excused absence: ..." | "Unexcused absence: ..."
+  createdAt     DateTime @default(now())
 
-  events Event[]
+  @@unique([date, studentId, subjectId])
+}
+
+model LessonTopic {
+  id        Int      @id @default(autoincrement())
+  date      DateTime
+  classId   Int
+  class     Class    @relation(fields: [classId], references: [id])
+  subjectId Int
+  subject   Subject  @relation(fields: [subjectId], references: [id])
+  topic     String
+  createdAt DateTime @default(now())
+
+  @@unique([date, classId, subjectId])
+}
+
+model Room {
+  id         Int         @id @default(autoincrement())
+  name       String      @unique
+  timeTables TimeTable[]
+}
+
+model Class {
+  id           Int           @id @default(autoincrement())
+  name         String
+  students     User[]
+  timeTables   TimeTable[]
+  events       Event[]
+  attendances  Attendance[]
+  lessonTopics LessonTopic[]
 }
 
 model TimeTable {
   id           Int    @id @default(autoincrement())
   day          String
+  week         String
   startTime    String
   endTime      String
   periodNumber Int
-  room         String
+  roomId       Int
+  room         Room   @relation(fields: [roomId], references: [id])
+  group        String @default("Whole Class")
 
   subjectId Int
   subject   Subject @relation(fields: [subjectId], references: [id])
@@ -129,6 +172,6 @@ model Message {
   createdAt   DateTime @default(now())
   read        Boolean  @default(false)
 
-  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
-  recipient   User     @relation("ReceivedMessages", fields: [recipientId], references: [id])
+  sender    User @relation("SentMessages", fields: [senderId], references: [id])
+  recipient User @relation("ReceivedMessages", fields: [recipientId], references: [id])
 }
