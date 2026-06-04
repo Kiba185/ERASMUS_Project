@@ -155,7 +155,9 @@ const SchoolInfoPage: React.FC = () => {
       <div className={`flex flex-col gap-1.5 w-full ${className}`}>
         <label htmlFor={name} className="text-xs font-semibold text-gray-700 uppercase tracking-wide flex justify-between gap-2">
           <span>{label}</span>
-          <span className="text-[10px] text-gray-400 font-normal normal-case">Max {maxLength}</span>
+          {!disabled && (
+            <span className="text-[10px] text-gray-400 font-normal normal-case">Max {maxLength}</span>
+          )}
         </label>
         <input
           id={name}
@@ -165,7 +167,7 @@ const SchoolInfoPage: React.FC = () => {
           onChange={onChange}
           maxLength={maxLength}
           disabled={disabled}
-          className={`bg-white border border-green-200 text-gray-900 text-sm rounded-lg p-2.5 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-shadow w-full shadow-sm ${disabled ? 'bg-slate-100 cursor-not-allowed text-slate-500' : ''}`}
+          className={`bg-white border border-green-200 text-gray-900 text-sm rounded-lg p-2.5 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-shadow w-full shadow-sm ${disabled ? 'bg-slate-100 cursor-default text-slate-500' : ''}`}
           placeholder={`Enter ${label.toLowerCase()}...`}
         />
       </div>

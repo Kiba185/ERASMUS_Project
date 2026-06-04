@@ -11,7 +11,8 @@ type SchoolEvent = {
   title: string;
   startDate: string; // YYYY-MM-DD
   endDate: string;   // YYYY-MM-DD
-  time: string;      // Použije se, pokud isAllDay === false
+  time: string;      // start time, used if isAllDay === false
+  endTime?: string;  // optional end time for non-all-day multi-day events
   isAllDay: boolean;
   type: EventType;
   className?: string;
@@ -101,6 +102,7 @@ const EventsPage: React.FC = () => {
           startDate: String(e.startDate).split('T')[0],  // strip time
           endDate: String(e.endDate).split('T')[0],
           time: e.startTime ? String(e.startTime).split('T')[1]?.slice(0, 5) : '',
+          endTime: e.endTime ? String(e.endTime).split('T')[1]?.slice(0, 5) : '',
           isAllDay: Boolean(e.allDay),
           type: e.type,
           audienceTags: (() => {
@@ -184,6 +186,7 @@ const EventsPage: React.FC = () => {
   const [eventStartDate, setEventStartDate] = useState('');
   const [eventEndDate, setEventEndDate] = useState('');
   const [eventTime, setEventTime] = useState('08:00');
+  const [eventEndTime, setEventEndTime] = useState('08:45');
   const [isAllDay, setIsAllDay] = useState(false);
   const [eventType, setEventType] = useState<EventType>('exam');
   const [customType, setCustomType] = useState('');
@@ -294,6 +297,7 @@ const EventsPage: React.FC = () => {
     setEventStartDate(event.startDate);
     setEventEndDate(event.endDate);
     setEventTime(event.time || '08:00');
+    setEventEndTime(event.endTime || event.time || '08:45');
     setIsAllDay(event.isAllDay);
     const eventAudienceTags = getAudienceTagsFromEvent(event);
     setAudienceType(getAudienceTypeFromTags(eventAudienceTags));
@@ -348,6 +352,7 @@ const EventsPage: React.FC = () => {
       startDate: eventStartDate,
       endDate: finalEndDate,
       startTime: isAllDay ? null : `${eventStartDate}T${eventTime}:00.000Z`,
+      endTime: isAllDay ? null : `${finalEndDate}T${eventEndTime}:00.000Z`,
       allDay: isAllDay,
       type: finalType,
       participantIndividualIds,
@@ -371,6 +376,7 @@ const EventsPage: React.FC = () => {
           startDate: eventStartDate,
           endDate: finalEndDate,
           time: isAllDay ? '' : eventTime,
+          endTime: isAllDay ? '' : eventEndTime,
           isAllDay,
           type: finalType,
           className: finalClassName,
@@ -399,6 +405,7 @@ const EventsPage: React.FC = () => {
           startDate: eventStartDate,
           endDate: finalEndDate,
           time: isAllDay ? '' : eventTime,
+          endTime: isAllDay ? '' : eventEndTime,
           isAllDay,
           type: finalType,
           className: finalClassName,
@@ -547,7 +554,9 @@ const EventsPage: React.FC = () => {
                           {event.isAllDay ? (
                             <span className="text-[9px] font-bold uppercase opacity-80">All Day</span>
                           ) : (
-                            <span className="text-[9px] opacity-60 font-normal">{event.time}</span>
+                            <span className="text-[9px] opacity-60 font-normal">
+                              {event.time}{event.endTime ? ` - ${event.endTime}` : ''}
+                            </span>
                           )}
                           <span className="truncate flex-1">{event.title}</span>
                         </div>
@@ -580,7 +589,7 @@ const EventsPage: React.FC = () => {
                     <span className="text-[11px] font-medium text-slate-400">
                       {new Date(event.startDate).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}
                       {event.startDate !== event.endDate && ` - ${new Date(event.endDate).toLocaleDateString('cs-CZ', { day: 'numeric', month: 'numeric' })}`}
-                      {!event.isAllDay && <span className="text-emerald-600 font-semibold ml-1">• {event.time}</span>}
+                      {!event.isAllDay && <span className="text-emerald-600 font-semibold ml-1">• {event.time}{event.endTime ? ` - ${event.endTime}` : ''}</span>}
                     </span>
                     <span className={`text-[9px] uppercase tracking-wider font-bold px-1.5 py-0.5 rounded border ${getStyle(event.type).badge}`}>
                       {event.type}
@@ -623,7 +632,7 @@ const EventsPage: React.FC = () => {
                     <div key={event.id} className={`p-3 rounded-xl border bg-slate-50/40 flex flex-col gap-2 border-l-4 ${getStyle(event.type).border}`}>
                       <div className="flex justify-between items-center">
                         <span className="text-xs font-semibold text-slate-600 bg-white border border-slate-200 px-2 py-0.5 rounded-md shadow-2xs">
-                          {event.isAllDay ? 'All Day' : event.time}
+                          {event.isAllDay ? 'All Day' : `${event.time}${event.endTime ? ` - ${event.endTime}` : ''}`}
                         </span>
                         {canManageEvents && (
                           <button
@@ -720,9 +729,27 @@ const EventsPage: React.FC = () => {
 
                 {/* TIME INPUT CONTAINER */}
                 {!isAllDay && (
-                  <div className="animate-in fade-in duration-150">
-                    <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Event Start Time</label>
-                    <input type="time" value={eventTime} onChange={(e) => setEventTime(e.target.value)} className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-emerald-600" required={!isAllDay} />
+                  <div className="animate-in fade-in duration-150 grid grid-cols-2 gap-3">
+                    <div>
+                      <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Event Start Time</label>
+                      <input
+                        type="time"
+                        value={eventTime}
+                        onChange={(e) => setEventTime(e.target.value)}
+                        className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-emerald-600"
+                        required
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Event End Time</label>
+                      <input
+                        type="time"
+                        value={eventEndTime}
+                        onChange={(e) => setEventEndTime(e.target.value)}
+                        className="w-full p-2.5 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 text-sm font-semibold text-emerald-600"
+                        required
+                      />
+                    </div>
                   </div>
                 )}
 
