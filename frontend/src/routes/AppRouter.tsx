@@ -21,6 +21,7 @@ import MessagesPage from '../pages/MessagesPage';
 import AbsenceNotesPage from '../pages/AbsenceNotesPage';
 import AbsencePage from '../pages/AbsencePage';
 import SetupPage from '../pages/SetupPage';
+import SchoolInfoPage from '../pages/SchoolInfoPage';
 
 export const appRouter = createBrowserRouter([
   {
@@ -57,7 +58,7 @@ export const appRouter = createBrowserRouter([
       { path: '/absence-notes', element: <AbsenceNotesPage /> },
       { path: '/absence', element: <AbsencePage /> },
       { path: '/setup', element: <SetupPage /> },
-
+      { path: '/school-info', element: <SchoolInfoPage /> },
     ]
   },
   {
