@@ -17,6 +17,7 @@ declare module 'express-session' {
 }
 
 const app = express();
+app.set('trust proxy', 1); // Trust first proxy to allow secure cookies on Render
 const PORT = process.env.PORT || 3000;
 
 const privileges = {
