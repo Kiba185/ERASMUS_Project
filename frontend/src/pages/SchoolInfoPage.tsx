@@ -67,7 +67,7 @@ const SchoolInfoPage: React.FC = () => {
             <button 
               onClick={handleSave}
               disabled={isSaving}
-              className={`w-full sm:w-auto text-white font-semibold text-sm px-5 py-2.5 rounded-lg shadow-sm transition-colors flex items-center justify-center gap-2 ${
+              className={`inline-flex h-11 items-center justify-center gap-2 rounded-md bg-palette-fern px-5 text-sm font-black text-white shadow-soft transition hover:bg-palette-leaf focus:outline-none focus:ring-2 focus:ring-palette-leaf/30x ${
                 isSaving ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
               }`}
             >
