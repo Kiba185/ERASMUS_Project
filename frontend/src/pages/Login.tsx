@@ -32,11 +32,8 @@ const Login: React.FC = () => {
 
       if (data?.success === true) {
         const authUser = { ...data.user };
-        if (authUser.role === 'parent') {
-          authUser.children = [
-            { id: '1', firstName: 'Jan', lastName: 'Novák' },
-            { id: '2', firstName: 'Petr', lastName: 'Svoboda' }
-          ];
+        if (authUser.role === 'parent' && !authUser.children) {
+          authUser.children = [];
         }
         login(formattedUsername, authUser);
         navigate('/dashboard');
