@@ -33,6 +33,10 @@ model User {
   classes    Class[]
   timeTables TimeTable[]
 
+// Messaging relations
+sentMessages     Message[] @relation("SentMessages")
+receivedMessages Message[] @relation("ReceivedMessages")
+
   // Parent-child relationship
   parentId Int?
   parent   User?  @relation("ParentChild", fields: [parentId], references: [id])
@@ -40,6 +44,7 @@ model User {
 
   // Other relations
   events Event[]
+  subjects   Subject[]
 }
 
 model Subject {
@@ -48,6 +53,7 @@ model Subject {
   code       String
   color      String
   timeTables TimeTable[]
+  teachers   User[]
 }
 
 model Lesson {
@@ -117,4 +123,16 @@ model Event {
   type                    String
   startTime               DateTime
   allDay                  Boolean
+}
+
+model Message {
+  id          Int      @id @default(autoincrement())
+  senderId    Int
+  recipientId Int
+  body        String
+  createdAt   DateTime @default(now())
+  read        Boolean  @default(false)
+
+  sender      User     @relation("SentMessages", fields: [senderId], references: [id])
+  recipient   User     @relation("ReceivedMessages", fields: [recipientId], references: [id])
 }

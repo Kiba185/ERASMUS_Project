@@ -571,7 +571,95 @@ app.get('/api/classes', async (req, res, next) => {
     res.json(classToUser);
 });
 
+//CREATE CLASS - TEACHER ONLY
+app.post('/api/classes', async (req, res, next) => {
+  if (await requireAuth(req, res, next, 5) !== true) { return; }
+  
+  console.log('POST /api/classes body:', JSON.stringify(req.body)); // 👈 log it
+  
+  const { name, studentIds } = req.body;
+  
+  if (!name) {
+    return res.status(400).json({ error: 'name is required' });
+  }
 
+  try {
+    const newClass = await prisma.class.create({
+      data: {
+        name,
+        students: studentIds?.length
+          ? { connect: studentIds.map((id: any) => ({ id: Number(id) })) }
+          : undefined,
+      },
+      include: { students: true },
+    });
+    res.status(201).json(newClass);
+  } catch (e: any) {
+    console.error('Prisma error:', e);
+    res.status(500).json({ error: e.message }); // 👈 send error back
+  }
+});
+
+//DELETE CLASS - TEACHER ONLY
+app.delete('/api/classes/:id', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+
+    const classId = parseInt(req.params.id);
+    const deletedClass = await prisma.class.delete({
+        where: { id: classId }
+    });
+    res.json(deletedClass);
+});
+
+//UPDATE CLASS - TEACHER ONLY
+app.put('/api/classes/:id', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    const classId = parseInt(req.params.id);
+    const { name, studentIds } = req.body;
+    const updatedClass = await prisma.class.update({
+        where: { id: classId },
+        data: {
+            name,
+            students: {
+                set: studentIds.map((id: number) => ({ id }))
+            }
+        },
+        include: {
+            students: true
+        }
+    });
+    res.json(updatedClass);
+});
+
+//GET CLASS OFF OF STUDENT ID - STUDENT AND TEACHER ONLY
+app.get('/api/class/studentId/:studentId', async (req, res, next) => {
+    /// AUTH ///
+    if (await requireAuth(req, res, next, 1) !== true) { return; }
+
+    const studentId = parseInt(req.params.studentId);
+    const classInfo = await prisma.class.findFirst({
+        where: {
+            students: {
+                some: {
+                    id: studentId
+                }
+            }
+        },
+        include: {
+            students: true
+        }
+    });
+
+    // If not a class the user is a part of, require teahcer or admin auth
+    if (!classInfo) {
+        if (await requireAuth(req, res, next, 5) !== true) { return; }
+        return res.status(404).json({ success: false, message: 'Class not found for this student' });
+    }
+
+    res.json(classInfo);
+});
 
 
 
@@ -739,12 +827,78 @@ app.put('/api/events/:id', async (req, res, next) => {
 
 
 
+///////////////////////////////////////
+//      --=== MESSAGES STUFF ===--
+
+// GET INBOX
+app.get('/api/messages/inbox', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 1) !== true) { return; }
+    const messages = await prisma.message.findMany({
+        where: { recipientId: req.session.userId! },
+        include: { sender: { select: { firstName: true, lastName: true } } },
+        orderBy: { createdAt: 'desc' }
+    });
+    res.json(messages);
+});
+
+// GET SENT
+app.get('/api/messages/sent', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 1) !== true) { return; }
+    const messages = await prisma.message.findMany({
+        where: { senderId: req.session.userId! },
+        include: { recipient: { select: { firstName: true, lastName: true } } },
+        orderBy: { createdAt: 'desc' }
+    });
+    res.json(messages);
+});
+
+// SEND MESSAGE
+app.post('/api/messages', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 1) !== true) { return; }
+    const { recipientId, body } = req.body;
+    if (!recipientId || !body) {
+        return res.status(400).json({ success: false, message: 'recipientId and body are required' });
+    }
+    const message = await prisma.message.create({
+        data: {
+            senderId: req.session.userId!,
+            recipientId: Number(recipientId),
+            body
+        }
+    });
+    res.status(201).json(message);
+});
+
+// GET RECIPIENTS
+app.get('/api/messages/recipients', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 1) !== true) { return; }
+    const users = await prisma.user.findMany({
+        where: { id: { not: req.session.userId! } },
+        select: { id: true, firstName: true, lastName: true, role: true }
+    });
+    res.json(users);
+});
+
+
+// TEMP - create message table
+app.get('/api/setup/messages', async (req, res) => {
+    try {
+        await prisma.$executeRawUnsafe(`
+            CREATE TABLE IF NOT EXISTS "Message" (
+                "id" SERIAL PRIMARY KEY,
+                "senderId" INTEGER NOT NULL REFERENCES "User"("id"),
+                "recipientId" INTEGER NOT NULL REFERENCES "User"("id"),
+                "body" TEXT NOT NULL,
+                "createdAt" TIMESTAMP NOT NULL DEFAULT NOW(),
+                "read" BOOLEAN NOT NULL DEFAULT FALSE
+            );
+        `);
+        res.json({ success: true, message: 'Message table created' });
+    } catch (err: any) {
+        res.status(500).json({ success: false, error: err.message });
+    }
+});
 
 app.listen(PORT, () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
-
-function next(): express.NextFunction {
-    throw new Error('Function not implemented.');
-}
-
