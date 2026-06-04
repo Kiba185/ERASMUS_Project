@@ -39,22 +39,22 @@ const SchedulePage: React.FC = () => {
         const data = await response.json();
 
         // Mapování dat z DB do FE struktury
-        const formattedLessons = data.map((item: any) => {
-          const dbColor = item.subject?.color || 'blue';
-          const tailwindColorClass = colorMap[dbColor] || colorMap['blue'];
-          
-          return {
-            id: item.id,
-            day: item.day, 
-            time: `${item.startTime} - ${item.endTime}`,
-            subject: item.subject?.code || 'Unknown Subject',
-            teacher: item.teacher ? `${item.teacher.firstName || ''} ${item.teacher.lastName || ''}`.trim() : '',
-            // Pokud učitel nemá přiřazenou třídu, napíšeme Free Time, jinak název třídy
-            class: item.class?.name || 'Free Time',
-            room: item.room || 'Unkown Room',
-            color: tailwindColorClass,
-          };
-        });
+            const formattedLessons = data.map((item: any) => {
+        const dbColor = item.subject?.color || 'blue';
+        const tailwindColorClass = colorMap[dbColor] || colorMap['blue'];
+        
+        return {
+          id: item.id,
+          day: item.day,
+          time: `${item.startTime} - ${item.endTime}`,
+          // 🌟 OPRAVA: Musíme sahat na .name u všech propojených tabulek!
+          subject: item.subject?.name || item.subject?.code || 'Neznámý předmět',
+          teacher: item.teacher ? `${item.teacher.firstName || ''} ${item.teacher.lastName || ''}`.trim() : '',
+          class: item.class?.name || 'Free Time',
+          room: item.room?.name || 'Neznámá třída', // ZDE BYLA CHYBA!
+          color: tailwindColorClass,
+        };
+      });
 
         setLessons(formattedLessons);
       } catch (error) {
