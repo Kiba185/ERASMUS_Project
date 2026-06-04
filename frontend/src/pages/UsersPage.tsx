@@ -26,19 +26,20 @@ interface MockUser {
   adress: string;
   birthday: string;
   role: Role;
-  classId?: number | null; 
-  childrenIds?: number[]; 
+  classId?: number | null;
+  childrenIds?: number[];
   subjectIds?: number[];
 }
 
-// --- COMPONENT ---
 const UsersPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
   const [users, setUsers] = useState<MockUser[]>([]);
   const [classes, setClasses] = useState<MockClass[]>([]);
-  const [subjects] = useState<MockSubject[]>([]);
+  const [subjects, setSubjects] = useState<MockSubject[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
@@ -51,14 +52,13 @@ const UsersPage: React.FC = () => {
   const [isNew, setIsNew] = useState(false);
   const [newPassword, setNewPassword] = useState('');
 
-  // --- NAČTENÍ DAT Z BACKENDU ---
   const fetchUsers = async () => {
     const res = await fetch(`${API_URL}/api/admin/users`, { credentials: 'include' });
     const data = await res.json();
-    // Přemapuj classes array na classId pro kompatibilitu
     const mapped = data.map((u: any) => ({
       ...u,
       classId: u.classes?.[0]?.id ?? null,
+      subjectIds: u.subjects?.map((s: any) => s.id) ?? []
     }));
     setUsers(mapped);
   };
@@ -69,13 +69,15 @@ const UsersPage: React.FC = () => {
     setClasses(data);
   };
 
-  useEffect(() => {
-    Promise.all([fetchUsers(), fetchClasses()]).finally(() => setLoading(false));
-  }, []);
+  const fetchSubjects = async () => {
+    const res = await fetch(`${API_URL}/api/subjects`, { credentials: 'include' });
+    const data = await res.json();
+    setSubjects(data);
+  };
 
-  if (!users || !classes) return <div className="p-8 text-palette-pine font-bold">Načítání...</div>;
-  const [loading, setLoading] = useState(true);
-  //const students = useMemo(() => users.filter(u => u.role === 'student'), [users]);
+  useEffect(() => {
+    Promise.all([fetchUsers(), fetchClasses(), fetchSubjects()]).finally(() => setLoading(false));
+  }, []);
 
   const filteredAndSortedUsers = useMemo(() => {
     let result = users;
@@ -90,7 +92,7 @@ const UsersPage: React.FC = () => {
     }
     if (roleFilter !== 'all') result = result.filter(u => u.role === roleFilter);
     if (classFilter !== 'all') result = result.filter(u => u.classId === classFilter);
-    result.sort((a, b) => {
+    result = [...result].sort((a, b) => {
       const aVal = String(a[sortField] || '');
       const bVal = String(b[sortField] || '');
       return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
@@ -104,97 +106,93 @@ const UsersPage: React.FC = () => {
   };
 
   const openAddModal = () => {
-    setEditingUser({
-      id: Date.now(),
-      firstName: '',
-      lastName: '',
-      username: '',
-      email: '',
-      phone: '',
-      adress: '',
-      birthday: '',
-      role: 'student',
-      classId: null,
-      childrenIds: [],
-      subjectIds: []
-    });
+    setIsNew(true);
+    setNewPassword('');
+    setEditingUser({ id: 0, firstName: '', lastName: '', username: '', email: '', phone: '', adress: '', birthday: '', role: 'student', classId: null, childrenIds: [], subjectIds: [] });
     setIsModalOpen(true);
   };
 
   const openEditModal = (user: MockUser) => {
     setIsNew(false);
     setNewPassword('');
-    setEditingUser({ 
-        ...user,
-        // Ořízni datum na yyyy-MM-dd
-        birthday: user.birthday ? user.birthday.split('T')[0] : ''
-    });
+    setEditingUser({ ...user, birthday: user.birthday ? user.birthday.split('T')[0] : '' });
     setIsModalOpen(true);
-};
+  };
 
- const handleSave = async (e: React.FormEvent) => {
+  const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
 
-    // Validace
     if (!editingUser.birthday) {
-        alert('Datum narození je povinné!');
-        return;
+      alert('Datum narození je povinné!');
+      return;
     }
-    if (!editingUser) return;
+
+    setIsModalOpen(false);
+    setSaving(true);
 
     if (isNew) {
-        const res = await fetch(`${API_URL}/api/admin/users`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ ...editingUser, password: newPassword })
-        });
-        if (!res.ok) { const err = await res.json(); alert(err.message); return; }
+      const res = await fetch(`${API_URL}/api/admin/users`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...editingUser, password: newPassword })
+      });
+      if (!res.ok) { const err = await res.json(); alert(err.message); setSaving(false); return; }
     } else {
-        const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
-            method: 'PUT',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify(editingUser)
-        });
-        if (!res.ok) { const err = await res.json(); alert(err.message); return; }
+      const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingUser)
+      });
+      if (!res.ok) { const err = await res.json(); alert(err.message); setSaving(false); return; }
 
-        if (newPassword.length >= 6) {
-            await fetch(`${API_URL}/api/admin/users/${editingUser.id}/password`, {
-                method: 'PUT',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ newPassword })
-            });
-        }
-
-        // Přepíše třídu (nebo odebere pokud žádná)
-        console.log('Sending classId:', editingUser.classId);
-        await fetch(`${API_URL}/api/admin/users/${editingUser.id}/classes`, {
-            method: 'PUT',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ classId: editingUser.classId ?? null })
+      if (newPassword.length >= 6) {
+        await fetch(`${API_URL}/api/admin/users/${editingUser.id}/password`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ newPassword })
         });
+      }
+
+      await fetch(`${API_URL}/api/admin/users/${editingUser.id}/classes`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classId: editingUser.classId ?? null })
+      });
+
+      if (editingUser.role === 'teacher') {
+        await fetch(`${API_URL}/api/admin/users/${editingUser.id}/subjects`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ subjectIds: editingUser.subjectIds ?? [] })
+        });
+      }
     }
 
     await fetchUsers();
-    setIsModalOpen(false);
-};
-
-  // --- SMAZÁNÍ ---
-  const handleDelete = async (id: number) => {
-    if (!confirm('Opravdu smazat uživatele?')) return;
-    await fetch(`${API_URL}/api/admin/users/${id}`, {
-      method: 'DELETE',
-      credentials: 'include'
-    });
-    await fetchUsers();
+    setSaving(false);
   };
 
-  const handleLoginAs = (user: MockUser) => {
-    login(String(user.id), { ...user, id: String(user.id) } as any);
+  const handleDelete = async (id: number) => {
+    if (!confirm('Opravdu smazat uživatele?')) return;
+    setSaving(true);
+    await fetch(`${API_URL}/api/admin/users/${id}`, { method: 'DELETE', credentials: 'include' });
+    await fetchUsers();
+    setSaving(false);
+  };
+
+  const handleLoginAs = async (user: MockUser) => {
+    await fetch(`${API_URL}/api/admin/loginas/${user.id}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    login(String(user.id), { ...user, id: String(user.id), children: [] } as any);
     navigate('/dashboard');
   };
 
@@ -209,10 +207,22 @@ const UsersPage: React.FC = () => {
     return <span className="text-gray-400">-</span>;
   };
 
-  if (loading) return <div className="p-8 text-palette-pine font-bold">Načítání...</div>;
+  if (loading) return <div className="p-8 text-palette-pine font-bold">Loading...</div>;
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
+
+      {/* Saving overlay */}
+      {saving && createPortal(
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-palette-pine font-bold text-lg">Saving...</p>
+          </div>
+        </div>,
+        document.body
+      )}
+
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold text-palette-pine">User Management</h1>
         <button onClick={openAddModal} className="px-5 py-2.5 bg-palette-fern text-white font-semibold rounded-xl shadow-soft hover:bg-palette-leaf hover:-translate-y-0.5 transition-all flex items-center gap-2">
@@ -221,7 +231,6 @@ const UsersPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Filters */}
       <div className="bg-white p-5 rounded-2xl shadow-soft border border-palette-mist flex flex-wrap gap-4 items-center">
         <div className="flex-1 min-w-[200px]">
           <input type="text" placeholder="Search by name, email..." value={search} onChange={e => setSearch(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow focus:border-palette-meadow outline-none transition" />
@@ -239,7 +248,6 @@ const UsersPage: React.FC = () => {
         </select>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl shadow-soft border border-palette-mist overflow-hidden overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-100 text-sm">
           <thead className="bg-palette-mist">
@@ -284,7 +292,6 @@ const UsersPage: React.FC = () => {
         </table>
       </div>
 
-      {/* Modal */}
       {isModalOpen && editingUser && createPortal(
         <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-palette-mist">
@@ -315,15 +322,15 @@ const UsersPage: React.FC = () => {
                   <input type="text" value={editingUser.phone} onChange={e => setEditingUser({...editingUser, phone: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-palette-pine mb-1.5">Date of Birth</label>
-                  <input type="date" value={editingUser.birthday} onChange={e => setEditingUser({...editingUser, birthday: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
+                  <label className="block text-sm font-bold text-palette-pine mb-1.5">Date of Birth *</label>
+                  <input type="date" required value={editingUser.birthday} onChange={e => setEditingUser({...editingUser, birthday: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">Address</label>
                   <input type="text" value={editingUser.adress} onChange={e => setEditingUser({...editingUser, adress: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-palette-pine mb-1.5">{isNew ? 'Password' : 'New Password (nechej prázdné pokud nechceš měnit)'}</label>
+                  <label className="block text-sm font-bold text-palette-pine mb-1.5">{isNew ? 'Password *' : 'New Password (nechej prázdné pokud nechceš měnit)'}</label>
                   <input type="password" required={isNew} value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div className="md:col-span-2 pt-4 border-t border-gray-100">
@@ -346,29 +353,19 @@ const UsersPage: React.FC = () => {
                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     </div>
-
                     {editingUser.role === 'teacher' && (
                       <div className="pt-2 border-t border-palette-sage/30">
-                        <label className="block text-sm font-bold text-palette-pine mb-2">Assign Subjects (Teacher qualification)</label>
-                        <div className="max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 space-y-1 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-1">
-                          
+                        <label className="block text-sm font-bold text-palette-pine mb-2">Assign Subjects</label>
+                        <div className="max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-1">
                           {subjects.map(subject => {
                             const isSelected = editingUser.subjectIds?.includes(subject.id);
                             return (
                               <label key={subject.id} className={`flex items-center space-x-3 p-2.5 rounded-md cursor-pointer border transition ${isSelected ? 'bg-palette-mist border-palette-sage' : 'border-transparent hover:bg-gray-50'}`}>
-                                <input 
-                                  type="checkbox" 
-                                  checked={!!isSelected}
-                                  onChange={(e) => {
-                                    const currentIds = editingUser.subjectIds || [];
-                                    if (e.target.checked) {
-                                      setEditingUser({...editingUser, subjectIds: [...currentIds, subject.id]});
-                                    } else {
-                                      setEditingUser({...editingUser, subjectIds: currentIds.filter(id => id !== subject.id)});
-                                    }
-                                  }}
-                                  className="w-4 h-4 text-palette-fern border-gray-300 rounded focus:ring-palette-meadow cursor-pointer" 
-                                />
+                                <input type="checkbox" checked={!!isSelected} onChange={(e) => {
+                                  const currentIds = editingUser.subjectIds || [];
+                                  if (e.target.checked) setEditingUser({...editingUser, subjectIds: [...currentIds, subject.id]});
+                                  else setEditingUser({...editingUser, subjectIds: currentIds.filter(id => id !== subject.id)});
+                                }} className="w-4 h-4 text-palette-fern border-gray-300 rounded focus:ring-palette-meadow cursor-pointer" />
                                 <span className="text-sm font-bold text-palette-pine">{subject.name}</span>
                               </label>
                             );

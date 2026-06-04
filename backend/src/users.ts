@@ -17,7 +17,7 @@ router.get('/api/admin/users', async (req, res, next) => {
 
     const saveUsers = users.map(({ password, ...u }: any) => ({
         ...u,
-        classes: u.classes.map((c: any) => ({ id: c.id, name: c.name }))
+        classes: u.classes.map(c => ({ id: c.id, name: c.name }))
     }));
 
     res.json(saveUsers);
@@ -183,5 +183,44 @@ router.delete('/api/admin/users/:id/classes/:classId', async (req, res, next) =>
     res.json({ success: true, message: 'User removed from class' });
 });
 
+// UPDATE TEACHER SUBJECTS - ADMIN ONLY
+router.put('/api/admin/users/:id/subjects', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const userId = parseInt(req.params.id);
+    const { subjectIds } = req.body; // pole čísel [1, 2, 3]
+
+    const result = await prisma.user.update({
+        where: { id: userId },
+        data: {
+            subjects: {
+                set: subjectIds.map((id: number) => ({ id }))
+            }
+        },
+        include: { subjects: true }
+    });
+
+    res.json({ success: true, subjects: result.subjects });
+});
+
+// LOGIN AS - ADMIN ONLY
+router.post('/api/admin/loginas/:id', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const userId = parseInt(req.params.id);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Přepíše session na tohoto uživatele
+    req.session.userId = userId;
+    req.session.save((err) => {
+        if (err) return res.status(500).json({ success: false });
+        const { password: _, ...safeUser } = user;
+        res.json({ success: true, user: safeUser });
+    });
+});
 
 export default router;
