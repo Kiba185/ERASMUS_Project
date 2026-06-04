@@ -34,6 +34,7 @@ const MessagesPage: React.FC = () => {
   const [recipients, setRecipients] = useState<{id: number; firstName: string; lastName: string; role?: string}[]>([]);
   const [sending, setSending] = useState(false);
   const [recipientSelected, setRecipientSelected] = useState(false);
+  const [viewingMessage, setViewingMessage] = useState<Message | null>(null);
   const recipientDropdownRef = useRef<HTMLDivElement>(null);
   const [classes, setClasses] = useState<{id: number; name: string; students: {id: number}[]}[]>([]);
 
@@ -152,6 +153,21 @@ useEffect(() => { fetchMessages(); }, []);
     setIsNewMessageOpen(true);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
+
+const handleViewMessage = (msg: Message) => {
+  setViewingMessage(msg);
+  setIsNewMessageOpen(false);
+};
+
+const handleReplyFromView = () => {
+  if (!viewingMessage) return;
+  setRecipient(viewingMessage.person);
+  setSubject(viewingMessage.subject.startsWith('Re:') ? viewingMessage.subject : `Re: ${viewingMessage.subject}`);
+  setMessageText('');
+  setAttachment(null);
+  setViewingMessage(null);
+  setIsNewMessageOpen(true);
+};
 
 const handleSendMessage = async () => {
   console.log('recipient value:', JSON.stringify(recipient));
@@ -425,6 +441,47 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
           </div>
         </section>
       )}
+      {viewingMessage && (
+        <section className="rounded-lg border border-palette-leaf/35 bg-white p-5 shadow-soft">
+          <div className="mb-4 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
+            <h2 className="text-xl font-black text-palette-pine">Message</h2>
+            <button
+              type="button"
+              onClick={() => setViewingMessage(null)}
+              className="self-start rounded-md border border-palette-lichen/60 px-3 py-2 text-xs font-black text-palette-moss transition hover:border-palette-leaf hover:text-palette-pine md:self-auto"
+            >
+              Close
+            </button>
+          </div>
+          <div className="grid gap-3 md:grid-cols-2">
+            <div className="flex flex-col gap-1.5 text-xs font-black uppercase tracking-wide text-palette-moss">
+              From
+              <div className="h-11 flex items-center rounded-md border border-palette-lichen/60 bg-palette-mist/40 px-3 text-sm font-semibold normal-case text-palette-pine">
+                {viewingMessage.person}
+              </div>
+            </div>
+            <div className="flex flex-col gap-1.5 text-xs font-black uppercase tracking-wide text-palette-moss">
+              Subject
+              <div className="h-11 flex items-center rounded-md border border-palette-lichen/60 bg-palette-mist/40 px-3 text-sm font-semibold normal-case text-palette-pine">
+                {viewingMessage.subject}
+              </div>
+            </div>
+          </div>
+          <div className="mt-3 rounded-md border border-palette-lichen/60 bg-palette-mist/40 px-3 py-3 text-sm font-medium text-palette-pine min-h-32 whitespace-pre-wrap break-all overflow-hidden">
+            {viewingMessage.message}
+          </div>
+          <div className="mt-3 flex justify-between items-center">
+            <span className="text-xs text-palette-moss font-medium">{viewingMessage.time}</span>
+            <button
+              type="button"
+              onClick={handleReplyFromView}
+              className="h-10 rounded-md bg-palette-fern px-5 text-sm font-black text-white shadow-soft transition hover:bg-palette-leaf"
+            >
+              Reply
+            </button>
+          </div>
+        </section>
+      )}
 
       <section className="rounded-lg border border-palette-lichen/45 bg-palette-mist p-4 shadow-soft">
         <div className="mb-3 flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
@@ -450,7 +507,7 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
                 <tr><td colSpan={5} className="px-4 py-8 text-center text-palette-moss font-medium">No messages found.</td></tr>
               )}
               {filteredReceived.map((message) => (
-                <tr key={message.id} className="transition hover:bg-palette-mist/60">
+                <tr key={message.id} className="transition hover:bg-palette-mist/60 cursor-pointer" onClick={() => handleViewMessage(message)}>
                   <td className="px-4 py-3 font-black text-palette-pine">{message.person}</td>
                   <td className="px-4 py-3">
                     <div className="flex items-center gap-2">
@@ -462,22 +519,9 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
                       )}
                     </div>
                   </td>
-                    <td className="px-4 py-3 font-medium text-palette-moss cursor-pointer group" onClick={() => toggleExpand(message.id)}>
-                      <div className="flex flex-col gap-1">
-                        <div className={`transition-all duration-300 ${expandedMessageId === message.id ? "whitespace-pre-wrap" : "line-clamp-1"}`}>
-                          {message.message}
-                        </div>
-                        {expandedMessageId === message.id ? (
-                          <div className="text-[10px] uppercase font-black tracking-wider text-palette-fern/70">
-                            Click to collapse
-                          </div>
-                        ) : message.message.length > 50 ? (
-                          <div className="text-[10px] uppercase font-black tracking-wider text-palette-moss/50 group-hover:text-palette-fern/70 transition-colors">
-                            Click to expand
-                          </div>
-                        ) : null}
-                      </div>
-                    </td>
+                    <td className="max-w-xs px-4 py-3 font-medium text-palette-moss truncate">
+                    {message.message}
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 font-bold text-palette-moss">{message.time}</td>
                   <td className="px-4 py-3 text-right">
                     <button
@@ -521,20 +565,8 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
                 <tr key={message.id} className="transition hover:bg-palette-mist/60">
                   <td className="px-4 py-3 font-black text-palette-pine">{message.person}</td>
                   <td className="px-4 py-3 font-bold text-palette-pine">{message.subject}</td>
-                  <td className="max-w-md px-4 py-3 font-medium text-palette-moss cursor-pointer group" onClick={() => toggleExpand(message.id)}>
-                    <div className={`transition-all duration-300 ${expandedMessageId === message.id ? "" : "line-clamp-1"}`}>
-                      {message.message}
-                    </div>
-                    {expandedMessageId === message.id && (
-                      <div className="mt-2 text-[10px] uppercase font-black tracking-wider text-palette-fern/70">
-                        Click to collapse
-                      </div>
-                    )}
-                    {expandedMessageId !== message.id && message.message.length > 50 && (
-                      <div className="mt-1 text-[10px] uppercase font-black tracking-wider text-palette-moss/50 group-hover:text-palette-fern/70 transition-colors">
-                        Click to expand
-                      </div>
-                    )}
+                  <td className="max-w-xs px-4 py-3 font-medium text-palette-moss truncate">
+                    {message.message}
                   </td>
                   <td className="whitespace-nowrap px-4 py-3 font-bold text-palette-moss">{message.time}</td>
                 </tr>
