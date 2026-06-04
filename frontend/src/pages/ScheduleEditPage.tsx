@@ -603,8 +603,8 @@ const ScheduleEditPage: React.FC = () => {
                 >
                   {dbTeachers.length === 0 && <option value="" disabled>Načítám učitele...</option>}
                   {dbTeachers.length > 0 && <option value="" disabled>Select teacher...</option>}
-                  {dbTeachers.map(t => (
-                    <option key={t.id} value={`Mr. ${t.lastName}`}>{t.firstName} {t.lastName}</option>
+                  {getFilteredTeachers().map((teacherName) => (
+                    <option key={teacherName} value={teacherName}>{teacherName}</option>
                   ))}
                 </select>
               </div>
