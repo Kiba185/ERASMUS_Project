@@ -66,7 +66,7 @@ const STUDENTS: StudentProfile[] = [
   { id: 'walter-white', name: 'Walter White', className: '4.B' },
   { id: 'michal-džeksn', name: 'Michal Džeksn', className: '4.B' },
   { id: 'tomas-gregorik', name: 'Tomas Gregorik', className: '4.B' },
-  { id: 'saul-Goodman', name: 'Saul Goodman', className: '4.B' },
+  { id: 'saul-goodman', name: 'Saul Goodman', className: '4.B' },
   { id: 'hank-schrader', name: 'Hank Schrader', className: '4.B' },
   { id: 'lil-tito', name: 'LiL Tito', className: '4.B' },
   { id: 'prophet-brohammed', name: 'ProphetBrohammed', className: '4.C' },

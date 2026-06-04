@@ -23,6 +23,43 @@ interface MockUser {
   subjectIds?: number[];
 }
 
+interface ApiRelation {
+  id: number;
+}
+
+interface ApiUser extends MockUser {
+  classes?: ApiRelation[];
+  subjects?: ApiRelation[];
+  children?: ApiRelation[];
+}
+
+interface MockChildOption {
+  id: number;
+  name: string;
+  className?: string;
+}
+
+const MOCK_SUBJECTS: MockSubject[] = [
+  { id: 1, name: 'Maths' },
+  { id: 2, name: 'Physics' },
+  { id: 3, name: 'Chemistry' },
+  { id: 4, name: 'Biology' },
+  { id: 5, name: 'History' },
+  { id: 6, name: 'Geography' },
+  { id: 7, name: 'English' },
+  { id: 8, name: 'PE' },
+  { id: 9, name: 'Art' },
+  { id: 10, name: 'Computer Science' },
+  { id: 11, name: 'Music' },
+];
+
+const MOCK_CHILDREN: MockChildOption[] = [
+  { id: 1001, name: 'Jane Doe', className: '4.C' },
+  { id: 1002, name: 'Tomas Benes', className: '4.C' },
+  { id: 1003, name: 'David Smith', className: '4.D' },
+  { id: 1004, name: 'Karolina Pokorna', className: '4.D' },
+];
+
 const UsersPage: React.FC = () => {
   const navigate  = useNavigate();
   const { login } = useAuth();
@@ -49,47 +86,75 @@ const UsersPage: React.FC = () => {
 
   // --- DATA FETCHING (with error handling) ---
 
-  const fetchUsers = async () => {
+  const loadUsers = async () => {
     const res = await fetch(`${API_URL}/api/admin/users`, { credentials: 'include' });
-    if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
-    const data = await res.json();
-    setUsers(data.map((u: any) => ({
+    const data = (await res.json()) as ApiUser[];
+    return data.map((u) => ({
       ...u,
-      classId:    u.classes?.[0]?.id ?? null,
-      subjectIds: u.subjects?.map((s: any) => s.id) ?? [],
-    })));
+      classId: u.classes?.[0]?.id ?? null,
+      subjectIds: u.subjects?.map((s) => s.id) ?? [],
+      childrenIds: u.children?.map((child) => child.id) ?? [],
+    }));
   };
 
-  const fetchClasses = async () => {
+  const loadClasses = async () => {
     const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
-    if (!res.ok) throw new Error(`Failed to load classes (${res.status})`);
-    setClasses(await res.json());
+    return (await res.json()) as MockClass[];
   };
 
-  const fetchSubjects = async () => {
-    const res = await fetch(`${API_URL}/api/subjects`, { credentials: 'include' });
-    if (!res.ok) throw new Error(`Failed to load subjects (${res.status})`);
-    setSubjects(await res.json());
+  const fetchUsers = async () => {
+    setUsers(await loadUsers());
   };
 
-  const loadAll = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      await Promise.all([fetchUsers(), fetchClasses(), fetchSubjects()]);
-    } catch (e: any) {
-      setError(e.message ?? 'Failed to load data');
-    } finally {
+  useEffect(() => {
+    let ignoreResponse = false;
+
+    const loadInitialData = async () => {
+      const [loadedUsers, loadedClasses] = await Promise.all([loadUsers(), loadClasses()]);
+
+      if (ignoreResponse) {
+        return;
+      }
+
+      setUsers(loadedUsers);
+      setClasses(loadedClasses);
+      setSubjects(MOCK_SUBJECTS);
       setLoading(false);
-    }
-  };
+    };
 
-  useEffect(() => { loadAll(); }, []);
+    void loadInitialData();
 
-  // --- FILTER + SORT ---
+    return () => {
+      ignoreResponse = true;
+    };
+  }, []);
+
+  const usersWithMockRelations = useMemo(
+    () =>
+      users.map((user) => ({
+        ...user,
+        ...mockUserRelations[user.id],
+      })),
+    [mockUserRelations, users],
+  );
+
+  const childOptions = useMemo<MockChildOption[]>(() => {
+    const studentsFromUsers = usersWithMockRelations
+      .filter((user) => user.role === 'student')
+      .map((student) => {
+        const assignedClass = classes.find((classItem) => classItem.id === student.classId);
+        return {
+          id: student.id,
+          name: `${student.firstName} ${student.lastName}`,
+          className: assignedClass?.name,
+        };
+      });
+
+    return studentsFromUsers.length > 0 ? studentsFromUsers : MOCK_CHILDREN;
+  }, [classes, usersWithMockRelations]);
 
   const filteredAndSortedUsers = useMemo(() => {
-    let result = users;
+    let result = usersWithMockRelations;
     if (search) {
       const s = search.toLowerCase();
       result = result.filter(u =>
@@ -106,7 +171,8 @@ const UsersPage: React.FC = () => {
       const bVal = String(b[sortField] || '');
       return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
-  }, [users, search, roleFilter, classFilter, sortField, sortOrder]);
+    return result;
+  }, [usersWithMockRelations, search, roleFilter, classFilter, sortField, sortOrder]);
 
   const handleSort = (field: keyof MockUser) => {
     if (sortField === field) setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
@@ -140,64 +206,53 @@ const UsersPage: React.FC = () => {
 
     setModalError(null);
     setSaving(true);
-    setSavingLabel('Saving...');
+    let savedUserId = editingUser.id;
 
-    try {
-      if (isNew) {
-        const res = await fetch(`${API_URL}/api/admin/users`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...editingUser, password: newPassword }),
-        });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.message ?? `Server error ${res.status}`);
-        }
-      } else {
-        // Update core fields
-        const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
+    if (isNew) {
+      const res = await fetch(`${API_URL}/api/admin/users`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ ...editingUser, password: newPassword })
+      });
+      if (!res.ok) { const err = (await res.json()) as { message?: string }; alert(err.message); setSaving(false); return; }
+      const createdUser = (await res.json()) as { user?: { id?: number }; id?: number };
+      savedUserId = createdUser.user?.id ?? createdUser.id ?? savedUserId;
+    } else {
+      const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(editingUser)
+      });
+      if (!res.ok) { const err = (await res.json()) as { message?: string }; alert(err.message); setSaving(false); return; }
+
+      if (newPassword.length >= 6) {
+        await fetch(`${API_URL}/api/admin/users/${editingUser.id}/password`, {
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(editingUser),
         });
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.message ?? `Server error ${res.status}`);
-        }
-
-        // Password change (only if filled and long enough)
-        if (newPassword.length >= 6) {
-          const pwRes = await fetch(`${API_URL}/api/admin/users/${editingUser.id}/password`, {
-            method: 'PUT',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ newPassword }),
-          });
-          if (!pwRes.ok) throw new Error('Failed to update password');
-        }
-
-        // Class assignment
-        const clsRes = await fetch(`${API_URL}/api/admin/users/${editingUser.id}/classes`, {
-          method: 'PUT',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ classId: editingUser.classId ?? null }),
-        });
-        if (!clsRes.ok) throw new Error('Failed to update class assignment');
-
-        // Subject assignment (teachers only)
-        if (editingUser.role === 'teacher') {
-          const subRes = await fetch(`${API_URL}/api/admin/users/${editingUser.id}/subjects`, {
-            method: 'PUT',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ subjectIds: editingUser.subjectIds ?? [] }),
-          });
-          if (!subRes.ok) throw new Error('Failed to update subject assignments');
-        }
       }
+
+      await fetch(`${API_URL}/api/admin/users/${editingUser.id}/classes`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ classId: editingUser.classId ?? null })
+      });
+    }
+
+    if (savedUserId) {
+      setMockUserRelations((currentRelations) => ({
+        ...currentRelations,
+        [savedUserId]: {
+          subjectIds: editingUser.role === 'teacher' ? editingUser.subjectIds ?? [] : [],
+          childrenIds: editingUser.role === 'parent' ? editingUser.childrenIds ?? [] : [],
+        },
+      }));
+    }
 
       // Only close modal + refresh on full success
       setIsModalOpen(false);
@@ -233,30 +288,52 @@ const UsersPage: React.FC = () => {
   // --- LOGIN AS ---
 
   const handleLoginAs = async (user: MockUser) => {
-    try {
-      const res = await fetch(`${API_URL}/api/admin/loginas/${user.id}`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) throw new Error(`Login as failed (${res.status})`);
-      login(String(user.id), { ...user, id: String(user.id), children: [] } as any);
-      navigate('/dashboard');
-    } catch (e: any) {
-      alert(e.message ?? 'Failed to login as this user.');
-    }
+    await fetch(`${API_URL}/api/admin/loginas/${user.id}`, {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' }
+    });
+    login(String(user.id), { ...user, id: String(user.id), children: [] } as Parameters<typeof login>[1]);
+    navigate('/dashboard');
   };
 
-  // --- HELPERS ---
+  const getSubjectNames = (subjectIds: number[] = []) =>
+    subjectIds
+      .map((subjectId) => subjects.find((subject) => subject.id === subjectId)?.name)
+      .filter(Boolean)
+      .join(', ');
+
+  const getChildNames = (childrenIds: number[] = []) =>
+    childrenIds
+      .map((childId) => childOptions.find((child) => child.id === childId)?.name)
+      .filter(Boolean)
+      .join(', ');
 
   const getClassBadge = (user: MockUser) => {
-    if (user.role === 'student' || user.role === 'teacher') {
+    if (user.role === 'student') {
       const c = classes.find(c => c.id === user.classId);
       if (c) return <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-fern rounded-full border border-palette-sage">{c.name}</span>;
     }
-    if (user.role === 'parent' && user.childrenIds?.length) {
-      return <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-moss rounded-full border border-palette-sage">{user.childrenIds.length} children</span>;
+
+    if (user.role === 'teacher') {
+      const c = classes.find(c => c.id === user.classId);
+      const subjectNames = getSubjectNames(user.subjectIds);
+
+      if (c || subjectNames) {
+        return (
+          <div className="flex flex-col items-start gap-1">
+            {c && <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-fern rounded-full border border-palette-sage">{c.name}</span>}
+            {subjectNames && <span className="max-w-56 truncate text-xs font-semibold text-palette-moss" title={subjectNames}>{subjectNames}</span>}
+          </div>
+        );
+      }
     }
+
+    if (user.role === 'parent' && user.childrenIds?.length) {
+      const childNames = getChildNames(user.childrenIds);
+      return <span className="max-w-56 truncate px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-moss rounded-full border border-palette-sage" title={childNames}>{childNames || `${user.childrenIds.length} children`}</span>;
+    }
+
     return <span className="text-gray-400">-</span>;
   };
 
@@ -309,8 +386,7 @@ const UsersPage: React.FC = () => {
           <input type="text" placeholder="Search by name, email..." value={search} onChange={e => setSearch(e.target.value)}
             className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
         </div>
-        <select value={roleFilter} onChange={e => setRoleFilter(e.target.value as any)}
-          className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition text-palette-pine font-medium">
+        <select value={roleFilter} onChange={e => setRoleFilter(e.target.value as Role | 'all')} className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition text-palette-pine font-medium">
           <option value="all">All Roles</option>
           <option value="student">Student</option>
           <option value="teacher">Teacher</option>
@@ -469,6 +545,32 @@ const UsersPage: React.FC = () => {
                         </div>
                       </div>
                     )}
+                  </div>
+                )}
+                {editingUser.role === 'parent' && (
+                  <div className="md:col-span-2 bg-orange-50/70 p-5 rounded-xl border border-orange-200 space-y-3">
+                    <label className="block text-sm font-bold text-palette-pine">Assign Children</label>
+                    <div className="max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-1">
+                      {childOptions.map(child => {
+                        const isSelected = editingUser.childrenIds?.includes(child.id);
+                        return (
+                          <label key={child.id} className={`flex items-center space-x-3 p-2.5 rounded-md cursor-pointer border transition ${isSelected ? 'bg-orange-50 border-orange-200' : 'border-transparent hover:bg-gray-50'}`}>
+                            <input type="checkbox" checked={!!isSelected} onChange={(e) => {
+                              const currentIds = editingUser.childrenIds || [];
+                              if (e.target.checked) setEditingUser({...editingUser, childrenIds: [...currentIds, child.id]});
+                              else setEditingUser({...editingUser, childrenIds: currentIds.filter(id => id !== child.id)});
+                            }} className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-400 cursor-pointer" />
+                            <span className="min-w-0 text-sm font-bold text-palette-pine">
+                              <span>{child.name}</span>
+                              {child.className && <span className="ml-1 font-medium text-palette-moss">({child.className})</span>}
+                            </span>
+                          </label>
+                        );
+                      })}
+                      {childOptions.length === 0 && (
+                        <p className="p-3 text-sm font-medium text-palette-moss">No students available.</p>
+                      )}
+                    </div>
                   </div>
                 )}
               </div>
