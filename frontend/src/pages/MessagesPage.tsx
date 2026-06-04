@@ -1,69 +1,16 @@
-import React, { useState, useMemo } from 'react';
-
-const STUDENTS = [
-  'John West',
-  'Dominik Novak',
-  'Richard Urban',
-  'Filip Marek',
-  'Anna Kralova',
-  'Petr Svoboda',
-  'Eva Horakova',
-];
+import React, { useState, useMemo, useEffect } from 'react';
 
 type Message = {
-  id: string;
+  id: number;
   person: string;
   subject: string;
   message: string;
   time: string;
   status?: 'new' | 'read' | 'sent';
+  senderId?: number;
+  recipientId?: number;
 };
 
-const RECEIVED_MESSAGES: Message[] = [
-  {
-    id: 'received-1',
-    person: 'MGR. John Doe',
-    subject: 'Meeting reschedule',
-    message: 'Hey, can we reschedule our meeting? I have another urgent appointment that came up at the last minute and I will not be able to make it to our scheduled time. Could we perhaps move it to Friday afternoon?',
-    time: '2 hours ago',
-    status: 'new',
-  },
-  {
-    id: 'received-2',
-    person: 'ING. Jane Smith',
-    subject: 'Parent-teacher conference',
-    message: "Don't forget about the parent-teacher conference next week.",
-    time: '1 day ago',
-    status: 'read',
-  },
-  {
-    id: 'received-3',
-    person: 'Anna Kralova',
-    subject: 'Homework question',
-    message: 'Can I send the worksheet later today? I was sick over the weekend and did not manage to finish all the exercises on time. I promise I will submit it by 8 PM tonight at the latest.',
-    time: '2 days ago',
-    status: 'read',
-  },
-];
-
-const SENT_MESSAGES: Message[] = [
-  {
-    id: 'sent-1',
-    person: 'MGR. John Doe',
-    subject: 'Re: Meeting reschedule',
-    message: "Sure, let's reschedule for tomorrow.",
-    time: '1 hour ago',
-    status: 'sent',
-  },
-  {
-    id: 'sent-2',
-    person: 'ING. Jane Smith',
-    subject: 'Re: Conference',
-    message: "Thanks for the reminder! I'll be there.",
-    time: '20 hours ago',
-    status: 'sent',
-  },
-];
 
 const statusClassNames: Record<NonNullable<Message['status']>, string> = {
   new: 'bg-palette-leaf text-white',
@@ -75,8 +22,7 @@ const MessagesPage: React.FC = () => {
   const [isNewMessageOpen, setIsNewMessageOpen] = useState(false);
   const [recipient, setRecipient] = useState('');
   const [subject, setSubject] = useState('');
-  const [expandedMessageId, setExpandedMessageId] = useState<string | null>(null);
-
+  const [expandedMessageId, setExpandedMessageId] = useState<number | null>(null);
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<'all' | 'new' | 'read'>('all');
   const [sortField, setSortField] = useState<'time' | 'person' | 'subject'>('time');
@@ -84,8 +30,49 @@ const MessagesPage: React.FC = () => {
 
   const [messageText, setMessageText] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
-  const [sentMessagesList, setSentMessagesList] = useState<Message[]>(SENT_MESSAGES);
+const [receivedMessagesList, setReceivedMessagesList] = useState<Message[]>([]);
+const [sentMessagesList, setSentMessagesList] = useState<Message[]>([]);
+const [recipients, setRecipients] = useState<{id: number; firstName: string; lastName: string; role?: string}[]>([]);
+const [sending, setSending] = useState(false);
 
+const fetchMessages = async () => {
+  try {
+    const [inboxRes, sentRes, recipientsRes] = await Promise.all([
+      fetch('http://localhost:3000/api/messages/inbox', { credentials: 'include' }),
+      fetch('http://localhost:3000/api/messages/sent', { credentials: 'include' }),
+      fetch('http://localhost:3000/api/messages/recipients', { credentials: 'include' }),
+    ]);
+    const inbox = await inboxRes.json();
+    const sent = await sentRes.json();
+    const recipientsList = await recipientsRes.json();
+
+    setReceivedMessagesList(inbox.map((m: any) => ({
+      id: m.id,
+      person: `${m.sender?.firstName} ${m.sender?.lastName}`,
+      subject: '—',
+      message: m.body,
+      time: new Date(m.createdAt).toLocaleString(),
+      status: m.read ? 'read' : 'new',
+      senderId: m.senderId,
+    })));
+
+    setSentMessagesList(sent.map((m: any) => ({
+      id: m.id,
+      person: `${m.recipient?.firstName} ${m.recipient?.lastName}`,
+      subject: '—',
+      message: m.body,
+      time: new Date(m.createdAt).toLocaleString(),
+      status: 'sent',
+      recipientId: m.recipientId,
+    })));
+
+    setRecipients(recipientsList);
+  } catch {
+    console.error('Failed to load messages');
+  }
+};
+
+useEffect(() => { fetchMessages(); }, []);
   const parseTime = (t: string) => {
     if (t.includes('hour')) return parseInt(t) || 0;
     if (t.includes('day')) return (parseInt(t) || 0) * 24;
@@ -93,9 +80,8 @@ const MessagesPage: React.FC = () => {
   };
 
   const filteredReceived = useMemo(() => {
-    let result = RECEIVED_MESSAGES;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
+      let result = receivedMessagesList;
+      if (searchQuery) {      const q = searchQuery.toLowerCase();
       result = result.filter(m => m.subject.toLowerCase().includes(q) || m.person.toLowerCase().includes(q) || m.message.toLowerCase().includes(q));
     }
     if (filterStatus !== 'all') {
@@ -111,7 +97,7 @@ const MessagesPage: React.FC = () => {
       return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
     return result;
-  }, [searchQuery, filterStatus, sortField, sortOrder]);
+}, [searchQuery, filterStatus, sortField, sortOrder, receivedMessagesList]);
 
   const filteredSent = useMemo(() => {
     let result = sentMessagesList;
@@ -132,7 +118,7 @@ const MessagesPage: React.FC = () => {
       return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
     return result;
-  }, [searchQuery, filterStatus, sortField, sortOrder]);
+}, [searchQuery, filterStatus, sortField, sortOrder, receivedMessagesList]);
 
   const handleReply = (msg: Message) => {
     setRecipient(msg.person);
@@ -143,30 +129,40 @@ const MessagesPage: React.FC = () => {
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-  const handleSendMessage = () => {
-    if (!recipient.trim() || !subject.trim() || !messageText.trim()) {
-      alert('Please fill in the recipient, subject, and message.');
-      return;
-    }
+const handleSendMessage = async () => {
+  if (!recipient.trim() || !messageText.trim()) {
+    alert('Please fill in the recipient and message.');
+    return;
+  }
 
-    const newMessage: Message = {
-      id: `sent-${Date.now()}`,
-      person: recipient,
-      subject: subject,
-      message: messageText + (attachment ? `\n[Attachment: ${attachment.name}]` : ''),
-      time: 'Just now',
-      status: 'sent',
-    };
-
-    setSentMessagesList([newMessage, ...sentMessagesList]);
+  const recipientUser = recipients.find(r => `${r.firstName} ${r.lastName}` === recipient.trim());
+  if (!recipientUser) {
+    alert('Recipient not found. Please select from the list.');
+    return;
+  }
+  setSending(true);
+  try {
+    const res = await fetch('http://localhost:3000/api/messages', {
+      method: 'POST',
+      credentials: 'include',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ recipientId: recipientUser.id, body: messageText }),
+    });
+    if (!res.ok) throw new Error();
     setIsNewMessageOpen(false);
     setRecipient('');
     setSubject('');
     setMessageText('');
     setAttachment(null);
-  };
+    await fetchMessages();
+  } catch {
+    alert('Failed to send message.');
+  } finally {
+    setSending(false);
+  }
+};
 
-  const toggleExpand = (id: string) => {
+  const toggleExpand = (id: number) => {
     setExpandedMessageId(prev => prev === id ? null : id);
   };
 
@@ -181,15 +177,24 @@ const MessagesPage: React.FC = () => {
             </p>
           </div>
 
-          <button
-            type="button"
-            onClick={() => setIsNewMessageOpen((currentValue) => !currentValue)}
-            aria-expanded={isNewMessageOpen}
-            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-palette-fern px-5 text-sm font-black text-white shadow-soft transition hover:bg-palette-leaf focus:outline-none focus:ring-2 focus:ring-palette-leaf/30"
-          >
-            <span className="text-lg leading-none">+</span>
-            New message
-          </button>
+          <div className="flex gap-2">
+            <button
+              type="button"
+              onClick={() => setIsNewMessageOpen((currentValue) => !currentValue)}
+              aria-expanded={isNewMessageOpen}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-palette-fern px-5 text-sm font-black text-white shadow-soft transition hover:bg-palette-leaf focus:outline-none focus:ring-2 focus:ring-palette-leaf/30"
+            >
+              <span className="text-lg leading-none">+</span>
+              New message
+            </button>
+            <button
+              type="button"
+              onClick={fetchMessages}
+              className="inline-flex h-11 items-center justify-center gap-2 rounded-md border border-palette-lichen/60 bg-white px-4 text-sm font-black text-palette-moss shadow-soft transition hover:bg-palette-mist hover:text-palette-pine"
+            >
+              ↻ Refresh
+            </button>
+          </div>
         </div>
       </header>
 
@@ -257,14 +262,33 @@ const MessagesPage: React.FC = () => {
           <div className="grid gap-3 md:grid-cols-2">
             <label className="flex flex-col gap-1.5 text-xs font-black uppercase tracking-wide text-palette-moss">
               Recipient
-              <input
-                type="search"
-                list="message-recipients"
-                placeholder="Search recipient..."
-                value={recipient}
-                onChange={(event) => setRecipient(event.target.value)}
-                className="h-11 rounded-md border border-palette-lichen/60 bg-palette-mist/40 px-3 text-sm font-semibold normal-case tracking-normal text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:bg-white focus:ring-2 focus:ring-palette-leaf/20"
-              />
+          <div className="relative">
+            <input
+              type="text"
+              placeholder="Search recipient..."
+              value={recipient}
+              onChange={(e) => setRecipient(e.target.value)}
+              className="h-11 w-full rounded-md border border-palette-lichen/60 bg-palette-mist/40 px-3 text-sm font-semibold text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:bg-white focus:ring-2 focus:ring-palette-leaf/20"
+            />
+            {recipient && recipients.filter(r => 
+              `${r.firstName} ${r.lastName}`.toLowerCase().includes(recipient.toLowerCase())
+            ).length > 0 && (
+              <ul className="absolute z-10 mt-1 w-full rounded-md border border-palette-lichen/60 bg-white shadow-lg">
+                {recipients
+                  .filter(r => `${r.firstName} ${r.lastName}`.toLowerCase().includes(recipient.toLowerCase()))
+                  .map(r => (
+                    <li
+                      key={r.id}
+                      onClick={() => setRecipient(`${r.firstName} ${r.lastName}`)}
+                      className="cursor-pointer px-3 py-2 text-sm text-palette-pine hover:bg-palette-mist"
+                    >
+                      {r.firstName} {r.lastName} <span className="text-palette-moss">({r.role})</span>
+                    </li>
+                  ))
+                }
+              </ul>
+            )}
+          </div>
             </label>
 
             <label className="flex flex-col gap-1.5 text-xs font-black uppercase tracking-wide text-palette-moss">
@@ -280,8 +304,8 @@ const MessagesPage: React.FC = () => {
           </div>
 
           <datalist id="message-recipients">
-            {STUDENTS.map((student) => (
-              <option key={student} value={student} />
+            {recipients.map((r) => (
+              <option key={r.id} value={`${r.firstName} ${r.lastName}`} />
             ))}
           </datalist>
 
@@ -332,7 +356,7 @@ const MessagesPage: React.FC = () => {
               onClick={handleSendMessage}
               className="h-10 rounded-md bg-palette-fern px-5 text-sm font-black text-white shadow-soft transition hover:bg-palette-leaf focus:outline-none focus:ring-2 focus:ring-palette-leaf/30"
             >
-              Send message
+              {sending ? 'Sending...' : 'Send message'}
             </button>
           </div>
         </section>
