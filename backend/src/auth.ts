@@ -24,8 +24,18 @@ const privileges = {
 
 
 app.use(cors({
-  origin: 'http://localhost:5173', 
-  credentials: true               
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (
+      origin.startsWith('http://localhost') ||
+      origin.endsWith('.onrender.com') ||
+      origin === process.env.CORS_ORIGIN
+    ) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS blocked: ${origin}`));
+  },
+  credentials: true
 }));
 app.use(express.json());
 app.use(session({
@@ -60,7 +70,7 @@ export async function requireAuth(req: express.Request, res: express.Response, n
     }
 
     return true;
-    //next(); // ✅ they're logged in, let them through
+
 
 }
 
