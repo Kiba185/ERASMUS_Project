@@ -1,3 +1,4 @@
+import API_URL from '../config/config.tsx';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
@@ -91,7 +92,7 @@ const ScheduleEditPage: React.FC = () => {
   useEffect(() => {
     const fetchSetupOptions = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/setup-data');
+        const response = await fetch(`${API_URL}/api/setup-data`);
         const result = await response.json();
         
         if (result.success) {
@@ -119,7 +120,7 @@ const ScheduleEditPage: React.FC = () => {
     const fetchClassTimetable = async () => {
       try {
         // Zde voláme API backendu pro stažení hodin podle názvu třídy
-        const response = await fetch(`http://localhost:3000/api/timetables/class/${selectedClass}`);
+        const response = await fetch(`${API_URL}/api/timetables/class/${selectedClass}`);
         if (!response.ok) throw new Error('Chyba při načítání rozvrhu');
         
         const data = await response.json();
@@ -242,8 +243,8 @@ const ScheduleEditPage: React.FC = () => {
     const testAdminName = "admin";
     
     const url = isNewLesson 
-      ? `http://localhost:3000/api/timetables/edit/${testAdminName}` 
-      : `http://localhost:3000/api/timetables/edit/${testAdminName}/${editingLesson.id}`;
+      ? `${API_URL}/api/timetables/edit/${testAdminName}` 
+      : `${API_URL}/api/timetables/edit/${testAdminName}/${editingLesson.id}`;
     
     const method = isNewLesson ? 'POST' : 'PUT';
 
@@ -302,7 +303,7 @@ const ScheduleEditPage: React.FC = () => {
 
     try {
       const testAdminName = "admin";
-      const url = `http://localhost:3000/api/timetables/edit/${testAdminName}/${id}`;
+      const url = `${API_URL}/api/timetables/edit/${testAdminName}/${id}`;
       const response = await fetch(url, { method: 'DELETE' });
       const result = await response.json();
 

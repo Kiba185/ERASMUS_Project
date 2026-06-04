@@ -22,7 +22,7 @@ const SIDEBAR_LINKS: SidebarLink[] = [
   { label: 'Absence', icon: 'error', path: '/absence', roles: ['student', 'parent'] },
   { label: 'Absence notes', icon: 'note', path: '/absence-notes', roles: ['parent', 'teacher'] },
   { label: 'Messages', icon: 'message', path: '/messages', roles: ['admin', 'teacher', 'student', 'parent'] },
-  { label: 'Classes', icon: 'class', path: '/classes', roles: ['teacher', 'admin'] },
+  { label: 'Classes', icon: 'class', path: '/classes', roles: ['admin'] },
   { label: 'Semester', icon: 'date_range', path: '/semester', roles: ['parent', 'admin', 'student', 'teacher'] },
   { label: 'Events', icon: 'map_pin_review', path: '/events', roles: ['admin', 'teacher', 'student', 'parent'] },
   { label: 'User info', icon: 'person', path: '/user', roles: ['parent', 'admin', 'student', 'teacher'] },
