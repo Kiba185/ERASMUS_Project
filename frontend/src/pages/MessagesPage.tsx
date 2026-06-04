@@ -462,21 +462,22 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
                       )}
                     </div>
                   </td>
-                  <td className="max-w-md px-4 py-3 font-medium text-palette-moss cursor-pointer group" onClick={() => toggleExpand(message.id)}>
-                    <div className={`transition-all duration-300 ${expandedMessageId === message.id ? "" : "line-clamp-1"}`}>
-                      {message.message}
-                    </div>
-                    {expandedMessageId === message.id && (
-                      <div className="mt-2 text-[10px] uppercase font-black tracking-wider text-palette-fern/70">
-                        Click to collapse
+                    <td className="px-4 py-3 font-medium text-palette-moss cursor-pointer group" onClick={() => toggleExpand(message.id)}>
+                      <div className="flex flex-col gap-1">
+                        <div className={`transition-all duration-300 ${expandedMessageId === message.id ? "whitespace-pre-wrap" : "line-clamp-1"}`}>
+                          {message.message}
+                        </div>
+                        {expandedMessageId === message.id ? (
+                          <div className="text-[10px] uppercase font-black tracking-wider text-palette-fern/70">
+                            Click to collapse
+                          </div>
+                        ) : message.message.length > 50 ? (
+                          <div className="text-[10px] uppercase font-black tracking-wider text-palette-moss/50 group-hover:text-palette-fern/70 transition-colors">
+                            Click to expand
+                          </div>
+                        ) : null}
                       </div>
-                    )}
-                    {expandedMessageId !== message.id && message.message.length > 50 && (
-                      <div className="mt-1 text-[10px] uppercase font-black tracking-wider text-palette-moss/50 group-hover:text-palette-fern/70 transition-colors">
-                        Click to expand
-                      </div>
-                    )}
-                  </td>
+                    </td>
                   <td className="whitespace-nowrap px-4 py-3 font-bold text-palette-moss">{message.time}</td>
                   <td className="px-4 py-3 text-right">
                     <button
