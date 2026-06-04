@@ -76,6 +76,7 @@ const ScheduleEditPage: React.FC = () => {
   const [dbClasses, setDbClasses] = useState<{id: number, name: string}[]>([]);
   const [dbSubjects, setDbSubjects] = useState<{id: number, name: string}[]>([]);
   const [dbTeachers, setDbTeachers] = useState<{id: number, firstName: string, lastName: string}[]>([]);
+  const availableTeachers = dbTeachers.map((t) => `Mr. ${t.lastName}`);
 
   const [selectedClass, setSelectedClass] = useState<string>('9.B');
   const [weekOffset, setWeekOffset] = useState<number>(0);
@@ -579,8 +580,8 @@ const ScheduleEditPage: React.FC = () => {
                 >
                   {dbTeachers.length === 0 && <option value="" disabled>Načítám učitele...</option>}
                   {dbTeachers.length > 0 && <option value="" disabled>Select teacher...</option>}
-                  {dbTeachers.map(t => (
-                    <option key={t.id} value={`Mr. ${t.lastName}`}>{t.firstName} {t.lastName}</option>
+                  {getFilteredTeachers().map((teacherName) => (
+                    <option key={teacherName} value={teacherName}>{teacherName}</option>
                   ))}
                 </select>
               </div>
