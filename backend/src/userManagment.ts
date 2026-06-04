@@ -14,13 +14,14 @@ router.get('/api/admin/users', async (req, res, next) => {
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
     const users = await prisma.user.findMany({
-        include: { classes: true, subjects: true }
+        include: { classes: true, subjects: true, children: true }
     });
 
     const saveUsers = users.map(({ password, ...u }: any) => ({
         ...u,
-        classes:  u.classes.map((c: any)  => ({ id: c.id, name: c.name })),
-        subjects: u.subjects.map((s: any) => ({ id: s.id, name: s.name })),
+        classes:     u.classes.map((c: any)  => ({ id: c.id, name: c.name })),
+        subjects:    u.subjects.map((s: any) => ({ id: s.id, name: s.name })),
+        childrenIds: u.children.map((c: any) => c.id),
     }));
 
     res.json(saveUsers);
@@ -70,7 +71,7 @@ router.put('/api/admin/users/:id', async (req, res, next) => {
 router.post('/api/admin/users', async (req, res, next) => {
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
-    const { firstName, lastName, birthday, username, password, email, phone, adress, role } = req.body;
+    const { firstName, lastName, birthday, username, password, email, phone, adress, role, classId } = req.body;
 
     if (!username || !password) {
         return res.status(400).json({ success: false, message: 'Username and password are required' });
@@ -92,7 +93,10 @@ router.post('/api/admin/users', async (req, res, next) => {
             birthday: new Date(birthday),
             username, email, phone, adress,
             role: role ?? 'student',
-            password: hashedPassword
+            password: hashedPassword,
+            ...(classId && {
+                classes: { connect: { id: Number(classId) } }
+            })
         }
     });
 
@@ -158,7 +162,7 @@ router.put('/api/admin/users/:id/classes', async (req, res, next) => {
     const userId = parseInt(req.params.id);
     const { classId } = req.body;
 
-    const result = await prisma.user.update({
+    await prisma.user.update({
         where: { id: userId },
         data: {
             classes: classId
@@ -206,6 +210,27 @@ router.put('/api/admin/users/:id/subjects', async (req, res, next) => {
     });
 
     res.json({ success: true, subjects: result.subjects });
+});
+
+
+// ASSIGN CHILDREN TO PARENT - ADMIN ONLY
+router.put('/api/admin/users/:id/children', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const userId = parseInt(req.params.id);
+    const { childrenIds } = req.body;
+
+    const result = await prisma.user.update({
+        where: { id: userId },
+        data: {
+            children: {
+                set: (childrenIds ?? []).map((id: number) => ({ id }))
+            }
+        },
+        include: { children: true }
+    });
+
+    res.json({ success: true, children: result.children });
 });
 
 
