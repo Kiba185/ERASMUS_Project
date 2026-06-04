@@ -53,26 +53,44 @@ const UsersPage: React.FC = () => {
   const [newPassword, setNewPassword] = useState('');
 
   const fetchUsers = async () => {
-    const res = await fetch(`${API_URL}/api/admin/users`, { credentials: 'include' });
-    const data = await res.json();
-    const mapped = data.map((u: any) => ({
-      ...u,
-      classId: u.classes?.[0]?.id ?? null,
-      subjectIds: u.subjects?.map((s: any) => s.id) ?? []
-    }));
-    setUsers(mapped);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users`, { credentials: 'include' });
+      if (!res.ok) { console.error('fetchUsers failed:', res.status); return; }
+      const data = await res.json();
+      if (!Array.isArray(data)) { console.error('fetchUsers: expected array, got:', data); return; }
+      const mapped = data.map((u: any) => ({
+        ...u,
+        classId: u.classes?.[0]?.id ?? null,
+        subjectIds: u.subjects?.map((s: any) => s.id) ?? []
+      }));
+      setUsers(mapped);
+    } catch (err) {
+      console.error('fetchUsers error:', err);
+    }
   };
 
   const fetchClasses = async () => {
-    const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
-    const data = await res.json();
-    setClasses(data);
+    try {
+      const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
+      if (!res.ok) { console.error('fetchClasses failed:', res.status); return; }
+      const data = await res.json();
+      if (!Array.isArray(data)) { console.error('fetchClasses: expected array, got:', data); return; }
+      setClasses(data);
+    } catch (err) {
+      console.error('fetchClasses error:', err);
+    }
   };
 
   const fetchSubjects = async () => {
-    const res = await fetch(`${API_URL}/api/subjects`, { credentials: 'include' });
-    const data = await res.json();
-    setSubjects(data);
+    try {
+      const res = await fetch(`${API_URL}/api/subjects`, { credentials: 'include' });
+      if (!res.ok) { console.error('fetchSubjects failed:', res.status); return; }
+      const data = await res.json();
+      if (!Array.isArray(data)) { console.error('fetchSubjects: expected array, got:', data); return; }
+      setSubjects(data);
+    } catch (err) {
+      console.error('fetchSubjects error:', err);
+    }
   };
 
   useEffect(() => {
