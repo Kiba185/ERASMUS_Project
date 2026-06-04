@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useAuth } from '../context/AuthContext';
 
 // --- TYPES ---
 type SchoolData = {
@@ -14,6 +15,9 @@ type SchoolData = {
 };
 
 const SchoolInfoPage: React.FC = () => {
+  const { user } = useAuth();
+  const canEdit = user?.role === 'admin';
+
   // --- STATE ---
   const [isSaving, setIsSaving] = useState(false);
   const [schoolData, setSchoolData] = useState<SchoolData>({
@@ -63,19 +67,26 @@ const SchoolInfoPage: React.FC = () => {
             </p>
           </div>
 
-          <div className="flex w-full md:w-auto shrink-0">
-            <button 
-              onClick={handleSave}
-              disabled={isSaving}
-              className={`inline-flex h-11 items-center justify-center gap-2 rounded-md bg-palette-fern px-5 text-sm font-black text-white shadow-soft transition hover:bg-palette-leaf focus:outline-none focus:ring-2 focus:ring-palette-leaf/30x ${
-                isSaving ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
-              }`}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
-              </svg>
-              {isSaving ? 'Saving...' : 'Save Changes'}
-            </button>
+          <div className="flex w-full md:w-auto shrink-0 flex-col items-end gap-3">
+            {!canEdit && (
+              <div>
+                
+              </div>
+            )}
+            {canEdit && (
+              <button 
+                onClick={handleSave}
+                disabled={isSaving}
+                className={`inline-flex h-11 items-center justify-center gap-2 rounded-md px-5 text-sm font-black text-white shadow-soft transition focus:outline-none focus:ring-2 focus:ring-palette-leaf/30x ${
+                  isSaving ? 'bg-emerald-400 cursor-not-allowed' : 'bg-emerald-600 hover:bg-emerald-700'
+                }`}
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M8 7H5a2 2 0 00-2 2v9a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-3m-1 4l-3 3m0 0l-3-3m3 3V4" />
+                </svg>
+                {isSaving ? 'Saving...' : 'Save Changes'}
+              </button>
+            )}
           </div>
         </header>
 
@@ -90,9 +101,9 @@ const SchoolInfoPage: React.FC = () => {
             </div>
             <div className="p-6 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 bg-green-50/10 flex-1">
               {/* Max 250 chars for school name covers even extreme international or combined names */}
-              {renderInput('schoolName', 'School Name', schoolData.schoolName, handleChange, 250, 'text', 'md:col-span-2 lg:col-span-1')}
-              {renderInput('registrationId', 'Registration ID', schoolData.registrationId, handleChange, 30)}
-              {renderInput('principal', 'Principal', schoolData.principal, handleChange, 150)}
+              {renderInput('schoolName', 'School Name', schoolData.schoolName, handleChange, 250, 'text', 'md:col-span-2 lg:col-span-1', !canEdit)}
+              {renderInput('registrationId', 'Registration ID', schoolData.registrationId, handleChange, 30, 'text', '', !canEdit)}
+              {renderInput('principal', 'Principal', schoolData.principal, handleChange, 150, 'text', '', !canEdit)}
             </div>
           </article>
 
@@ -103,10 +114,10 @@ const SchoolInfoPage: React.FC = () => {
               <p className="text-sm text-gray-500">Educational institution headquarters</p>
             </div>
             <div className="p-6 space-y-4 bg-green-50/10 flex-1 flex flex-col justify-between">
-              {renderInput('street', 'Street Address', schoolData.street, handleChange, 150)}
+              {renderInput('street', 'Street Address', schoolData.street, handleChange, 150, 'text', '', !canEdit)}
               <div className="grid grid-cols-2 gap-4">
-                {renderInput('city', 'City', schoolData.city, handleChange, 100)}
-                {renderInput('zipCode', 'ZIP / Postal Code', schoolData.zipCode, handleChange, 20)}
+                {renderInput('city', 'City', schoolData.city, handleChange, 100, 'text', '', !canEdit)}
+                {renderInput('zipCode', 'ZIP / Postal Code', schoolData.zipCode, handleChange, 20, 'text', '', !canEdit)}
               </div>
             </div>
           </article>
@@ -118,9 +129,9 @@ const SchoolInfoPage: React.FC = () => {
               <p className="text-sm text-gray-500">Public and communication details</p>
             </div>
             <div className="p-6 space-y-4 bg-green-50/10 flex-1 flex flex-col justify-between">
-              {renderInput('email', 'Official Email', schoolData.email, handleChange, 100, 'email')}
-              {renderInput('phone', 'Phone Number', schoolData.phone, handleChange, 30, 'tel')}
-              {renderInput('website', 'Website', schoolData.website, handleChange, 200, 'url')}
+              {renderInput('email', 'Official Email', schoolData.email, handleChange, 100, 'email', '', !canEdit)}
+              {renderInput('phone', 'Phone Number', schoolData.phone, handleChange, 30, 'tel', '', !canEdit)}
+              {renderInput('website', 'Website', schoolData.website, handleChange, 200, 'url', '', !canEdit)}
             </div>
           </article>
 
@@ -137,7 +148,8 @@ const SchoolInfoPage: React.FC = () => {
     onChange: (e: React.ChangeEvent<HTMLInputElement>) => void,
     maxLength: number,
     type: string = 'text',
-    className: string = ''
+    className: string = '',
+    disabled: boolean = false
   ) {
     return (
       <div className={`flex flex-col gap-1.5 w-full ${className}`}>
@@ -152,7 +164,8 @@ const SchoolInfoPage: React.FC = () => {
           value={value}
           onChange={onChange}
           maxLength={maxLength}
-          className="bg-white border border-green-200 text-gray-900 text-sm rounded-lg p-2.5 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-shadow w-full shadow-sm"
+          disabled={disabled}
+          className={`bg-white border border-green-200 text-gray-900 text-sm rounded-lg p-2.5 outline-none focus:border-emerald-500 focus:ring-1 focus:ring-emerald-500 transition-shadow w-full shadow-sm ${disabled ? 'bg-slate-100 cursor-not-allowed text-slate-500' : ''}`}
           placeholder={`Enter ${label.toLowerCase()}...`}
         />
       </div>
