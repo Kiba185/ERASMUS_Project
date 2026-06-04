@@ -17,7 +17,6 @@ declare module 'express-session' {
 }
 
 const app = express();
-app.set('trust proxy', 1); // Trust first proxy to allow secure cookies on Render
 const PORT = process.env.PORT || 3000;
 
 const privileges = {
@@ -1323,4 +1322,35 @@ app.get('/api/myattendance', async (req, res, next) => {
   } catch (e: any) {
     res.status(500).json({ error: e.message });
   }
+});
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+app.listen(PORT, () => {
+    console.log(`Server running on http://localhost:${PORT}`);
 });

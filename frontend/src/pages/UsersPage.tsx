@@ -54,7 +54,6 @@ const UsersPage: React.FC = () => {
   const [subjects,    setSubjects]    = useState<MockSubject[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [saving,      setSaving]      = useState(false);
-  const [savingLabel, setSavingLabel] = useState('Saving...');
   const [error,       setError]       = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
@@ -329,14 +328,14 @@ const UsersPage: React.FC = () => {
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
       </svg>
-      Loading...
+      Loading users...
     </div>
   );
 
   if (error) return (
     <div className="p-8 text-center space-y-4">
       <p className="text-red-600 font-bold">{error}</p>
-      <button onClick={fetchAll} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl hover:bg-palette-leaf transition">
+      <button onClick={fetchUsers} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl hover:bg-palette-leaf transition">
         Retry
       </button>
     </div>

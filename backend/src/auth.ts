@@ -21,9 +21,6 @@ const privileges = {
     "admin": 10
 };
 
-app.listen(PORT, () => {
-    console.log(`Server running at http://localhost:${PORT}`);
-});
 
 app.use(cors({
   origin: (origin, callback) => {
@@ -72,7 +69,7 @@ export async function requireAuth(req: express.Request, res: express.Response, n
     }
 
     return true;
-    //next(); // ✅ they're logged in, let them through
+
 
 }
 

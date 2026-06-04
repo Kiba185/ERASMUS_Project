@@ -1,4 +1,5 @@
 import React, { useState, useMemo, useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 
 type Message = {
   id: number;
@@ -31,72 +32,79 @@ const MessagesPage: React.FC = () => {
   const [attachment, setAttachment] = useState<File | null>(null);
   const [receivedMessagesList, setReceivedMessagesList] = useState<Message[]>([]);
   const [sentMessagesList, setSentMessagesList] = useState<Message[]>([]);
-  const [recipients, setRecipients] = useState<{id: number; firstName: string; lastName: string; role?: string}[]>([]);
-  const [sending, setSending] = useState(false);
+  const [recipients, setRecipients] = useState<{ id: number; firstName: string; lastName: string; role?: string }[]>([]);
   const [recipientSelected, setRecipientSelected] = useState(false);
   const recipientDropdownRef = useRef<HTMLDivElement>(null);
-  const [classes, setClasses] = useState<{id: number; name: string; students: {id: number}[]}[]>([]);
+  const [classes, setClasses] = useState<{ id: number; name: string; students: { id: number }[] }[]>([]);
 
-const fetchMessages = async () => {
-  try {
-const [inboxRes, sentRes, recipientsRes, classesRes] = await Promise.all([
-      fetch('http://localhost:3000/api/messages/inbox', { credentials: 'include' }),
-      fetch('http://localhost:3000/api/messages/sent', { credentials: 'include' }),
-      fetch('http://localhost:3000/api/messages/recipients', { credentials: 'include' }),
-      fetch('http://localhost:3000/api/messages/classes', { credentials: 'include' }),
+  const [loading, setLoading] = useState(true);
+  const [sending, setSending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-    ]);
-    const inbox = await inboxRes.json();
-    const sent = await sentRes.json();
-    const recipientsList = await recipientsRes.json();
-    const classesList = await classesRes.json();
-    setClasses(Array.isArray(classesList) ? classesList : []);
+  const fetchMessages = async () => {
+    loading && setLoading(true);
+    try {
+      const [inboxRes, sentRes, recipientsRes, classesRes] = await Promise.all([
+        fetch('http://localhost:3000/api/messages/inbox', { credentials: 'include' }),
+        fetch('http://localhost:3000/api/messages/sent', { credentials: 'include' }),
+        fetch('http://localhost:3000/api/messages/recipients', { credentials: 'include' }),
+        fetch('http://localhost:3000/api/messages/classes', { credentials: 'include' }),
 
-    setReceivedMessagesList(inbox.map((m: any) => {
-      const parts = m.body.split('\n');
-      const hasSubject = parts[0].startsWith('**') && parts[0].endsWith('**');
-      return {
-        id: m.id,
-        person: `${m.sender?.firstName} ${m.sender?.lastName}`,
-        subject: hasSubject ? parts[0].replace(/\*\*/g, '') : '—',
-        message: hasSubject ? parts.slice(1).join('\n') : m.body,
-        time: new Date(m.createdAt).toLocaleString(),
-        status: m.read ? 'read' : 'new',
-        senderId: m.senderId,
-      };
-    }));
+      ]);
+      const inbox = await inboxRes.json();
+      const sent = await sentRes.json();
+      const recipientsList = await recipientsRes.json();
+      const classesList = await classesRes.json();
+      setClasses(Array.isArray(classesList) ? classesList : []);
 
-    setSentMessagesList(sent.map((m: any) => {
-      const parts = m.body.split('\n');
-      const hasSubject = parts[0].startsWith('**') && parts[0].endsWith('**');
-      return {
-        id: m.id,
-        person: `${m.recipient?.firstName} ${m.recipient?.lastName}`,
-        subject: hasSubject ? parts[0].replace(/\*\*/g, '') : '—',
-        message: hasSubject ? parts.slice(1).join('\n') : m.body,
-        time: new Date(m.createdAt).toLocaleString(),
-        status: 'sent',
-        recipientId: m.recipientId,
-      };
-    }));
+      setReceivedMessagesList(inbox.map((m: any) => {
+        const parts = m.body.split('\n');
+        const hasSubject = parts[0].startsWith('**') && parts[0].endsWith('**');
+        return {
+          id: m.id,
+          person: `${m.sender?.firstName} ${m.sender?.lastName}`,
+          subject: hasSubject ? parts[0].replace(/\*\*/g, '') : '—',
+          message: hasSubject ? parts.slice(1).join('\n') : m.body,
+          time: new Date(m.createdAt).toLocaleString(),
+          status: m.read ? 'read' : 'new',
+          senderId: m.senderId,
+        };
+      }));
 
-    setRecipients(recipientsList);
-  } catch {
-    console.error('Failed to load messages');
-  }
-};
+      setSentMessagesList(sent.map((m: any) => {
+        const parts = m.body.split('\n');
+        const hasSubject = parts[0].startsWith('**') && parts[0].endsWith('**');
+        return {
+          id: m.id,
+          person: `${m.recipient?.firstName} ${m.recipient?.lastName}`,
+          subject: hasSubject ? parts[0].replace(/\*\*/g, '') : '—',
+          message: hasSubject ? parts.slice(1).join('\n') : m.body,
+          time: new Date(m.createdAt).toLocaleString(),
+          status: 'sent',
+          recipientId: m.recipientId,
+        };
+      }));
 
-useEffect(() => {
-  const handleClickOutside = (e: MouseEvent) => {
-    if (recipientDropdownRef.current && !recipientDropdownRef.current.contains(e.target as Node)) {
-      setRecipientSelected(true);
+      setRecipients(recipientsList);
+    } catch {
+      error && setError('Failed to load messages');
+      console.error('Failed to load messages');
     }
-  };
-  document.addEventListener('mousedown', handleClickOutside);
-  return () => document.removeEventListener('mousedown', handleClickOutside);
-}, []);
 
-useEffect(() => { fetchMessages(); }, []);
+    setLoading(false);
+  };
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (recipientDropdownRef.current && !recipientDropdownRef.current.contains(e.target as Node)) {
+        setRecipientSelected(true);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  useEffect(() => { fetchMessages(); }, []);
   const parseTime = (t: string) => {
     if (t.includes('hour')) return parseInt(t) || 0;
     if (t.includes('day')) return (parseInt(t) || 0) * 24;
@@ -104,8 +112,9 @@ useEffect(() => { fetchMessages(); }, []);
   };
 
   const filteredReceived = useMemo(() => {
-      let result = receivedMessagesList;
-      if (searchQuery) {      const q = searchQuery.toLowerCase();
+    let result = receivedMessagesList;
+    if (searchQuery) {
+      const q = searchQuery.toLowerCase();
       result = result.filter(m => m.subject.toLowerCase().includes(q) || m.person.toLowerCase().includes(q) || m.message.toLowerCase().includes(q));
     }
     if (filterStatus !== 'all') {
@@ -121,7 +130,7 @@ useEffect(() => { fetchMessages(); }, []);
       return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
     return result;
-}, [searchQuery, filterStatus, sortField, sortOrder, receivedMessagesList]);
+  }, [searchQuery, filterStatus, sortField, sortOrder, receivedMessagesList]);
 
   const filteredSent = useMemo(() => {
     let result = sentMessagesList;
@@ -142,7 +151,7 @@ useEffect(() => { fetchMessages(); }, []);
       return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
     return result;
-}, [searchQuery, filterStatus, sortField, sortOrder, receivedMessagesList]);
+  }, [searchQuery, filterStatus, sortField, sortOrder, receivedMessagesList]);
 
   const handleReply = (msg: Message) => {
     setRecipient(msg.person);
@@ -153,64 +162,96 @@ useEffect(() => { fetchMessages(); }, []);
     window.scrollTo({ top: 0, behavior: 'smooth' });
   };
 
-const handleSendMessage = async () => {
-  console.log('recipient value:', JSON.stringify(recipient));
-  if (!recipient.trim() || !messageText.trim()) {
-    alert('Please fill in the recipient and message.');
-    return;
-  }
+  const handleSendMessage = async () => {
 
-let payload: { recipientId?: number; recipientIds?: number[]; body: string } = { 
-  body: subject ? `**${subject}**\n${messageText}` : messageText };
-  if (recipient === 'Everyone') {
-    payload.recipientIds = recipients.map(r => r.id);
-  } else if (recipient.startsWith('Class: ')) {
-  const className = recipient.replace('Class: ', '');
-  const cls = classes.find(c => c.name === className);
-  if (cls) {
-      payload.recipientIds = cls.students.map(s => s.id);
-  }
-  } else if (recipient === 'All Teachers') {
-    payload.recipientIds = recipients.filter(r => r.role === 'teacher').map(r => r.id);
-  } else if (recipient === 'All Students') {
-    payload.recipientIds = recipients.filter(r => r.role === 'student').map(r => r.id);
-  } else {
-    const recipientUser = recipients.find(r => `${r.firstName} ${r.lastName}` === recipient.trim());
-    if (!recipientUser) {
-      alert('Recipient not found. Please select from the list.');
+    console.log('recipient value:', JSON.stringify(recipient));
+    if (!recipient.trim() || !messageText.trim()) {
+      alert('Please fill in the recipient and message.');
       return;
     }
-    payload.recipientId = recipientUser.id;
-  }
 
-  setSending(true);
-  try {
-    const res = await fetch('http://localhost:3000/api/messages', {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(payload),
-    });
-    if (!res.ok) throw new Error();
-    setIsNewMessageOpen(false);
-    setRecipient('');
-    setSubject('');
-    setMessageText('');
-    setAttachment(null);
-    await fetchMessages();
-  } catch {
-    alert('Failed to send message.');
-  } finally {
-    setSending(false);
-  }
-};
+    let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
+      body: subject ? `**${subject}**\n${messageText}` : messageText
+    };
+    if (recipient === 'Everyone') {
+      payload.recipientIds = recipients.map(r => r.id);
+    } else if (recipient.startsWith('Class: ')) {
+      const className = recipient.replace('Class: ', '');
+      const cls = classes.find(c => c.name === className);
+      if (cls) {
+        payload.recipientIds = cls.students.map(s => s.id);
+      }
+    } else if (recipient === 'All Teachers') {
+      payload.recipientIds = recipients.filter(r => r.role === 'teacher').map(r => r.id);
+    } else if (recipient === 'All Students') {
+      payload.recipientIds = recipients.filter(r => r.role === 'student').map(r => r.id);
+    } else {
+      const recipientUser = recipients.find(r => `${r.firstName} ${r.lastName}` === recipient.trim());
+      if (!recipientUser) {
+        alert('Recipient not found. Please select from the list.');
+        return;
+      }
+      payload.recipientId = recipientUser.id;
+    }
+
+    setSending(true);
+    try {
+      const res = await fetch('http://localhost:3000/api/messages', {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(payload),
+      });
+      if (!res.ok) throw new Error();
+      setIsNewMessageOpen(false);
+      setRecipient('');
+      setSubject('');
+      setMessageText('');
+      setAttachment(null);
+      await fetchMessages();
+    } catch {
+      alert('Failed to send message.');
+    } finally {
+      setSending(false);
+    }
+  };
 
   const toggleExpand = (id: number) => {
     setExpandedMessageId(prev => prev === id ? null : id);
   };
 
+  if (loading) return (
+    <div className="flex items-center justify-center gap-3 p-12 text-palette-pine font-bold text-lg">
+      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      </svg>
+      Loading messages...
+    </div>
+  );
+
+  if (error) return (
+    <div className="p-8 text-center space-y-4">
+      <p className="text-red-600 font-bold">{error}</p>
+      <button onClick={fetchMessages} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl hover:bg-palette-leaf transition">
+        Retry
+      </button>
+    </div>
+  );
+
   return (
     <section className="mx-auto max-w-7xl space-y-4 px-2 py-2 text-palette-pine">
+
+      {sending && createPortal(
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-palette-pine font-bold text-lg">Sending...</p>
+          </div>
+        </div>,
+        document.body
+      )}
+
       <header className="rounded-lg border border-palette-lichen/45 bg-palette-mist p-5 shadow-soft">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
@@ -253,8 +294,8 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
           />
         </div>
         <div className="flex flex-wrap gap-4 w-full md:w-auto">
-          <select 
-            value={filterStatus} 
+          <select
+            value={filterStatus}
             onChange={(e) => setFilterStatus(e.target.value as any)}
             className="h-10 rounded-md border border-palette-lichen/60 bg-gray-50 px-3 text-sm font-bold text-palette-pine outline-none transition focus:bg-white focus:border-palette-leaf focus:ring-2 focus:ring-palette-leaf/20"
           >
@@ -263,8 +304,8 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
             <option value="read">Read</option>
           </select>
 
-          <select 
-            value={sortField} 
+          <select
+            value={sortField}
             onChange={(e) => setSortField(e.target.value as any)}
             className="h-10 rounded-md border border-palette-lichen/60 bg-gray-50 px-3 text-sm font-bold text-palette-pine outline-none transition focus:bg-white focus:border-palette-leaf focus:ring-2 focus:ring-palette-leaf/20"
           >
@@ -272,8 +313,8 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
             <option value="person">Sort by Person</option>
             <option value="subject">Sort by Subject</option>
           </select>
-          
-          <button 
+
+          <button
             onClick={() => setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')}
             className="h-10 px-3 flex items-center justify-center rounded-md border border-palette-lichen/60 bg-gray-50 text-sm font-black text-palette-moss transition hover:bg-palette-mist hover:text-palette-pine"
             title="Toggle sort order"
@@ -312,8 +353,8 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
                   value={recipient}
                   onChange={(e) => { setRecipient(e.target.value); setRecipientSelected(false); }}
                   className="h-11 w-full rounded-md border border-palette-lichen/60 bg-palette-mist/40 px-3 text-sm font-semibold text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:bg-white focus:ring-2 focus:ring-palette-leaf/20"
-                />                                        
-                    {!recipientSelected && recipient !== 'Everyone' && recipient !== 'All Teachers' && recipient !== 'All Students' && (
+                />
+                {!recipientSelected && recipient !== 'Everyone' && recipient !== 'All Teachers' && recipient !== 'All Students' && (
                   <ul className="absolute z-10 mt-1 w-full rounded-md border border-palette-lichen/60 bg-white shadow-lg max-h-64 overflow-y-auto">
                     {['Everyone', 'All Teachers', 'All Students']
                       .filter(opt => opt.toLowerCase().includes(recipient.toLowerCase()) || recipient === '')
@@ -383,10 +424,10 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
 
           <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
             <div className="flex items-center gap-3">
-              <input 
-                id="message-attachment" 
-                type="file" 
-                className="hidden" 
+              <input
+                id="message-attachment"
+                type="file"
+                className="hidden"
                 onChange={(e) => {
                   if (e.target.files && e.target.files.length > 0) {
                     setAttachment(e.target.files[0]);
@@ -404,8 +445,8 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
               {attachment && (
                 <div className="flex items-center gap-2 rounded-full bg-palette-mist px-3 py-1 text-xs font-black text-palette-moss">
                   <span>{attachment.name}</span>
-                  <button 
-                    type="button" 
+                  <button
+                    type="button"
                     onClick={() => setAttachment(null)}
                     className="text-red-500 hover:text-red-700"
                     title="Remove attachment"
@@ -462,22 +503,22 @@ let payload: { recipientId?: number; recipientIds?: number[]; body: string } = {
                       )}
                     </div>
                   </td>
-                    <td className="px-4 py-3 font-medium text-palette-moss cursor-pointer group" onClick={() => toggleExpand(message.id)}>
-                      <div className="flex flex-col gap-1">
-                        <div className={`transition-all duration-300 ${expandedMessageId === message.id ? "whitespace-pre-wrap" : "line-clamp-1"}`}>
-                          {message.message}
-                        </div>
-                        {expandedMessageId === message.id ? (
-                          <div className="text-[10px] uppercase font-black tracking-wider text-palette-fern/70">
-                            Click to collapse
-                          </div>
-                        ) : message.message.length > 50 ? (
-                          <div className="text-[10px] uppercase font-black tracking-wider text-palette-moss/50 group-hover:text-palette-fern/70 transition-colors">
-                            Click to expand
-                          </div>
-                        ) : null}
+                  <td className="px-4 py-3 font-medium text-palette-moss cursor-pointer group" onClick={() => toggleExpand(message.id)}>
+                    <div className="flex flex-col gap-1">
+                      <div className={`transition-all duration-300 ${expandedMessageId === message.id ? "whitespace-pre-wrap" : "line-clamp-1"}`}>
+                        {message.message}
                       </div>
-                    </td>
+                      {expandedMessageId === message.id ? (
+                        <div className="text-[10px] uppercase font-black tracking-wider text-palette-fern/70">
+                          Click to collapse
+                        </div>
+                      ) : message.message.length > 50 ? (
+                        <div className="text-[10px] uppercase font-black tracking-wider text-palette-moss/50 group-hover:text-palette-fern/70 transition-colors">
+                          Click to expand
+                        </div>
+                      ) : null}
+                    </div>
+                  </td>
                   <td className="whitespace-nowrap px-4 py-3 font-bold text-palette-moss">{message.time}</td>
                   <td className="px-4 py-3 text-right">
                     <button
