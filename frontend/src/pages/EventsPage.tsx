@@ -496,8 +496,8 @@ const EventsPage: React.FC = () => {
               setModalView('create');
               setIsModalOpen(true);
             }}
-            className="py-2 px-4 bg-emerald-600 text-white font-semibold text-sm rounded-xl hover:bg-emerald-700 transition shadow-xs focus:ring-2 focus:ring-emerald-500 focus:outline-hidden"
-          >
+            className="inline-flex h-11 items-center justify-center gap-2 rounded-md bg-palette-fern px-5 text-sm font-black text-white shadow-soft transition hover:bg-palette-leaf focus:outline-none focus:ring-2 focus:ring-palette-leaf/30"
+              >
             + New Event
           </button>
         )}
