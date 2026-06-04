@@ -141,10 +141,6 @@ const ScheduleEditPage: React.FC = () => {
   const [isPermanentEditMode, setIsPermanentEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Partial<Lesson> | null>(null);
-  /* const availableSubjectOptions = mergeUniqueOptions(
-    [...availableSubjects, ...lessons.map((lesson) => lesson.subject)],
-    setupMockData.subjects.map((subject) => subject.subject),
-  ); */
   const availableRoomOptions = mergeUniqueOptions(availableRooms, setupMockData.rooms);
 
   const currentWeekDates = getWeekDatesStrings(weekOffset);
@@ -229,7 +225,7 @@ const ScheduleEditPage: React.FC = () => {
       room: availableRoomOptions[0],
       weekType: 'all',
       group: 'Whole Class',
-      color: 'border-gray-500 bg-gray-50',
+      color: 'border-gray-500 bg-gray-900/5',
       isPermanent: true,
       status: 'active'
     });
@@ -302,7 +298,6 @@ const ScheduleEditPage: React.FC = () => {
     setEditingLesson((prev) => prev ? { ...prev, [name]: value } : null);
   };
 
-  // Specifický handler pro změnu předmětu (validuje/přenastavuje učitele)
   const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextSubject = e.target.value;
     setEditingLesson((prev) => {
@@ -312,7 +307,6 @@ const ScheduleEditPage: React.FC = () => {
       const isSubstituted = prev.status === 'substituted';
 
       let nextTeacher = prev.teacher || '';
-      // Pokud to není suplování a učitel neučí nový předmět, vybereme prvního validního
       if (!isSubstituted && nextSubject && !allowedTeachers.includes(nextTeacher)) {
         nextTeacher = allowedTeachers[0] || '';
       }
@@ -325,7 +319,6 @@ const ScheduleEditPage: React.FC = () => {
     });
   };
 
-  // Specifický handler pro změnu stavu hodiny (při změně na/ze suplování hlídá učitele)
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextStatus = e.target.value as any;
     setEditingLesson((prev) => {
@@ -347,11 +340,10 @@ const ScheduleEditPage: React.FC = () => {
     });
   };
 
-  // Pomocná funkce pro získání seznamu učitelů na základě kontextu
   const getFilteredTeachers = () => {
     if (!editingLesson) return [];
     if (editingLesson.status === 'substituted') {
-      return availableTeachers; // Suplování -> všichni učitelé školy k dispozici
+      return availableTeachers;
     }
     return subjectTeachersMap[editingLesson.subject || ''] || [];
   };
@@ -377,8 +369,9 @@ const ScheduleEditPage: React.FC = () => {
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Calendar Range Tracker</label>
               <div className="flex items-center gap-2">
+                {/* Změněno z relativního krokování na přímé nastavení hodnoty -1 */}
                 <button
-                  onClick={() => setWeekOffset(prev => prev - 1)}
+                  onClick={() => setWeekOffset(-1)}
                   className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === -1 ? 'bg-palette-pine text-white border-transparent' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
                 >
                   Previous Week
@@ -389,8 +382,9 @@ const ScheduleEditPage: React.FC = () => {
                 >
                   Current Week
                 </button>
+                {/* Změněno z relativního krokování na přímé nastavení hodnoty 1 */}
                 <button
-                  onClick={() => setWeekOffset(prev => prev + 1)}
+                  onClick={() => setWeekOffset(1)}
                   className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === 1 ? 'bg-palette-pine text-white border-transparent' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
                 >
                   Next Week
@@ -577,7 +571,6 @@ const ScheduleEditPage: React.FC = () => {
               )}
 
               <div className="grid grid-cols-2 gap-4">
-                {/* Změněno z textového inputu na Select předmětů */}
                 <div>
                   <label className="block text-sm font-bold text-gray-700 mb-1">Subject Name</label>
                   <select
@@ -599,7 +592,6 @@ const ScheduleEditPage: React.FC = () => {
                 </div>
               </div>
 
-              {/* Dynamicky filtrovaný výběr učitelů */}
               <div>
                 <label className="block text-sm font-bold text-gray-700 mb-1">
                   Assigned Teacher {editingLesson.status === 'substituted' && <span className="text-xs text-amber-600 font-normal">(Substitution Mode: All options opened)</span>}
