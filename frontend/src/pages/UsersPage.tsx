@@ -6,8 +6,16 @@ import { useAuth } from '../context/AuthContext';
 
 type Role = 'student' | 'teacher' | 'parent' | 'admin';
 
-interface MockSubject { id: number; name: string; }
-interface MockClass   { id: number; name: string; }
+interface MockSubject {
+  id: number;
+  name: string;
+}
+
+interface MockClass {
+  id: number;
+  name: string;
+}
+
 interface MockUser {
   id: number;
   firstName: string;
@@ -26,7 +34,7 @@ interface MockUser {
 // ─── Component ───────────────────────────────────────────────────────────────
 
 const UsersPage: React.FC = () => {
-  const navigate  = useNavigate();
+  const navigate = useNavigate();
   const { login } = useAuth();
 
   // ── State ──────────────────────────────────────────────────────────────────
@@ -37,11 +45,11 @@ const UsersPage: React.FC = () => {
   const [saving,   setSaving]   = useState(false);
   const [error,    setError]    = useState<string | null>(null);
 
-  const [search,      setSearch]      = useState('');
-  const [roleFilter,  setRoleFilter]  = useState<Role | 'all'>('all');
+  const [search, setSearch] = useState('');
+  const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
   const [classFilter, setClassFilter] = useState<number | 'all'>('all');
-  const [sortField,   setSortField]   = useState<keyof MockUser>('lastName');
-  const [sortOrder,   setSortOrder]   = useState<'asc' | 'desc'>('asc');
+  const [sortField, setSortField] = useState<keyof MockUser>('lastName');
+  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<MockUser | null>(null);
@@ -104,12 +112,12 @@ const UsersPage: React.FC = () => {
       const s = search.toLowerCase();
       result = result.filter(u =>
         u.firstName.toLowerCase().includes(s) ||
-        u.lastName.toLowerCase().includes(s)  ||
-        u.username.toLowerCase().includes(s)  ||
+        u.lastName.toLowerCase().includes(s) ||
+        u.username.toLowerCase().includes(s) ||
         u.email.toLowerCase().includes(s)
       );
     }
-    if (roleFilter  !== 'all') result = result.filter(u => u.role    === roleFilter);
+    if (roleFilter !== 'all') result = result.filter(u => u.role === roleFilter);
     if (classFilter !== 'all') result = result.filter(u => u.classId === classFilter);
     return [...result].sort((a, b) => {
       const aVal = String(a[sortField] ?? '');
@@ -130,14 +138,13 @@ const UsersPage: React.FC = () => {
   // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleSort = (field: keyof MockUser) => {
-    if (sortField === field) setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
+    if (sortField === field) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortOrder('asc'); }
   };
 
   const openAddModal = () => {
     setIsNew(true);
     setNewPassword('');
-    setModalError(null);
     setEditingUser({ id: 0, firstName: '', lastName: '', username: '', email: '', phone: '', adress: '', birthday: '', role: 'student', classId: null, childrenIds: [], subjectIds: [] });
     setIsModalOpen(true);
   };
@@ -145,7 +152,6 @@ const UsersPage: React.FC = () => {
   const openEditModal = (user: MockUser) => {
     setIsNew(false);
     setNewPassword('');
-    setModalError(null);
     setEditingUser({ ...user, birthday: user.birthday ? user.birthday.split('T')[0] : '' });
     setIsModalOpen(true);
   };
@@ -153,9 +159,13 @@ const UsersPage: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
-    if (!editingUser.birthday) { setModalError('Date of birth is required.'); return; }
 
-    setModalError(null);
+    if (!editingUser.birthday) {
+      alert('Datum narození je povinné!');
+      return;
+    }
+
+    setIsModalOpen(false);
     setSaving(true);
 
     try {
@@ -187,7 +197,7 @@ const UsersPage: React.FC = () => {
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(editingUser),
+          body: JSON.stringify({ newPassword })
         });
         if (!res.ok) {
           const ct = res.headers.get('content-type') ?? '';
@@ -223,7 +233,7 @@ const UsersPage: React.FC = () => {
   };
 
   const handleDelete = async (id: number) => {
-    if (!confirm('Are you sure you want to delete this user?')) return;
+    if (!confirm('Opravdu smazat uživatele?')) return;
     setSaving(true);
     try {
       const res = await fetch(`${API_URL}/api/admin/users/${id}`, { method: 'DELETE', credentials: 'include' });
@@ -252,23 +262,7 @@ const UsersPage: React.FC = () => {
     return <span className="text-gray-400">-</span>;
   };
 
-  // ── Loading / error states (AFTER all hooks) ───────────────────────────────
-
-  if (loading) return (
-    <div className="p-8 flex items-center justify-center gap-3 text-palette-pine font-bold text-lg">
-      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-      </svg>
-      Loading users...
-    </div>
-  );
-
-  if (error) return (
-    <div className="p-8 text-center space-y-4">
-      <p className="text-red-600 font-bold text-lg">{error}</p>
-    </div>
-  );
+  if (loading) return <div className="p-8 text-palette-pine font-bold">Loading...</div>;
 
   // ── Render ─────────────────────────────────────────────────────────────────
 
@@ -277,9 +271,9 @@ const UsersPage: React.FC = () => {
 
       {/* Saving overlay */}
       {saving && createPortal(
-        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-[99999]">
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-50">
           <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
-            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
+            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin"></div>
             <p className="text-palette-pine font-bold text-lg">Saving...</p>
           </div>
         </div>,
@@ -295,11 +289,9 @@ const UsersPage: React.FC = () => {
         </button>
       </div>
 
-      {/* Filters */}
       <div className="bg-white p-5 rounded-2xl shadow-soft border border-palette-mist flex flex-wrap gap-4 items-center">
         <div className="flex-1 min-w-[200px]">
-          <input type="text" placeholder="Search by name, email..." value={search} onChange={e => setSearch(e.target.value)}
-            className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
+          <input type="text" placeholder="Search by name, email..." value={search} onChange={e => setSearch(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow focus:border-palette-meadow outline-none transition" />
         </div>
         <select value={roleFilter} onChange={e => setRoleFilter(e.target.value as Role | 'all')} className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition text-palette-pine font-medium">
           <option value="all">All Roles</option>
@@ -308,24 +300,18 @@ const UsersPage: React.FC = () => {
           <option value="parent">Parent</option>
           <option value="admin">Admin</option>
         </select>
-        <select value={classFilter} onChange={e => setClassFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-          className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition text-palette-pine font-medium">
+        <select value={classFilter} onChange={e => setClassFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))} className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition text-palette-pine font-medium">
           <option value="all">All Classes</option>
           {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
 
-      {/* Table */}
       <div className="bg-white rounded-2xl shadow-soft border border-palette-mist overflow-hidden overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-100 text-sm">
           <thead className="bg-palette-mist">
             <tr>
-              <th className="px-6 py-4 text-left font-bold text-palette-pine cursor-pointer hover:bg-palette-sage hover:text-white transition" onClick={() => handleSort('lastName')}>
-                Name {sortField === 'lastName' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </th>
-              <th className="px-6 py-4 text-left font-bold text-palette-pine cursor-pointer hover:bg-palette-sage hover:text-white transition" onClick={() => handleSort('role')}>
-                Role {sortField === 'role' && (sortOrder === 'asc' ? '↑' : '↓')}
-              </th>
+              <th className="px-6 py-4 text-left font-bold text-palette-pine cursor-pointer hover:bg-palette-sage hover:text-white transition" onClick={() => handleSort('lastName')}>Name {sortField === 'lastName' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
+              <th className="px-6 py-4 text-left font-bold text-palette-pine cursor-pointer hover:bg-palette-sage hover:text-white transition" onClick={() => handleSort('role')}>Role {sortField === 'role' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
               <th className="px-6 py-4 text-left font-bold text-palette-pine">Class / Assigned</th>
               <th className="px-6 py-4 text-left font-bold text-palette-pine">Email</th>
               <th className="px-6 py-4 text-left font-bold text-palette-pine">Phone</th>
@@ -341,21 +327,19 @@ const UsersPage: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-3 py-1 text-xs font-bold rounded-full capitalize border
-                    ${user.role === 'admin'   ? 'bg-red-50 text-red-700 border-red-200' : ''}
+                    ${user.role === 'admin' ? 'bg-red-50 text-red-700 border-red-200' : ''}
                     ${user.role === 'teacher' ? 'bg-palette-mist text-palette-fern border-palette-sage' : ''}
-                    ${user.role === 'parent'  ? 'bg-orange-50 text-orange-700 border-orange-200' : ''}
+                    ${user.role === 'parent' ? 'bg-palette-mist text-palette-moss border-palette-sage' : ''}
                     ${user.role === 'student' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}
                   `}>{user.role}</span>
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">{getClassBadge(user)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">{user.email}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">{user.phone}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-right">
-                  <div className="flex justify-end gap-3">
-                    <button onClick={() => handleLoginAs(user)} className="text-palette-moss hover:text-palette-pine font-bold transition">Login As</button>
-                    <button onClick={() => openEditModal(user)} className="text-palette-fern hover:text-palette-leaf font-bold transition">Edit</button>
-                    <button onClick={() => handleDelete(user.id)} className="text-red-400 hover:text-red-600 font-bold transition">Delete</button>
-                  </div>
+                <td className="px-6 py-4 whitespace-nowrap text-right flex justify-end gap-3">
+                  <button onClick={() => handleLoginAs(user)} className="text-palette-moss hover:text-palette-pine font-bold transition">Login As</button>
+                  <button onClick={() => openEditModal(user)} className="text-palette-fern hover:text-palette-leaf font-bold transition">Edit</button>
+                  <button onClick={() => handleDelete(user.id)} className="text-red-400 hover:text-red-600 font-bold transition">Delete</button>
                 </td>
               </tr>
             ))}
@@ -366,7 +350,6 @@ const UsersPage: React.FC = () => {
         </table>
       </div>
 
-      {/* Modal */}
       {isModalOpen && editingUser && createPortal(
         <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-palette-mist">
@@ -374,15 +357,7 @@ const UsersPage: React.FC = () => {
               <h2 className="text-2xl font-bold text-palette-pine">{isNew ? 'Add New User' : 'Edit User'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-palette-moss hover:text-palette-pine text-3xl font-light leading-none">&times;</button>
             </div>
-
             <form onSubmit={handleSave} className="overflow-y-auto p-6 space-y-6">
-
-              {modalError && (
-                <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-semibold">
-                  {modalError}
-                </div>
-              )}
-
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">First Name</label>
@@ -413,15 +388,12 @@ const UsersPage: React.FC = () => {
                   <input type="text" value={editingUser.adress} onChange={e => setEditingUser({...editingUser, adress: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div className="md:col-span-2">
-                  <label className="block text-sm font-bold text-palette-pine mb-1.5">
-                    {isNew ? 'Password *' : 'New Password (leave blank to keep current)'}
-                  </label>
+                  <label className="block text-sm font-bold text-palette-pine mb-1.5">{isNew ? 'Password *' : 'New Password (nechej prázdné pokud nechceš měnit)'}</label>
                   <input type="password" required={isNew} value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div className="md:col-span-2 pt-4 border-t border-gray-100">
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">Role</label>
-                  <select value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as Role, classId: null, childrenIds: [], subjectIds: []})}
-                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition font-medium">
+                  <select value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as Role, classId: null, childrenIds: [], subjectIds: []})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition font-medium">
                     <option value="student">Student</option>
                     <option value="teacher">Teacher</option>
                     <option value="parent">Parent</option>
@@ -487,12 +459,9 @@ const UsersPage: React.FC = () => {
                   </div>
                 )}
               </div>
-
               <div className="pt-6 mt-4 border-t border-gray-100 flex justify-end space-x-3">
                 <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition">Cancel</button>
-                <button type="submit" disabled={saving} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl shadow-soft hover:bg-palette-leaf hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
-                  Save User
-                </button>
+                <button type="submit" className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl shadow-soft hover:bg-palette-leaf hover:-translate-y-0.5 transition-all">Save User</button>
               </div>
             </form>
           </div>
