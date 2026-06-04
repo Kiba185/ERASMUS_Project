@@ -674,11 +674,30 @@ const EventsPage: React.FC = () => {
                 <div className="grid grid-cols-2 gap-3">
                   <div>
                     <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">Start Date</label>
-                    <input type="date" value={eventStartDate} onChange={(e) => setEventStartDate(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-hidden" required />
+                    <input
+                      type="date"
+                      value={eventStartDate}
+                      onChange={(e) => {
+                        const newStartDate = e.target.value;
+                        setEventStartDate(newStartDate);
+                        if (eventEndDate < newStartDate) {
+                          setEventEndDate(newStartDate);
+                        }
+                      }}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+                      required
+                    />
                   </div>
                   <div>
                     <label className="block text-slate-400 font-bold uppercase text-[10px] mb-1">End Date</label>
-                    <input type="date" value={eventEndDate} min={eventStartDate} onChange={(e) => setEventEndDate(e.target.value)} className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-hidden" required />
+                    <input
+                      type="date"
+                      value={eventEndDate}
+                      min={eventStartDate}
+                      onChange={(e) => setEventEndDate(e.target.value)}
+                      className="w-full p-2 bg-slate-50 border border-slate-200 rounded-xl focus:ring-1 focus:ring-emerald-500 focus:outline-hidden"
+                      required
+                    />
                   </div>
                 </div>
 

@@ -31,53 +31,19 @@ interface MockUser {
   subjectIds?: number[];
 }
 
-interface ApiRelation {
-  id: number;
-}
-
-interface ApiUser extends MockUser {
-  classes?: ApiRelation[];
-  subjects?: ApiRelation[];
-  children?: ApiRelation[];
-}
-
-interface MockChildOption {
-  id: number;
-  name: string;
-  className?: string;
-}
-
-const MOCK_SUBJECTS: MockSubject[] = [
-  { id: 1, name: 'Maths' },
-  { id: 2, name: 'Physics' },
-  { id: 3, name: 'Chemistry' },
-  { id: 4, name: 'Biology' },
-  { id: 5, name: 'History' },
-  { id: 6, name: 'Geography' },
-  { id: 7, name: 'English' },
-  { id: 8, name: 'PE' },
-  { id: 9, name: 'Art' },
-  { id: 10, name: 'Computer Science' },
-  { id: 11, name: 'Music' },
-];
-
-const MOCK_CHILDREN: MockChildOption[] = [
-  { id: 1001, name: 'Jane Doe', className: '4.C' },
-  { id: 1002, name: 'Tomas Benes', className: '4.C' },
-  { id: 1003, name: 'David Smith', className: '4.D' },
-  { id: 1004, name: 'Karolina Pokorna', className: '4.D' },
-];
+// ─── Component ───────────────────────────────────────────────────────────────
 
 const UsersPage: React.FC = () => {
   const navigate = useNavigate();
   const { login } = useAuth();
 
-  const [users, setUsers] = useState<MockUser[]>([]);
-  const [classes, setClasses] = useState<MockClass[]>([]);
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [users,    setUsers]    = useState<MockUser[]>([]);
+  const [classes,  setClasses]  = useState<MockClass[]>([]);
   const [subjects, setSubjects] = useState<MockSubject[]>([]);
-  const [mockUserRelations, setMockUserRelations] = useState<Record<number, Pick<MockUser, 'childrenIds' | 'subjectIds'>>>({});
-  const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
+  const [loading,  setLoading]  = useState(true);
+  const [saving,   setSaving]   = useState(false);
+  const [error,    setError]    = useState<string | null>(null);
 
   const [search, setSearch] = useState('');
   const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
@@ -87,78 +53,61 @@ const UsersPage: React.FC = () => {
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<MockUser | null>(null);
-  const [isNew, setIsNew] = useState(false);
+  const [isNew,       setIsNew]       = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [modalError,  setModalError]  = useState<string | null>(null);
 
-  const loadUsers = async () => {
-    const res = await fetch(`${API_URL}/api/admin/users`, { credentials: 'include' });
-    const data = (await res.json()) as ApiUser[];
-    return data.map((u) => ({
-      ...u,
-      classId: u.classes?.[0]?.id ?? null,
-      subjectIds: u.subjects?.map((s) => s.id) ?? [],
-      childrenIds: u.children?.map((child) => child.id) ?? [],
-    }));
-  };
-
-  const loadClasses = async () => {
-    const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
-    return (await res.json()) as MockClass[];
-  };
+  // ── Data fetching ──────────────────────────────────────────────────────────
 
   const fetchUsers = async () => {
-    setUsers(await loadUsers());
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users`, { credentials: 'include' });
+      if (!res.ok) { console.error('fetchUsers failed:', res.status); return; }
+      const data = await res.json();
+      if (!Array.isArray(data)) { console.error('fetchUsers: not array', data); return; }
+      setUsers(data.map((u: any) => ({
+        ...u,
+        classId:    u.classes?.[0]?.id   ?? null,
+        subjectIds: u.subjects?.map((s: any) => s.id)  ?? [],
+        childrenIds: u.children?.map((c: any) => c.id) ?? [],
+      })));
+    } catch (err) {
+      console.error('fetchUsers error:', err);
+    }
+  };
+
+  const fetchClasses = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/classes`, { credentials: 'include' });
+      if (!res.ok) { console.error('fetchClasses failed:', res.status); return; }
+      const data = await res.json();
+      if (!Array.isArray(data)) { console.error('fetchClasses: not array', data); return; }
+      setClasses(data);
+    } catch (err) {
+      console.error('fetchClasses error:', err);
+    }
+  };
+
+  const fetchSubjects = async () => {
+    try {
+      const res = await fetch(`${API_URL}/api/subjects`, { credentials: 'include' });
+      if (!res.ok) { console.error('fetchSubjects failed:', res.status); return; }
+      const data = await res.json();
+      if (!Array.isArray(data)) { console.error('fetchSubjects: not array', data); return; }
+      setSubjects(data);
+    } catch (err) {
+      console.error('fetchSubjects error:', err);
+    }
   };
 
   useEffect(() => {
-    let ignoreResponse = false;
-
-    const loadInitialData = async () => {
-      const [loadedUsers, loadedClasses] = await Promise.all([loadUsers(), loadClasses()]);
-
-      if (ignoreResponse) {
-        return;
-      }
-
-      setUsers(loadedUsers);
-      setClasses(loadedClasses);
-      setSubjects(MOCK_SUBJECTS);
-      setLoading(false);
-    };
-
-    void loadInitialData();
-
-    return () => {
-      ignoreResponse = true;
-    };
+    Promise.all([fetchUsers(), fetchClasses(), fetchSubjects()]).finally(() => setLoading(false));
   }, []);
 
-  const usersWithMockRelations = useMemo(
-    () =>
-      users.map((user) => ({
-        ...user,
-        ...mockUserRelations[user.id],
-      })),
-    [mockUserRelations, users],
-  );
-
-  const childOptions = useMemo<MockChildOption[]>(() => {
-    const studentsFromUsers = usersWithMockRelations
-      .filter((user) => user.role === 'student')
-      .map((student) => {
-        const assignedClass = classes.find((classItem) => classItem.id === student.classId);
-        return {
-          id: student.id,
-          name: `${student.firstName} ${student.lastName}`,
-          className: assignedClass?.name,
-        };
-      });
-
-    return studentsFromUsers.length > 0 ? studentsFromUsers : MOCK_CHILDREN;
-  }, [classes, usersWithMockRelations]);
+  // ── Derived state (hooks must be before any conditional returns) ───────────
 
   const filteredAndSortedUsers = useMemo(() => {
-    let result = usersWithMockRelations;
+    let result = users;
     if (search) {
       const s = search.toLowerCase();
       result = result.filter(u =>
@@ -170,13 +119,23 @@ const UsersPage: React.FC = () => {
     }
     if (roleFilter !== 'all') result = result.filter(u => u.role === roleFilter);
     if (classFilter !== 'all') result = result.filter(u => u.classId === classFilter);
-    result = [...result].sort((a, b) => {
-      const aVal = String(a[sortField] || '');
-      const bVal = String(b[sortField] || '');
+    return [...result].sort((a, b) => {
+      const aVal = String(a[sortField] ?? '');
+      const bVal = String(b[sortField] ?? '');
       return sortOrder === 'asc' ? aVal.localeCompare(bVal) : bVal.localeCompare(aVal);
     });
-    return result;
-  }, [usersWithMockRelations, search, roleFilter, classFilter, sortField, sortOrder]);
+  }, [users, search, roleFilter, classFilter, sortField, sortOrder]);
+
+  const studentOptions = useMemo(() =>
+    users.filter(u => u.role === 'student').map(u => ({
+      id: u.id,
+      name: `${u.firstName} ${u.lastName}`,
+      className: classes.find(c => c.id === u.classId)?.name,
+    })),
+    [users, classes]
+  );
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
 
   const handleSort = (field: keyof MockUser) => {
     if (sortField === field) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
@@ -208,117 +167,104 @@ const UsersPage: React.FC = () => {
 
     setIsModalOpen(false);
     setSaving(true);
-    let savedUserId = editingUser.id;
 
-    if (isNew) {
-      const res = await fetch(`${API_URL}/api/admin/users`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ ...editingUser, password: newPassword })
-      });
-      if (!res.ok) { const err = (await res.json()) as { message?: string }; alert(err.message); setSaving(false); return; }
-      const createdUser = (await res.json()) as { user?: { id?: number }; id?: number };
-      savedUserId = createdUser.user?.id ?? createdUser.id ?? savedUserId;
-    } else {
-      const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(editingUser)
-      });
-      if (!res.ok) { const err = (await res.json()) as { message?: string }; alert(err.message); setSaving(false); return; }
-
-      if (newPassword.length >= 6) {
-        await fetch(`${API_URL}/api/admin/users/${editingUser.id}/password`, {
+    try {
+      if (isNew) {
+        const res = await fetch(`${API_URL}/api/admin/users`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ ...editingUser, password: newPassword }),
+        });
+        if (!res.ok) {
+          const ct = res.headers.get('content-type') ?? '';
+          const err = ct.includes('application/json') ? await res.json() : { message: res.statusText };
+          setModalError(err.message ?? 'Failed to create user.');
+          return;
+        }
+        const created = await res.json() as { user?: { id?: number }; id?: number };
+        const newId = created.user?.id ?? created.id;
+        if (newId && editingUser.classId) {
+          await fetch(`${API_URL}/api/admin/users/${newId}/classes`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ classId: editingUser.classId }),
+          });
+        }
+      } else {
+        const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ newPassword })
         });
+        if (!res.ok) {
+          const ct = res.headers.get('content-type') ?? '';
+          const err = ct.includes('application/json') ? await res.json() : { message: res.statusText };
+          setModalError(err.message ?? 'Failed to update user.');
+          return;
+        }
+
+        if (newPassword.length >= 6) {
+          await fetch(`${API_URL}/api/admin/users/${editingUser.id}/password`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ newPassword }),
+          });
+        }
+
+        await fetch(`${API_URL}/api/admin/users/${editingUser.id}/classes`, {
+          method: 'PUT',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ classId: editingUser.classId ?? null }),
+        });
       }
 
-      await fetch(`${API_URL}/api/admin/users/${editingUser.id}/classes`, {
-        method: 'PUT',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ classId: editingUser.classId ?? null })
-      });
+      setIsModalOpen(false);
+      await fetchUsers();
+    } catch (err: any) {
+      setModalError(err.message ?? 'An unexpected error occurred.');
+    } finally {
+      setSaving(false);
     }
-
-    if (savedUserId) {
-      setMockUserRelations((currentRelations) => ({
-        ...currentRelations,
-        [savedUserId]: {
-          subjectIds: editingUser.role === 'teacher' ? editingUser.subjectIds ?? [] : [],
-          childrenIds: editingUser.role === 'parent' ? editingUser.childrenIds ?? [] : [],
-        },
-      }));
-    }
-
-    await fetchUsers();
-    setSaving(false);
   };
 
   const handleDelete = async (id: number) => {
     if (!confirm('Opravdu smazat uživatele?')) return;
     setSaving(true);
-    await fetch(`${API_URL}/api/admin/users/${id}`, { method: 'DELETE', credentials: 'include' });
-    await fetchUsers();
-    setSaving(false);
+    try {
+      const res = await fetch(`${API_URL}/api/admin/users/${id}`, { method: 'DELETE', credentials: 'include' });
+      if (!res.ok) throw new Error(`Delete failed (${res.status})`);
+      await fetchUsers();
+    } catch (err: any) {
+      alert(err.message ?? 'Failed to delete user.');
+    } finally {
+      setSaving(false);
+    }
   };
 
-  const handleLoginAs = async (user: MockUser) => {
-    await fetch(`${API_URL}/api/admin/loginas/${user.id}`, {
-      method: 'POST',
-      credentials: 'include',
-      headers: { 'Content-Type': 'application/json' }
-    });
+  const handleLoginAs = (user: MockUser) => {
     login(String(user.id), { ...user, id: String(user.id), children: [] } as Parameters<typeof login>[1]);
     navigate('/dashboard');
   };
 
-  const getSubjectNames = (subjectIds: number[] = []) =>
-    subjectIds
-      .map((subjectId) => subjects.find((subject) => subject.id === subjectId)?.name)
-      .filter(Boolean)
-      .join(', ');
-
-  const getChildNames = (childrenIds: number[] = []) =>
-    childrenIds
-      .map((childId) => childOptions.find((child) => child.id === childId)?.name)
-      .filter(Boolean)
-      .join(', ');
-
   const getClassBadge = (user: MockUser) => {
-    if (user.role === 'student') {
-      const c = classes.find(c => c.id === user.classId);
-      if (c) return <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-fern rounded-full border border-palette-sage">{c.name}</span>;
+    const c = classes.find(c => c.id === user.classId);
+    if ((user.role === 'student' || user.role === 'teacher') && c) {
+      return <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-fern rounded-full border border-palette-sage">{c.name}</span>;
     }
-
-    if (user.role === 'teacher') {
-      const c = classes.find(c => c.id === user.classId);
-      const subjectNames = getSubjectNames(user.subjectIds);
-
-      if (c || subjectNames) {
-        return (
-          <div className="flex flex-col items-start gap-1">
-            {c && <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-fern rounded-full border border-palette-sage">{c.name}</span>}
-            {subjectNames && <span className="max-w-56 truncate text-xs font-semibold text-palette-moss" title={subjectNames}>{subjectNames}</span>}
-          </div>
-        );
-      }
-    }
-
     if (user.role === 'parent' && user.childrenIds?.length) {
-      const childNames = getChildNames(user.childrenIds);
-      return <span className="max-w-56 truncate px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-moss rounded-full border border-palette-sage" title={childNames}>{childNames || `${user.childrenIds.length} children`}</span>;
+      return <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-moss rounded-full border border-palette-sage">{user.childrenIds.length} children</span>;
     }
-
     return <span className="text-gray-400">-</span>;
   };
 
   if (loading) return <div className="p-8 text-palette-pine font-bold">Loading...</div>;
+
+  // ── Render ─────────────────────────────────────────────────────────────────
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
@@ -334,6 +280,7 @@ const UsersPage: React.FC = () => {
         document.body
       )}
 
+      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold text-palette-pine">User Management</h1>
         <button onClick={openAddModal} className="px-5 py-2.5 bg-palette-fern text-white font-semibold rounded-xl shadow-soft hover:bg-palette-leaf hover:-translate-y-0.5 transition-all flex items-center gap-2">
@@ -453,18 +400,20 @@ const UsersPage: React.FC = () => {
                     <option value="admin">Admin</option>
                   </select>
                 </div>
+
                 {(editingUser.role === 'student' || editingUser.role === 'teacher') && (
                   <div className="md:col-span-2 bg-palette-mist/50 p-5 rounded-xl border border-palette-sage/30 space-y-5">
                     <div>
                       <label className="block text-sm font-bold text-palette-pine mb-1.5">
                         {editingUser.role === 'student' ? 'Assign to Class' : 'Head Teacher of Class (Optional)'}
                       </label>
-                      <select value={editingUser.classId || ''} onChange={e => setEditingUser({...editingUser, classId: e.target.value ? Number(e.target.value) : null})} className="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-palette-meadow outline-none transition">
+                      <select value={editingUser.classId ?? ''} onChange={e => setEditingUser({...editingUser, classId: e.target.value ? Number(e.target.value) : null})}
+                        className="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-palette-meadow outline-none transition">
                         <option value="">-- No class assigned --</option>
                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
                       </select>
                     </div>
-                    {editingUser.role === 'teacher' && (
+                    {editingUser.role === 'teacher' && subjects.length > 0 && (
                       <div className="pt-2 border-t border-palette-sage/30">
                         <label className="block text-sm font-bold text-palette-pine mb-2">Assign Subjects</label>
                         <div className="max-h-48 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-1">
@@ -472,10 +421,9 @@ const UsersPage: React.FC = () => {
                             const isSelected = editingUser.subjectIds?.includes(subject.id);
                             return (
                               <label key={subject.id} className={`flex items-center space-x-3 p-2.5 rounded-md cursor-pointer border transition ${isSelected ? 'bg-palette-mist border-palette-sage' : 'border-transparent hover:bg-gray-50'}`}>
-                                <input type="checkbox" checked={!!isSelected} onChange={(e) => {
-                                  const currentIds = editingUser.subjectIds || [];
-                                  if (e.target.checked) setEditingUser({...editingUser, subjectIds: [...currentIds, subject.id]});
-                                  else setEditingUser({...editingUser, subjectIds: currentIds.filter(id => id !== subject.id)});
+                                <input type="checkbox" checked={!!isSelected} onChange={e => {
+                                  const cur = editingUser.subjectIds ?? [];
+                                  setEditingUser({...editingUser, subjectIds: e.target.checked ? [...cur, subject.id] : cur.filter(id => id !== subject.id)});
                                 }} className="w-4 h-4 text-palette-fern border-gray-300 rounded focus:ring-palette-meadow cursor-pointer" />
                                 <span className="text-sm font-bold text-palette-pine">{subject.name}</span>
                               </label>
@@ -486,29 +434,27 @@ const UsersPage: React.FC = () => {
                     )}
                   </div>
                 )}
+
                 {editingUser.role === 'parent' && (
-                  <div className="md:col-span-2 bg-palette-mist/50 p-5 rounded-xl border border-palette-sage/30 space-y-3">
-                    <label className="block text-sm font-bold text-palette-pine">Assign Children</label>
+                  <div className="md:col-span-2 bg-orange-50/70 p-5 rounded-xl border border-orange-200 space-y-3">
+                    <label className="block text-sm font-bold text-palette-pine">Assign Children (students)</label>
                     <div className="max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-1">
-                      {childOptions.map(child => {
-                        const isSelected = editingUser.childrenIds?.includes(child.id);
+                      {studentOptions.map(student => {
+                        const isSelected = editingUser.childrenIds?.includes(student.id);
                         return (
-                          <label key={child.id} className={`flex items-center space-x-3 p-2.5 rounded-md cursor-pointer border transition ${isSelected ? 'bg-palette-mist border-palette-sage' : 'border-transparent hover:bg-gray-50'}`}>
-                            <input type="checkbox" checked={!!isSelected} onChange={(e) => {
-                              const currentIds = editingUser.childrenIds || [];
-                              if (e.target.checked) setEditingUser({...editingUser, childrenIds: [...currentIds, child.id]});
-                              else setEditingUser({...editingUser, childrenIds: currentIds.filter(id => id !== child.id)});
-                            }} className="w-4 h-4 text-palette-fern border-gray-300 rounded focus:ring-palette-meadow cursor-pointer" />
+                          <label key={student.id} className={`flex items-center space-x-3 p-2.5 rounded-md cursor-pointer border transition ${isSelected ? 'bg-orange-50 border-orange-200' : 'border-transparent hover:bg-gray-50'}`}>
+                            <input type="checkbox" checked={!!isSelected} onChange={e => {
+                              const cur = editingUser.childrenIds ?? [];
+                              setEditingUser({...editingUser, childrenIds: e.target.checked ? [...cur, student.id] : cur.filter(id => id !== student.id)});
+                            }} className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-400 cursor-pointer" />
                             <span className="min-w-0 text-sm font-bold text-palette-pine">
-                              <span>{child.name}</span>
-                              {child.className && <span className="ml-1 font-medium text-palette-moss">({child.className})</span>}
+                              {student.name}
+                              {student.className && <span className="ml-1 font-medium text-palette-moss">({student.className})</span>}
                             </span>
                           </label>
                         );
                       })}
-                      {childOptions.length === 0 && (
-                        <p className="p-3 text-sm font-medium text-palette-moss">No students available.</p>
-                      )}
+                      {studentOptions.length === 0 && <p className="p-3 text-sm font-medium text-palette-moss">No students available.</p>}
                     </div>
                   </div>
                 )}
