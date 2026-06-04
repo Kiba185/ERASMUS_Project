@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 
 type Message = {
   id: number;
@@ -27,50 +27,74 @@ const MessagesPage: React.FC = () => {
   const [filterStatus, setFilterStatus] = useState<'all' | 'new' | 'read'>('all');
   const [sortField, setSortField] = useState<'time' | 'person' | 'subject'>('time');
   const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
-
   const [messageText, setMessageText] = useState('');
   const [attachment, setAttachment] = useState<File | null>(null);
-const [receivedMessagesList, setReceivedMessagesList] = useState<Message[]>([]);
-const [sentMessagesList, setSentMessagesList] = useState<Message[]>([]);
-const [recipients, setRecipients] = useState<{id: number; firstName: string; lastName: string; role?: string}[]>([]);
-const [sending, setSending] = useState(false);
+  const [receivedMessagesList, setReceivedMessagesList] = useState<Message[]>([]);
+  const [sentMessagesList, setSentMessagesList] = useState<Message[]>([]);
+  const [recipients, setRecipients] = useState<{id: number; firstName: string; lastName: string; role?: string}[]>([]);
+  const [sending, setSending] = useState(false);
+  const [recipientSelected, setRecipientSelected] = useState(false);
+  const recipientDropdownRef = useRef<HTMLDivElement>(null);
+  const [classes, setClasses] = useState<{id: number; name: string; students: {id: number}[]}[]>([]);
 
 const fetchMessages = async () => {
   try {
-    const [inboxRes, sentRes, recipientsRes] = await Promise.all([
+const [inboxRes, sentRes, recipientsRes, classesRes] = await Promise.all([
       fetch('http://localhost:3000/api/messages/inbox', { credentials: 'include' }),
       fetch('http://localhost:3000/api/messages/sent', { credentials: 'include' }),
       fetch('http://localhost:3000/api/messages/recipients', { credentials: 'include' }),
+      fetch('http://localhost:3000/api/messages/classes', { credentials: 'include' }),
+
     ]);
     const inbox = await inboxRes.json();
     const sent = await sentRes.json();
     const recipientsList = await recipientsRes.json();
+    const classesList = await classesRes.json();
+    setClasses(Array.isArray(classesList) ? classesList : []);
 
-    setReceivedMessagesList(inbox.map((m: any) => ({
-      id: m.id,
-      person: `${m.sender?.firstName} ${m.sender?.lastName}`,
-      subject: '—',
-      message: m.body,
-      time: new Date(m.createdAt).toLocaleString(),
-      status: m.read ? 'read' : 'new',
-      senderId: m.senderId,
-    })));
+    setReceivedMessagesList(inbox.map((m: any) => {
+      const parts = m.body.split('\n');
+      const hasSubject = parts[0].startsWith('**') && parts[0].endsWith('**');
+      return {
+        id: m.id,
+        person: `${m.sender?.firstName} ${m.sender?.lastName}`,
+        subject: hasSubject ? parts[0].replace(/\*\*/g, '') : '—',
+        message: hasSubject ? parts.slice(1).join('\n') : m.body,
+        time: new Date(m.createdAt).toLocaleString(),
+        status: m.read ? 'read' : 'new',
+        senderId: m.senderId,
+      };
+    }));
 
-    setSentMessagesList(sent.map((m: any) => ({
-      id: m.id,
-      person: `${m.recipient?.firstName} ${m.recipient?.lastName}`,
-      subject: '—',
-      message: m.body,
-      time: new Date(m.createdAt).toLocaleString(),
-      status: 'sent',
-      recipientId: m.recipientId,
-    })));
+    setSentMessagesList(sent.map((m: any) => {
+      const parts = m.body.split('\n');
+      const hasSubject = parts[0].startsWith('**') && parts[0].endsWith('**');
+      return {
+        id: m.id,
+        person: `${m.recipient?.firstName} ${m.recipient?.lastName}`,
+        subject: hasSubject ? parts[0].replace(/\*\*/g, '') : '—',
+        message: hasSubject ? parts.slice(1).join('\n') : m.body,
+        time: new Date(m.createdAt).toLocaleString(),
+        status: 'sent',
+        recipientId: m.recipientId,
+      };
+    }));
 
     setRecipients(recipientsList);
   } catch {
     console.error('Failed to load messages');
   }
 };
+
+useEffect(() => {
+  const handleClickOutside = (e: MouseEvent) => {
+    if (recipientDropdownRef.current && !recipientDropdownRef.current.contains(e.target as Node)) {
+      setRecipientSelected(true);
+    }
+  };
+  document.addEventListener('mousedown', handleClickOutside);
+  return () => document.removeEventListener('mousedown', handleClickOutside);
+}, []);
 
 useEffect(() => { fetchMessages(); }, []);
   const parseTime = (t: string) => {
@@ -130,23 +154,42 @@ useEffect(() => { fetchMessages(); }, []);
   };
 
 const handleSendMessage = async () => {
+  console.log('recipient value:', JSON.stringify(recipient));
   if (!recipient.trim() || !messageText.trim()) {
     alert('Please fill in the recipient and message.');
     return;
   }
 
-  const recipientUser = recipients.find(r => `${r.firstName} ${r.lastName}` === recipient.trim());
-  if (!recipientUser) {
-    alert('Recipient not found. Please select from the list.');
-    return;
+let payload: { recipientId?: number; recipientIds?: number[]; body: string } = { 
+  body: subject ? `**${subject}**\n${messageText}` : messageText };
+  if (recipient === 'Everyone') {
+    payload.recipientIds = recipients.map(r => r.id);
+  } else if (recipient.startsWith('Class: ')) {
+  const className = recipient.replace('Class: ', '');
+  const cls = classes.find(c => c.name === className);
+  if (cls) {
+      payload.recipientIds = cls.students.map(s => s.id);
   }
+  } else if (recipient === 'All Teachers') {
+    payload.recipientIds = recipients.filter(r => r.role === 'teacher').map(r => r.id);
+  } else if (recipient === 'All Students') {
+    payload.recipientIds = recipients.filter(r => r.role === 'student').map(r => r.id);
+  } else {
+    const recipientUser = recipients.find(r => `${r.firstName} ${r.lastName}` === recipient.trim());
+    if (!recipientUser) {
+      alert('Recipient not found. Please select from the list.');
+      return;
+    }
+    payload.recipientId = recipientUser.id;
+  }
+
   setSending(true);
   try {
     const res = await fetch('http://localhost:3000/api/messages', {
       method: 'POST',
       credentials: 'include',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ recipientId: recipientUser.id, body: messageText }),
+      body: JSON.stringify(payload),
     });
     if (!res.ok) throw new Error();
     setIsNewMessageOpen(false);
@@ -262,33 +305,55 @@ const handleSendMessage = async () => {
           <div className="grid gap-3 md:grid-cols-2">
             <label className="flex flex-col gap-1.5 text-xs font-black uppercase tracking-wide text-palette-moss">
               Recipient
-          <div className="relative">
-            <input
-              type="text"
-              placeholder="Search recipient..."
-              value={recipient}
-              onChange={(e) => setRecipient(e.target.value)}
-              className="h-11 w-full rounded-md border border-palette-lichen/60 bg-palette-mist/40 px-3 text-sm font-semibold text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:bg-white focus:ring-2 focus:ring-palette-leaf/20"
-            />
-            {recipient && recipients.filter(r => 
-              `${r.firstName} ${r.lastName}`.toLowerCase().includes(recipient.toLowerCase())
-            ).length > 0 && (
-              <ul className="absolute z-10 mt-1 w-full rounded-md border border-palette-lichen/60 bg-white shadow-lg">
-                {recipients
-                  .filter(r => `${r.firstName} ${r.lastName}`.toLowerCase().includes(recipient.toLowerCase()))
-                  .map(r => (
-                    <li
-                      key={r.id}
-                      onClick={() => setRecipient(`${r.firstName} ${r.lastName}`)}
-                      className="cursor-pointer px-3 py-2 text-sm text-palette-pine hover:bg-palette-mist"
-                    >
-                      {r.firstName} {r.lastName} <span className="text-palette-moss">({r.role})</span>
-                    </li>
-                  ))
-                }
-              </ul>
-            )}
-          </div>
+              <div className="relative" ref={recipientDropdownRef}>
+                <input
+                  type="text"
+                  placeholder="Search recipient..."
+                  value={recipient}
+                  onChange={(e) => { setRecipient(e.target.value); setRecipientSelected(false); }}
+                  className="h-11 w-full rounded-md border border-palette-lichen/60 bg-palette-mist/40 px-3 text-sm font-semibold text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:bg-white focus:ring-2 focus:ring-palette-leaf/20"
+                />                                        
+                    {!recipientSelected && recipient !== 'Everyone' && recipient !== 'All Teachers' && recipient !== 'All Students' && (
+                  <ul className="absolute z-10 mt-1 w-full rounded-md border border-palette-lichen/60 bg-white shadow-lg max-h-64 overflow-y-auto">
+                    {['Everyone', 'All Teachers', 'All Students']
+                      .filter(opt => opt.toLowerCase().includes(recipient.toLowerCase()) || recipient === '')
+                      .map(opt => (
+                        <li
+                          key={opt}
+                          onClick={() => { setRecipient(opt); setRecipientSelected(true); }}
+                          className="cursor-pointer px-3 py-2 text-sm font-black text-palette-fern hover:bg-palette-mist"
+                        >
+                          {opt}
+                        </li>
+                      ))
+                    }
+                    {classes
+                      .filter(c => c.name.toLowerCase().includes(recipient.toLowerCase()) || recipient === '')
+                      .map(c => (
+                        <li
+                          key={`class-${c.id}`}
+                          onClick={() => { setRecipient(`Class: ${c.name}`); setRecipientSelected(true); }}
+                          className="cursor-pointer px-3 py-2 text-sm font-black text-palette-fern hover:bg-palette-mist"
+                        >
+                          Class: {c.name}
+                        </li>
+                      ))
+                    }
+                    {recipients
+                      .filter(r => `${r.firstName} ${r.lastName}`.toLowerCase().includes(recipient.toLowerCase()))
+                      .map(r => (
+                        <li
+                          key={r.id}
+                          onClick={() => { setRecipient(`${r.firstName} ${r.lastName}`); setRecipientSelected(true); }}
+                          className="cursor-pointer px-3 py-2 text-sm text-palette-pine hover:bg-palette-mist"
+                        >
+                          {r.firstName} {r.lastName} <span className="text-palette-moss">({r.role})</span>
+                        </li>
+                      ))
+                    }
+                  </ul>
+                )}
+              </div>
             </label>
 
             <label className="flex flex-col gap-1.5 text-xs font-black uppercase tracking-wide text-palette-moss">
@@ -302,7 +367,6 @@ const handleSendMessage = async () => {
               />
             </label>
           </div>
-
           <datalist id="message-recipients">
             {recipients.map((r) => (
               <option key={r.id} value={`${r.firstName} ${r.lastName}`} />
@@ -398,21 +462,22 @@ const handleSendMessage = async () => {
                       )}
                     </div>
                   </td>
-                  <td className="max-w-md px-4 py-3 font-medium text-palette-moss cursor-pointer group" onClick={() => toggleExpand(message.id)}>
-                    <div className={`transition-all duration-300 ${expandedMessageId === message.id ? "" : "line-clamp-1"}`}>
-                      {message.message}
-                    </div>
-                    {expandedMessageId === message.id && (
-                      <div className="mt-2 text-[10px] uppercase font-black tracking-wider text-palette-fern/70">
-                        Click to collapse
+                    <td className="px-4 py-3 font-medium text-palette-moss cursor-pointer group" onClick={() => toggleExpand(message.id)}>
+                      <div className="flex flex-col gap-1">
+                        <div className={`transition-all duration-300 ${expandedMessageId === message.id ? "whitespace-pre-wrap" : "line-clamp-1"}`}>
+                          {message.message}
+                        </div>
+                        {expandedMessageId === message.id ? (
+                          <div className="text-[10px] uppercase font-black tracking-wider text-palette-fern/70">
+                            Click to collapse
+                          </div>
+                        ) : message.message.length > 50 ? (
+                          <div className="text-[10px] uppercase font-black tracking-wider text-palette-moss/50 group-hover:text-palette-fern/70 transition-colors">
+                            Click to expand
+                          </div>
+                        ) : null}
                       </div>
-                    )}
-                    {expandedMessageId !== message.id && message.message.length > 50 && (
-                      <div className="mt-1 text-[10px] uppercase font-black tracking-wider text-palette-moss/50 group-hover:text-palette-fern/70 transition-colors">
-                        Click to expand
-                      </div>
-                    )}
-                  </td>
+                    </td>
                   <td className="whitespace-nowrap px-4 py-3 font-bold text-palette-moss">{message.time}</td>
                   <td className="px-4 py-3 text-right">
                     <button
