@@ -318,32 +318,23 @@ const ScheduleEditPage: React.FC = () => {
     }
   };
 
-  const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextSubject = e.target.value;
-    setEditingLesson((prev) => {
-      if (!prev) return null;
-      const allowedTeachers = subjectTeachersMap[nextSubject] || [];
-      const isSubstituted = prev.status === 'substituted';
-      let nextTeacher = prev.teacher || '';
-      if (!isSubstituted && nextSubject && !allowedTeachers.includes(nextTeacher)) {
-        nextTeacher = allowedTeachers[0] || '';
-      }
-      return { ...prev, subject: nextSubject, teacher: nextTeacher };
-    });
+    // Už nefiltrujeme podle mapy, prostě jen uložíme vybraný předmět
+    setEditingLesson((prev) => prev ? { ...prev, subject: nextSubject } : null);
   };
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextStatus = e.target.value as any;
-    setEditingLesson((prev) => {
-      if (!prev) return null;
-      let nextTeacher = prev.teacher || '';
-      const isSubstituted = nextStatus === 'substituted';
-      const allowedTeachers = subjectTeachersMap[prev.subject || ''] || [];
-      if (!isSubstituted && prev.subject && !allowedTeachers.includes(nextTeacher)) {
-        nextTeacher = allowedTeachers[0] || '';
-      }
-      return { ...prev, status: nextStatus, teacher: nextTeacher };
-    });
+    // Úplně stejné zjednodušení, jen uložíme nový status
+    setEditingLesson((prev) => prev ? { ...prev, status: nextStatus } : null);
+  };
+
+  const getFilteredTeachers = () => {
+    if (!editingLesson) return [];
+    // Ať už je to suplování nebo normální hodina, vždycky vypíšeme 
+    // VŠECHNY skutečné učitele z tvé databáze
+    return dbTeachers.map(t => `${t.firstName} ${t.lastName}`);
   };
 
   return (
@@ -416,7 +407,7 @@ const ScheduleEditPage: React.FC = () => {
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold text-palette-pine">Schedule Matrix: Class {selectedClass}</h1>
-          <p className="text-gray-500 mt-2">
+          <p className="text-gray-500 mt-2">  
             {isPermanentEditMode
               ? 'Configuring master template cyclic rotations.'
               : `Displaying timeline window from ${currentWeekDates[0]} to ${currentWeekDates[4]}`
