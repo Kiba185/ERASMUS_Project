@@ -76,6 +76,7 @@ const ScheduleEditPage: React.FC = () => {
   const [dbClasses, setDbClasses] = useState<{id: number, name: string}[]>([]);
   const [dbSubjects, setDbSubjects] = useState<{id: number, name: string}[]>([]);
   const [dbTeachers, setDbTeachers] = useState<{id: number, firstName: string, lastName: string}[]>([]);
+  const availableTeachers = dbTeachers.map((t) => `Mr. ${t.lastName}`);
 
   const [selectedClass, setSelectedClass] = useState<string>('9.B');
   const [weekOffset, setWeekOffset] = useState<number>(0);
@@ -84,7 +85,6 @@ const ScheduleEditPage: React.FC = () => {
   const [isPermanentEditMode, setIsPermanentEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Partial<Lesson> | null>(null);
-  
   const availableRoomOptions = mergeUniqueOptions(availableRooms, setupMockData.rooms);
 
   const currentWeekDates = getWeekDatesStrings(weekOffset);
@@ -188,7 +188,7 @@ const ScheduleEditPage: React.FC = () => {
       room: availableRoomOptions[0],
       weekType: 'all',
       group: 'Whole Class',
-      color: 'border-gray-500 bg-gray-50',
+      color: 'border-gray-500 bg-gray-900/5',
       isPermanent: true,
       status: 'active'
     });
@@ -292,7 +292,6 @@ const ScheduleEditPage: React.FC = () => {
       const allowedTeachers = subjectTeachersMap[nextSubject] || [];
       const isSubstituted = prev.status === 'substituted';
       let nextTeacher = prev.teacher || '';
-      
       if (!isSubstituted && nextSubject && !allowedTeachers.includes(nextTeacher)) {
         nextTeacher = allowedTeachers[0] || '';
       }
@@ -312,6 +311,14 @@ const ScheduleEditPage: React.FC = () => {
       }
       return { ...prev, status: nextStatus, teacher: nextTeacher };
     });
+  };
+
+  const getFilteredTeachers = () => {
+    if (!editingLesson) return [];
+    if (editingLesson.status === 'substituted') {
+      return availableTeachers;
+    }
+    return subjectTeachersMap[editingLesson.subject || ''] || [];
   };
 
   return (
@@ -336,8 +343,9 @@ const ScheduleEditPage: React.FC = () => {
             <div>
               <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Calendar Range Tracker</label>
               <div className="flex items-center gap-2">
+                {/* Změněno z relativního krokování na přímé nastavení hodnoty -1 */}
                 <button
-                  onClick={() => setWeekOffset(prev => prev - 1)}
+                  onClick={() => setWeekOffset(-1)}
                   className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === -1 ? 'bg-palette-pine text-white border-transparent' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
                 >
                   Previous Week
@@ -348,8 +356,9 @@ const ScheduleEditPage: React.FC = () => {
                 >
                   Current Week
                 </button>
+                {/* Změněno z relativního krokování na přímé nastavení hodnoty 1 */}
                 <button
-                  onClick={() => setWeekOffset(prev => prev + 1)}
+                  onClick={() => setWeekOffset(1)}
                   className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === 1 ? 'bg-palette-pine text-white border-transparent' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
                 >
                   Next Week
@@ -571,8 +580,8 @@ const ScheduleEditPage: React.FC = () => {
                 >
                   {dbTeachers.length === 0 && <option value="" disabled>Načítám učitele...</option>}
                   {dbTeachers.length > 0 && <option value="" disabled>Select teacher...</option>}
-                  {dbTeachers.map(t => (
-                    <option key={t.id} value={`Mr. ${t.lastName}`}>{t.firstName} {t.lastName}</option>
+                  {getFilteredTeachers().map((teacherName) => (
+                    <option key={teacherName} value={teacherName}>{teacherName}</option>
                   ))}
                 </select>
               </div>

@@ -12,12 +12,12 @@ const Login: React.FC = () => {
   const [password, setPassword] = useState('');
   const [error, setError] = useState('');
   const [showPassword, setShowPassword] = useState(false);
-  const [loading, setLoading] = useState(false); // 👈 new
+  const [loading, setLoading] = useState(false);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
-    setLoading(true); // 👈 new
+    setLoading(true);
 
     const formattedUsername = username.toLowerCase().trim();
     try {
@@ -42,11 +42,11 @@ const Login: React.FC = () => {
         navigate('/dashboard');
       } else {
         setError('Nesprávné přihlašovací údaje.');
-        setLoading(false); // 👈 only reset on failure; on success we're navigating away
+        setLoading(false);
       }
     } catch (err) {
       setError('Chyba připojení k serveru.');
-      setLoading(false); // 👈 new
+      setLoading(false);
     }
   };
 
@@ -118,7 +118,6 @@ const Login: React.FC = () => {
             </div>
           )}
 
-          {/* 👇 the only thing that visually changed */}
           <button 
             type="submit"
             disabled={loading}
