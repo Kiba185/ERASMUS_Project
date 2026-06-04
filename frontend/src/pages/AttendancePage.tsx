@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import AttendancePopUp from '../components/ui/AttendancePopUp';
 import { ALL_FILTER_VALUE, Filter, type FilterOption } from '../components/ui/Filter';
 import { useAuth } from '../context/AuthContext';
@@ -108,16 +108,18 @@ const CLASS_OPTIONS: FilterOption<ClassName>[] = CLASSES.map((className) => ({
 }));
 
 const formatDateValue = (date: Date) => date.toISOString().slice(0, 10);
+const TODAY_DATE_VALUE = formatDateValue(new Date());
 
-const DATE_OPTIONS: FilterOption[] = Array.from({ length: 14 }, (_, index) => {
-  const date = new Date();
-  date.setDate(date.getDate() - index);
+const getDateLabel = (dateValue: string) => {
+  const date = new Date(`${dateValue}T00:00:00`);
 
-  return {
-    value: formatDateValue(date),
-    label: index === 0 ? `Today (${date.toLocaleDateString('cs-CZ')})` : date.toLocaleDateString('cs-CZ'),
-  };
-});
+  if (Number.isNaN(date.getTime())) {
+    return dateValue;
+  }
+
+  const formattedDate = date.toLocaleDateString('cs-CZ');
+  return dateValue === TODAY_DATE_VALUE ? `Today (${formattedDate})` : formattedDate;
+};
 
 const getLessonLabel = (className: ClassName, subject: Subject) => {
   const lessonIndex = CLASS_SCHEDULES[className].indexOf(subject);
@@ -210,9 +212,12 @@ const loadMockAttendanceForDate = (date: string): AttendanceStudent[] =>
 const getLessonTopicKeyForValues = (date: string, className: string, subject: string) =>
   `${date}-${className}-${subject}`;
 
+const getAttendanceControlKey = (studentId: string, subject: Subject) => `${studentId}-${subject}`;
+
 const AttendancePage = () => {
   const { user } = useAuth();
-  const [dateFilter, setDateFilter] = useState(DATE_OPTIONS[0].value);
+  const attendanceControlRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  const [dateFilter, setDateFilter] = useState(TODAY_DATE_VALUE);
   const [classFilter, setClassFilter] = useState<ClassName>(CLASSES[0]);
   const [subjectFilter, setSubjectFilter] = useState(ALL_FILTER_VALUE);
   const [pendingAbsence, setPendingAbsence] = useState<PendingAbsence | null>(null);
@@ -221,7 +226,7 @@ const AttendancePage = () => {
   const [lessonTopicDrafts, setLessonTopicDrafts] = useState<Record<string, string>>({});
   const [editingLessonTopics, setEditingLessonTopics] = useState<Record<string, boolean>>({});
   const [studentsByDate, setStudentsByDate] = useState<Record<string, AttendanceStudent[]>>(() => ({
-    [DATE_OPTIONS[0].value]: loadMockAttendanceForDate(DATE_OPTIONS[0].value),
+    [TODAY_DATE_VALUE]: loadMockAttendanceForDate(TODAY_DATE_VALUE),
   }));
 
   const canEditAttendance = user?.role === 'teacher' || user?.role === 'admin';
@@ -234,7 +239,7 @@ const AttendancePage = () => {
     () => studentsByDate[dateFilter] ?? loadMockAttendanceForDate(dateFilter),
     [dateFilter, studentsByDate],
   );
-  const selectedDateLabel = DATE_OPTIONS.find((option) => option.value === dateFilter)?.label ?? dateFilter;
+  const selectedDateLabel = getDateLabel(dateFilter);
 
   useEffect(() => {
     let ignoreResponse = false;
@@ -307,6 +312,23 @@ const AttendancePage = () => {
     () => students.filter((student) => student.className === classFilter),
     [classFilter, students],
   );
+
+  const focusAttendanceControlAt = (controlIndex: number) => {
+    if (subjectsToShow.length === 0) {
+      return;
+    }
+
+    const studentIndex = Math.floor(controlIndex / subjectsToShow.length);
+    const subjectIndex = controlIndex % subjectsToShow.length;
+    const student = studentsToShow[studentIndex];
+    const subject = subjectsToShow[subjectIndex];
+
+    if (!student || !subject) {
+      return;
+    }
+
+    attendanceControlRefs.current[getAttendanceControlKey(student.id, subject)]?.focus();
+  };
 
   const getAbsenceKey = (studentId: string, subject: Subject) => `${dateFilter}-${studentId}-${subject}`;
   const getLessonTopicKey = (subject: Subject) => getLessonTopicKeyForValues(dateFilter, classFilter, subject);
@@ -430,6 +452,45 @@ const AttendancePage = () => {
     setPendingAbsence(null);
   };
 
+  const handleAttendanceControlKeyDown = (
+    event: KeyboardEvent<HTMLDivElement>,
+    student: AttendanceStudent,
+    subject: Subject,
+    currentStatus: AttendanceStatus,
+    controlIndex: number,
+  ) => {
+    if (
+      event.key === 'ArrowRight' ||
+      event.key === 'ArrowLeft' ||
+      event.key === 'ArrowDown' ||
+      event.key === 'ArrowUp'
+    ) {
+      event.preventDefault();
+
+      const direction =
+        event.key === 'ArrowRight'
+          ? 1
+          : event.key === 'ArrowLeft'
+            ? -1
+            : event.key === 'ArrowDown'
+              ? subjectsToShow.length
+              : -subjectsToShow.length;
+      const nextControlIndex = controlIndex + direction;
+      const controlCount = studentsToShow.length * subjectsToShow.length;
+
+      if (nextControlIndex >= 0 && nextControlIndex < controlCount) {
+        focusAttendanceControlAt(nextControlIndex);
+      }
+
+      return;
+    }
+
+    if (event.key === 'Enter' && event.currentTarget === event.target) {
+      event.preventDefault();
+      updateAttendanceStatus(student.id, subject, currentStatus === 'present' ? 'absent' : 'present');
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -443,7 +504,17 @@ const AttendancePage = () => {
         <div className="border-b border-palette-lichen/45 p-5">
           <h2 className="mb-4 text-xl font-semibold text-palette-pine">Class {classFilter}</h2>
           <div className="grid gap-4 md:grid-cols-3">
-            <Filter label="Date" value={dateFilter} onChange={setDateFilter} options={DATE_OPTIONS} />
+            <label htmlFor="attendance-date-filter" className="flex flex-col gap-2 text-sm font-medium text-palette-pine">
+              <span>Date</span>
+              <input
+                id="attendance-date-filter"
+                type="date"
+                value={dateFilter}
+                onChange={(event) => setDateFilter(event.target.value)}
+                className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-palette-pine focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+                required
+              />
+            </label>
             <Filter label="Class" value={classFilter} onChange={setClassFilter} options={CLASS_OPTIONS} />
             <Filter label="Subject" value={activeSubjectFilter} onChange={setSubjectFilter} options={subjectOptions} />
           </div>
@@ -516,14 +587,15 @@ const AttendancePage = () => {
               </tr>
             </thead>
             <tbody className="divide-y divide-palette-lichen/35 text-palette-moss">
-              {studentsToShow.map((student) => (
+              {studentsToShow.map((student, studentIndex) => (
                 <tr key={student.id} className="hover:bg-palette-sage/10">
                   <td className="px-4 py-3 font-medium text-palette-pine">{student.name}</td>
                   <td className="px-4 py-3">{student.className}</td>
-                  {subjectsToShow.map((subject) => {
+                  {subjectsToShow.map((subject, subjectIndex) => {
                     const status = student.attendance[subject] ?? 'absent';
                     const absenceReason = absenceReasons[getAbsenceKey(student.id, subject)];
                     const statusMeta = getStatusMeta(status, absenceReason);
+                    const controlIndex = studentIndex * subjectsToShow.length + subjectIndex;
                     const absentTitle =
                       status === 'absent'
                         ? absenceReason
@@ -534,7 +606,18 @@ const AttendancePage = () => {
                     return (
                       <td key={subject} className="px-4 py-3">
                         {canEditAttendance ? (
-                          <div className="inline-flex rounded-md border border-palette-lichen/60 bg-palette-mist p-1">
+                          <div
+                            ref={(element) => {
+                              attendanceControlRefs.current[getAttendanceControlKey(student.id, subject)] = element;
+                            }}
+                            role="group"
+                            tabIndex={0}
+                            onKeyDown={(event) =>
+                              handleAttendanceControlKeyDown(event, student, subject, status, controlIndex)
+                            }
+                            aria-label={`${student.name}, ${subject}: ${STATUS_LABELS[status]}`}
+                            className="inline-flex rounded-md border border-palette-lichen/60 bg-palette-mist p-1 outline-none transition focus:ring-2 focus:ring-palette-leaf/35"
+                          >
                             {(['present', 'absent'] as const).map((option) => {
                               const optionMeta = getStatusMeta(option, option === 'absent' ? absenceReason : undefined);
                               const isSelectedOption = option === status;
@@ -543,6 +626,7 @@ const AttendancePage = () => {
                                 <button
                                   key={option}
                                   type="button"
+                                  tabIndex={-1}
                                   onClick={() => handleAttendanceStatusClick(student, subject, option)}
                                   className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded px-3 py-1 text-xs font-semibold transition ${getStatusButtonClassName(
                                     option,
