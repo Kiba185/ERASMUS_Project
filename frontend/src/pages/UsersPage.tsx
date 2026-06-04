@@ -217,6 +217,14 @@ const UsersPage: React.FC = () => {
             body: JSON.stringify({ classId: editingUser.classId }),
           });
         }
+        if (newId && editingUser.role === 'parent' && editingUser.childrenIds) {
+          await fetch(`${API_URL}/api/admin/users/${newId}/children`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ childrenIds: editingUser.childrenIds }),
+          });
+        }
       } else {
         const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
           method: 'PUT',
@@ -253,6 +261,15 @@ const UsersPage: React.FC = () => {
             body: JSON.stringify({ subjectIds: editingUser.subjectIds ?? [] }),
           });
           if (!subRes.ok) throw new Error('Failed to update subject assignments');
+        }
+
+        if (editingUser.role === 'parent' && editingUser.childrenIds) {
+          const childRes = await fetch(`${API_URL}/api/admin/users/${editingUser.id}/children`, {
+            method: 'PUT', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ childrenIds: editingUser.childrenIds }),
+          });
+          if (!childRes.ok) throw new Error('Failed to update children assignments');
         }
       }
 

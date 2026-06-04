@@ -1,6 +1,7 @@
 import API_URL from '../config/config.tsx';
 import React, { useEffect, useMemo, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 
 interface AbsenceNote {
   id: string;         // attendance record id used as the key
@@ -17,7 +18,7 @@ const formatDateLabel = (isoDate: string) => {
 };
 
 const AbsenceNotesPage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, activeChildId } = useAuth();
   const [absences, setAbsences] = useState<AbsenceNote[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -30,12 +31,18 @@ const AbsenceNotesPage: React.FC = () => {
       setLoading(true);
       try {
         // Load all absences for the student
-        const attRes = await fetch(`${API_URL}/api/attendance/student/${user.id}`, { credentials: 'include' });
+        const urlAtt = user?.role === 'parent' && activeChildId 
+            ? `${API_URL}/api/myattendance?studentId=${activeChildId}` 
+            : `${API_URL}/api/myattendance`;
+        const attRes = await fetch(urlAtt, { credentials: 'include' });
         if (!attRes.ok) throw new Error('Failed to load absences');
         const attData: any[] = await attRes.json();
 
         // Load any notes the student has already sent
-        const noteRes = await fetch(`${API_URL}/api/absence-notes`, { credentials: 'include' });
+        const urlNote = user?.role === 'parent' && activeChildId
+            ? `${API_URL}/api/absence-notes?studentId=${activeChildId}`
+            : `${API_URL}/api/absence-notes`;
+        const noteRes = await fetch(urlNote, { credentials: 'include' });
         const noteData: any[] = noteRes.ok ? await noteRes.json() : [];
         const notesByAttendanceId = new Map(noteData.map(n => [n.attendanceId, n]));
 
@@ -63,7 +70,7 @@ const AbsenceNotesPage: React.FC = () => {
       }
     };
     load();
-  }, [user?.id]);
+  }, [user, activeChildId]);
 
   const selectedAbsence = absences.find(a => a.id === selectedId) ?? null;
 
@@ -102,12 +109,8 @@ const AbsenceNotesPage: React.FC = () => {
   };
 
   if (loading) return (
-    <div className="flex items-center justify-center gap-3 p-12 text-palette-pine font-bold text-lg">
-      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-      </svg>
-      Loading...
+    <div className="flex items-center justify-center min-h-[50vh]">
+        <LoadingSpinner />
     </div>
   );
 

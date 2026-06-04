@@ -1,6 +1,7 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { createPortal } from 'react-dom';
 import API_URL from '../config/config.tsx';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 
 // --- TYPES ---
 interface Student {
@@ -16,6 +17,7 @@ interface ApiClass {
   id: number;
   name: string;
   students: { id: number; name: string; role?: string }[];
+  groups?: Group[];
 }
 
 interface Group {
@@ -112,7 +114,7 @@ const ClassesPage: React.FC = () => {
             })
             .map((s) => s.id),
 
-          groups: []
+          groups: c.groups || []
         };
       });
 
@@ -203,6 +205,16 @@ const ClassesPage: React.FC = () => {
           body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error('Failed to create class');
+        const savedClass = await res.json();
+        const classId = savedClass.id;
+        for (const ng of groups) {
+            await fetch(`${API_URL}/api/classes/${classId}/groups`, {
+                method: 'POST',
+                credentials: 'include',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ name: ng.name, studentIds: ng.studentIds })
+            });
+        }
       } else if (editingClass) {
         // PUT
         const res = await fetch(`${API_URL}/api/classes/${editingClass.id}`, {
@@ -212,9 +224,38 @@ const ClassesPage: React.FC = () => {
           body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error('Failed to update class');
+        
+        const classId = editingClass.id;
+        const oldGroups = editingClass.groups || [];
+        const newGroups = groups;
+
+        // Deletes
+        const deletedGroups = oldGroups.filter(og => !newGroups.find(ng => ng.id === og.id));
+        for (const dg of deletedGroups) {
+          await fetch(`${API_URL}/api/groups/${dg.id}`, { method: 'DELETE', credentials: 'include' });
+        }
+
+        // Adds & Updates
+        for (const ng of newGroups) {
+          if (ng.id > 1000000000000) { // Date.now() check
+            await fetch(`${API_URL}/api/classes/${classId}/groups`, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: ng.name, studentIds: ng.studentIds })
+            });
+          } else {
+            await fetch(`${API_URL}/api/groups/${ng.id}`, {
+              method: 'PUT',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ name: ng.name, studentIds: ng.studentIds })
+            });
+          }
+        }
       }
       setIsModalOpen(false);
-      //await fetchData(); // Re-fetch to stay in sync
+      await fetchData(); // Re-fetch to stay in sync
     } catch (e: any) {
       alert(e.message ?? 'Save failed');
     } finally {
@@ -263,8 +304,8 @@ const ClassesPage: React.FC = () => {
   // --- RENDER ---
   if (loading) {
     return (
-      <div className="p-8 flex items-center justify-center text-palette-moss font-bold text-lg">
-        Loading classes...
+      <div className="p-8 flex items-center justify-center min-h-[50vh]">
+        <LoadingSpinner />
       </div>
     );
   }

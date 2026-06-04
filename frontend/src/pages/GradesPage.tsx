@@ -3,15 +3,20 @@ import React, { useEffect, useState } from 'react';
 
 type Grade = { id: string; gColumnId: string; userId: string; grade: string, subjectName: string; subjectId: number; date: string; gColumnName?: string; weight?: number };
 
+import { useAuth } from '../context/AuthContext';
+
 const GradesPage: React.FC = () => {
     //DOMINIK JE CERNY
-
+    const { user, activeChildId } = useAuth();
     const [grades, setGrades] = useState<Grade[]>([]);
 
     useEffect(() => {
         const loadGrades = async () => {
             try {
-                const response = await fetch(`${API_URL}/api/mygrades`, {
+                const url = user?.role === 'parent' && activeChildId
+                    ? `${API_URL}/api/mygrades?studentId=${activeChildId}`
+                    : `${API_URL}/api/mygrades`;
+                const response = await fetch(url, {
                     credentials: 'include',
                     headers: {
                         'Content-Type': 'application/json',
@@ -49,7 +54,7 @@ const GradesPage: React.FC = () => {
         };
 
         loadGrades();
-    }, []);
+    }, [user, activeChildId]);
 
     // 2. REAKTOVÉ STAVY A LOGIKA FILTROVÁNÍ
     const [selectedSubject, setSelectedSubject] = useState('All');

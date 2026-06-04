@@ -21,11 +21,23 @@ const privileges = {
     "admin": 10
 };
 
-
+app.listen(PORT, () => {
+    console.log(`Server running at http://localhost:${PORT}`);
+});
 
 app.use(cors({
-  origin: 'http://localhost:5173', 
-  credentials: true               
+  origin: (origin, callback) => {
+    if (!origin) return callback(null, true);
+    if (
+      origin.startsWith('http://localhost') ||
+      origin.endsWith('.onrender.com') ||
+      origin === process.env.CORS_ORIGIN
+    ) {
+      return callback(null, true);
+    }
+    return callback(new Error(`CORS blocked: ${origin}`));
+  },
+  credentials: true
 }));
 app.use(express.json());
 app.use(session({

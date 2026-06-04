@@ -45,6 +45,7 @@ model User {
   // Other relations
   events   Event[]
   subjects Subject[]
+  groups   Group[]       @relation("GroupStudents")
 
   attendances  Attendance[]  @relation("StudentAttendance")
   absenceNotes AbsenceNote[] @relation("StudentAbsenceNotes")
@@ -141,6 +142,7 @@ model Class {
   events       Event[]
   attendances  Attendance[]  @relation("AttendanceClass")
   lessonTopics LessonTopic[] @relation("LessonTopicClass")
+  groups       Group[]
 }
 
 model TimeTable {
@@ -187,4 +189,12 @@ model Message {
 
   sender    User @relation("SentMessages", fields: [senderId], references: [id])
   recipient User @relation("ReceivedMessages", fields: [recipientId], references: [id])
+}
+
+model Group {
+  id        Int     @id @default(autoincrement())
+  name      String
+  classId   Int
+  class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  students  User[]  @relation("GroupStudents")
 }

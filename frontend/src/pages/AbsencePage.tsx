@@ -1,6 +1,7 @@
 import API_URL from '../config/config.tsx';
-import { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useState, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { LoadingSpinner } from '../components/ui/LoadingSpinner';
 
 interface AbsenceRecord {
   id: number;
@@ -35,7 +36,7 @@ const formatDateLabel = (isoDate: string) => {
 };
 
 const AbsencePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, activeChildId } = useAuth();
   const [records, setRecords] = useState<AbsenceRecord[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
@@ -46,8 +47,10 @@ const AbsencePage: React.FC = () => {
     const load = async () => {
       setLoading(true);
       try {
-        //const res = await fetch(`${API_URL}/api/attendance/student/${user.id}`, {
-        const res = await fetch(`${API_URL}/api/myattendance`, {
+        const url = user?.role === 'parent' && activeChildId 
+            ? `${API_URL}/api/myattendance?studentId=${activeChildId}`
+            : `${API_URL}/api/myattendance`;
+        const res = await fetch(url, {
           credentials: 'include',
         });
         if (!res.ok) throw new Error(`Failed to load absences (${res.status})`);
@@ -66,7 +69,7 @@ const AbsencePage: React.FC = () => {
       }
     };
     load();
-  }, [user?.id]);
+  }, [user, activeChildId]);
 
   // Build a stable subject → color index map
   const subjectColorMap = useMemo(() => {
@@ -124,12 +127,8 @@ const AbsencePage: React.FC = () => {
   const maxChart = Math.max(...chartData.map(d => d.count), 1);
 
   if (loading) return (
-    <div className="flex items-center justify-center gap-3 p-12 text-palette-pine font-bold text-lg">
-      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-      </svg>
-      Loading absences...
+    <div className="flex items-center justify-center min-h-[50vh]">
+        <LoadingSpinner />
     </div>
   );
 
