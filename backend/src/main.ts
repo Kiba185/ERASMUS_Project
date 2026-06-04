@@ -678,7 +678,22 @@ app.get('/api/subjects', async (req, res, next) => {
     res.json(subjects);
 });
 
+// CREATE SUBJECT (currently only GET /api/subjects exists)
+app.post('/api/subjects', async (req, res, next) => {
+  if (await requireAuth(req, res, next, 5) !== true) { return; }
+  const { name, code, color } = req.body;
+  if (!name || !code) return res.status(400).json({ error: 'name and code are required' });
+  const subject = await prisma.subject.create({ data: { name, code: code.toUpperCase(), color: color ?? 'blue' } });
+  res.status(201).json(subject);
+});
 
+// DELETE SUBJECT
+app.delete('/api/subjects/:id', async (req, res, next) => {
+  if (await requireAuth(req, res, next, 5) !== true) { return; }
+  const id = parseInt(req.params.id);
+  await prisma.subject.delete({ where: { id } });
+  res.json({ success: true });
+});
 
 
 
@@ -940,96 +955,222 @@ app.delete('/api/rooms/:id', async (req, res, next) => {
 
 
 
-/////////////////////////////////////////
-//      --=== SUBJECTS STUFF ===--
-// CREATE SUBJECT (currently only GET /api/subjects exists)
-app.post('/api/subjects', async (req, res, next) => {
+///////////////////////////////////////
+//      --=== LESSON TOPICS STUFF ===--
+
+// GET lesson topics for a class on a date
+// GET /api/lesson-topics?classId=1&date=2026-06-04
+app.get('/api/lesson-topics', async (req, res, next) => {
   if (await requireAuth(req, res, next, 5) !== true) { return; }
-  const { name, code, color } = req.body;
-  if (!name || !code) return res.status(400).json({ error: 'name and code are required' });
-  const subject = await prisma.subject.create({ data: { name, code: code.toUpperCase(), color: color ?? 'blue' } });
-  res.status(201).json(subject);
+  const { classId, date } = req.query;
+  if (!classId || !date) return res.status(400).json({ error: 'classId and date are required' });
+  try {
+    const topics = await prisma.lessonTopic.findMany({
+      where: { classId: Number(classId), date: new Date(date as string) },
+      include: { subject: { select: { id: true, name: true } } },
+    });
+    res.json(topics);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// DELETE SUBJECT
-app.delete('/api/subjects/:id', async (req, res, next) => {
+// UPSERT lesson topic
+// POST /api/lesson-topics
+app.post('/api/lesson-topics', async (req, res, next) => {
   if (await requireAuth(req, res, next, 5) !== true) { return; }
-  const id = parseInt(req.params.id);
-  await prisma.subject.delete({ where: { id } });
-  res.json({ success: true });
+  const { date, classId, subjectId, topic } = req.body;
+  if (!date || !classId || !subjectId || topic === undefined) {
+    return res.status(400).json({ error: 'date, classId, subjectId, topic are required' });
+  }
+  try {
+    const record = await prisma.lessonTopic.upsert({
+      where: {
+        date_classId_subjectId: {
+          date: new Date(date),
+          classId: Number(classId),
+          subjectId: Number(subjectId),
+        }
+      },
+      update: { topic },
+      create: {
+        date: new Date(date),
+        classId: Number(classId),
+        subjectId: Number(subjectId),
+        topic,
+      }
+    });
+    res.json(record);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+
+///////////////////////////////////////
+//      --=== ABSENCE NOTES STUFF ===--
+
+// GET absence notes for current student
+// GET /api/absence-notes
+app.get('/api/absence-notes', async (req, res, next) => {
+  if (await requireAuth(req, res, next, 1) !== true) { return; }
+  try {
+    const notes = await prisma.absenceNote.findMany({
+      where: { studentId: req.session.userId! },
+      include: {
+        attendance: {
+          include: { subject: { select: { id: true, name: true } } }
+        }
+      },
+      orderBy: { createdAt: 'desc' },
+    });
+    res.json(notes);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
+});
+
+// CREATE absence note (student submits excuse)
+// POST /api/absence-notes
+app.post('/api/absence-notes', async (req, res, next) => {
+  if (await requireAuth(req, res, next, 1) !== true) { return; }
+  const { attendanceId, reason } = req.body;
+  if (!attendanceId || !reason?.trim()) {
+    return res.status(400).json({ error: 'attendanceId and reason are required' });
+  }
+  try {
+    // Verify the attendance record belongs to this student
+    const attendance = await prisma.attendance.findUnique({ where: { id: Number(attendanceId) } });
+    if (!attendance) return res.status(404).json({ error: 'Attendance record not found' });
+    if (attendance.studentId !== req.session.userId) {
+      return res.status(403).json({ error: 'Not your attendance record' });
+    }
+
+    const note = await prisma.absenceNote.upsert({
+      where: { attendanceId: Number(attendanceId) },
+      update: { reason: reason.trim() },
+      create: {
+        studentId: req.session.userId!,
+        attendanceId: Number(attendanceId),
+        reason: reason.trim(),
+      }
+    });
+    res.status(201).json(note);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
 
 
 
 
+///////////////////////////////////////
+//      --=== ATTENDANCE STUFF ===--
 
-//////////////////////////////////////////////////
-//      --=== ATTENDANCE & LESSON STUFF ===--
-// GET ATTENDANCE for a class on a date
+// GET attendance for a class on a date
+// GET /api/attendance?classId=1&date=2026-06-04
 app.get('/api/attendance', async (req, res, next) => {
   if (await requireAuth(req, res, next, 5) !== true) { return; }
   const { classId, date } = req.query;
-  const records = await prisma.attendance.findMany({
-    where: {
-      classId: Number(classId),
-      date: new Date(date as string),
-    },
-    include: { student: { select: { id: true, firstName: true, lastName: true } }, subject: true }
-  });
-  res.json(records);
+  if (!classId || !date) return res.status(400).json({ error: 'classId and date are required' });
+  try {
+    const records = await prisma.attendance.findMany({
+      where: {
+        classId: Number(classId),
+        date: new Date(date as string),
+      },
+      include: {
+        student: { select: { id: true, firstName: true, lastName: true } },
+        subject: { select: { id: true, name: true, code: true } },
+      }
+    });
+    res.json(records);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// UPSERT ATTENDANCE
+// UPSERT attendance record
+// POST /api/attendance
 app.post('/api/attendance', async (req, res, next) => {
   if (await requireAuth(req, res, next, 5) !== true) { return; }
   const { date, studentId, subjectId, classId, status, absenceReason } = req.body;
-  const record = await prisma.attendance.upsert({
-    where: { date_studentId_subjectId: { date: new Date(date), studentId: Number(studentId), subjectId: Number(subjectId) } },
-    update: { status, absenceReason: absenceReason ?? null },
-    create: { date: new Date(date), studentId: Number(studentId), subjectId: Number(subjectId), classId: Number(classId), status, absenceReason: absenceReason ?? null }
-  });
-  res.json(record);
+  if (!date || !studentId || !subjectId || !classId || !status) {
+    return res.status(400).json({ error: 'date, studentId, subjectId, classId, status are required' });
+  }
+  try {
+    const record = await prisma.attendance.upsert({
+      where: {
+        date_studentId_subjectId: {
+          date: new Date(date),
+          studentId: Number(studentId),
+          subjectId: Number(subjectId),
+        }
+      },
+      update: { status, absenceReason: absenceReason ?? null },
+      create: {
+        date: new Date(date),
+        studentId: Number(studentId),
+        subjectId: Number(subjectId),
+        classId: Number(classId),
+        status,
+        absenceReason: absenceReason ?? null,
+      }
+    });
+    res.json(record);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// GET ABSENCE SUMMARY for a student
-// Students can see their own, teachers can see anyone
+// GET absences for a specific student
 app.get('/api/attendance/student/:studentId', async (req, res, next) => {
   if (await requireAuth(req, res, next, 1) !== true) { return; }
   const studentId = parseInt(req.params.studentId);
   if (req.session.userId !== studentId) {
     if (await requireAuth(req, res, next, 5) !== true) { return; }
   }
-  const records = await prisma.attendance.findMany({
-    where: { studentId, status: 'absent' },
-    include: { subject: true },
-    orderBy: { date: 'desc' }
-  });
-  res.json(records);
+  try {
+    const records = await prisma.attendance.findMany({
+      where: { studentId, status: 'absent' },
+      include: {
+        subject: { select: { id: true, name: true } },
+      },
+      orderBy: { date: 'desc' },
+    });
+    res.json(records);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// GET LESSON TOPICS for a class on a date
-app.get('/api/lesson-topics', async (req, res, next) => {
-  if (await requireAuth(req, res, next, 5) !== true) { return; }
-  const { classId, date } = req.query;
-  const topics = await prisma.lessonTopic.findMany({
-    where: { classId: Number(classId), date: new Date(date as string) },
-    include: { subject: true }
-  });
-  res.json(topics);
+//GET ABSENCES FOR THE CURRENT STUDENT
+app.get('/api/myattendance', async (req, res, next) => {
+  if (await requireAuth(req, res, next, 1) !== true) { return; }
+  const studentId = req.session.userId!;
+  try {
+    const records = await prisma.attendance.findMany({
+      where: { studentId, status: 'absent' },
+      include: {
+        subject: { select: { id: true, name: true } },  
+      },
+      orderBy: { date: 'desc' },
+    });
+    res.json(records);
+  } catch (e: any) {
+    res.status(500).json({ error: e.message });
+  }
 });
 
-// UPSERT LESSON TOPIC
-app.post('/api/lesson-topics', async (req, res, next) => {
-  if (await requireAuth(req, res, next, 5) !== true) { return; }
-  const { date, classId, subjectId, topic } = req.body;
-  const record = await prisma.lessonTopic.upsert({
-    where: { date_classId_subjectId: { date: new Date(date), classId: Number(classId), subjectId: Number(subjectId) } },
-    update: { topic },
-    create: { date: new Date(date), classId: Number(classId), subjectId: Number(subjectId), topic }
-  });
-  res.json(record);
-});
+
+
+
+
+
+
+
+
 
 
 
