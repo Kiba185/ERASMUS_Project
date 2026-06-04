@@ -7,7 +7,8 @@ import timetableRouter from './timeTable.js';
 import { prisma } from "./prisma.js";
 
 import { requireAuth } from './auth.js';
-import userRoutes from './users.js';
+import userRoutes from './userManagment.js';
+import profileRouter from './userPage.js';
 
 declare module 'express-session' {
     interface SessionData {
@@ -56,6 +57,7 @@ app.use(session({
 
 app.use(timetableRouter);
 app.use(userRoutes);
+app.use(profileRouter);
 
 
 //////////////////////////////////////

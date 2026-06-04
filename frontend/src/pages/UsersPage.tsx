@@ -15,6 +15,7 @@ interface MockUser {
   username: string;
   email: string;
   phone: string;
+  phonePrefix: string;
   adress: string;
   birthday: string;
   role: Role;
@@ -23,17 +24,30 @@ interface MockUser {
   subjectIds?: number[];
 }
 
+const PHONE_PREFIXES = [
+  { code: '+420', label: '🇨🇿 +420' },
+  { code: '+421', label: '🇸🇰 +421' },
+  { code: '+43',  label: '🇦🇹 +43'  },
+  { code: '+49',  label: '🇩🇪 +49'  },
+  { code: '+48',  label: '🇵🇱 +48'  },
+  { code: '+44',  label: '🇬🇧 +44'  },
+  { code: '+33',  label: '🇫🇷 +33'  },
+  { code: '+39',  label: '🇮🇹 +39'  },
+  { code: '+34',  label: '🇪🇸 +34'  },
+  { code: '+1',   label: '🇺🇸 +1'   },
+];
+
 const UsersPage: React.FC = () => {
   const navigate  = useNavigate();
   const { login } = useAuth();
 
-  const [users,    setUsers]    = useState<MockUser[]>([]);
-  const [classes,  setClasses]  = useState<MockClass[]>([]);
-  const [subjects, setSubjects] = useState<MockSubject[]>([]);
-  const [loading,  setLoading]  = useState(true);
-  const [saving,   setSaving]   = useState(false);
-  const [savingLabel, setSavingLabel] = useState('Saving...'); // 👈 dynamic overlay label
-  const [error,    setError]    = useState<string | null>(null);
+  const [users,       setUsers]       = useState<MockUser[]>([]);
+  const [classes,     setClasses]     = useState<MockClass[]>([]);
+  const [subjects,    setSubjects]    = useState<MockSubject[]>([]);
+  const [loading,     setLoading]     = useState(true);
+  const [saving,      setSaving]      = useState(false);
+  const [savingLabel, setSavingLabel] = useState('Saving...');
+  const [error,       setError]       = useState<string | null>(null);
 
   const [search,      setSearch]      = useState('');
   const [roleFilter,  setRoleFilter]  = useState<Role | 'all'>('all');
@@ -41,23 +55,30 @@ const UsersPage: React.FC = () => {
   const [sortField,   setSortField]   = useState<keyof MockUser>('lastName');
   const [sortOrder,   setSortOrder]   = useState<'asc' | 'desc'>('asc');
 
-  const [isModalOpen,  setIsModalOpen]  = useState(false);
-  const [editingUser,  setEditingUser]  = useState<MockUser | null>(null);
-  const [isNew,        setIsNew]        = useState(false);
-  const [newPassword,  setNewPassword]  = useState('');
-  const [modalError,   setModalError]   = useState<string | null>(null); // 👈 inline modal errors
+  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [editingUser, setEditingUser] = useState<MockUser | null>(null);
+  const [isNew,       setIsNew]       = useState(false);
+  const [newPassword, setNewPassword] = useState('');
+  const [modalError,  setModalError]  = useState<string | null>(null);
 
-  // --- DATA FETCHING (with error handling) ---
+  // --- DATA FETCHING ---
 
   const fetchUsers = async () => {
     const res = await fetch(`${API_URL}/api/admin/users`, { credentials: 'include' });
     if (!res.ok) throw new Error(`Failed to load users (${res.status})`);
     const data = await res.json();
-    setUsers(data.map((u: any) => ({
-      ...u,
-      classId:    u.classes?.[0]?.id ?? null,
-      subjectIds: u.subjects?.map((s: any) => s.id) ?? [],
-    })));
+    setUsers(data.map((u: any) => {
+      const matchedPrefix = PHONE_PREFIXES.find(p => u.phone?.startsWith(p.code));
+      const prefix = matchedPrefix?.code ?? '+420';
+      const number = matchedPrefix ? (u.phone ?? '').slice(prefix.length).trim() : (u.phone ?? '');
+      return {
+        ...u,
+        phonePrefix: prefix,
+        phone:       number,
+        classId:     u.classes?.[0]?.id ?? null,
+        subjectIds:  u.subjects?.map((s: any) => s.id) ?? [],
+      };
+    }));
   };
 
   const fetchClasses = async () => {
@@ -119,7 +140,12 @@ const UsersPage: React.FC = () => {
     setIsNew(true);
     setNewPassword('');
     setModalError(null);
-    setEditingUser({ id: 0, firstName: '', lastName: '', username: '', email: '', phone: '', adress: '', birthday: '', role: 'student', classId: null, childrenIds: [], subjectIds: [] });
+    setEditingUser({
+      id: 0, firstName: '', lastName: '', username: '',
+      email: '', phone: '', phonePrefix: '+420',
+      adress: '', birthday: '', role: 'student',
+      classId: null, childrenIds: [], subjectIds: []
+    });
     setIsModalOpen(true);
   };
 
@@ -127,16 +153,24 @@ const UsersPage: React.FC = () => {
     setIsNew(false);
     setNewPassword('');
     setModalError(null);
-    setEditingUser({ ...user, birthday: user.birthday ? user.birthday.split('T')[0] : '' });
+    setEditingUser({
+      ...user,
+      birthday: user.birthday ? user.birthday.split('T')[0] : ''
+    });
     setIsModalOpen(true);
   };
 
-  // --- SAVE (modal stays open on failure) ---
+  // --- SAVE ---
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
     if (!editingUser.birthday) { setModalError('Date of birth is required.'); return; }
+
+    const fullPhone = editingUser.phone
+      ? `${editingUser.phonePrefix}${editingUser.phone}`
+      : '';
+    const payload = { ...editingUser, phone: fullPhone };
 
     setModalError(null);
     setSaving(true);
@@ -148,50 +182,43 @@ const UsersPage: React.FC = () => {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ ...editingUser, password: newPassword }),
+          body: JSON.stringify({ ...payload, password: newPassword }),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           throw new Error(err.message ?? `Server error ${res.status}`);
         }
       } else {
-        // Update core fields
         const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
           method: 'PUT',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(editingUser),
+          body: JSON.stringify(payload),
         });
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
           throw new Error(err.message ?? `Server error ${res.status}`);
         }
 
-        // Password change (only if filled and long enough)
-        if (newPassword.length >= 6) {
+        if (newPassword) {
           const pwRes = await fetch(`${API_URL}/api/admin/users/${editingUser.id}/password`, {
-            method: 'PUT',
-            credentials: 'include',
+            method: 'PUT', credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ newPassword }),
           });
           if (!pwRes.ok) throw new Error('Failed to update password');
         }
 
-        // Class assignment
         const clsRes = await fetch(`${API_URL}/api/admin/users/${editingUser.id}/classes`, {
-          method: 'PUT',
-          credentials: 'include',
+          method: 'PUT', credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ classId: editingUser.classId ?? null }),
         });
         if (!clsRes.ok) throw new Error('Failed to update class assignment');
 
-        // Subject assignment (teachers only)
         if (editingUser.role === 'teacher') {
           const subRes = await fetch(`${API_URL}/api/admin/users/${editingUser.id}/subjects`, {
-            method: 'PUT',
-            credentials: 'include',
+            method: 'PUT', credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ subjectIds: editingUser.subjectIds ?? [] }),
           });
@@ -199,11 +226,9 @@ const UsersPage: React.FC = () => {
         }
       }
 
-      // Only close modal + refresh on full success
       setIsModalOpen(false);
       await fetchUsers();
     } catch (e: any) {
-      // Show error inside the modal — form data is preserved
       setModalError(e.message ?? 'Something went wrong. Please try again.');
     } finally {
       setSaving(false);
@@ -217,10 +242,7 @@ const UsersPage: React.FC = () => {
     setSaving(true);
     setSavingLabel('Deleting...');
     try {
-      const res = await fetch(`${API_URL}/api/admin/users/${id}`, {
-        method: 'DELETE',
-        credentials: 'include',
-      });
+      const res = await fetch(`${API_URL}/api/admin/users/${id}`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error(`Delete failed (${res.status})`);
       await fetchUsers();
     } catch (e: any) {
@@ -235,8 +257,7 @@ const UsersPage: React.FC = () => {
   const handleLoginAs = async (user: MockUser) => {
     try {
       const res = await fetch(`${API_URL}/api/admin/loginas/${user.id}`, {
-        method: 'POST',
-        credentials: 'include',
+        method: 'POST', credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
       });
       if (!res.ok) throw new Error(`Login as failed (${res.status})`);
@@ -275,16 +296,13 @@ const UsersPage: React.FC = () => {
   if (error) return (
     <div className="p-8 text-center space-y-4">
       <p className="text-red-600 font-bold text-lg">{error}</p>
-      <button onClick={loadAll} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl hover:bg-palette-leaf transition">
-        Retry
-      </button>
+      <button onClick={loadAll} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl hover:bg-palette-leaf transition">Retry</button>
     </div>
   );
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
 
-      {/* Saving/Deleting overlay */}
       {saving && createPortal(
         <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-[99999]">
           <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
@@ -358,7 +376,9 @@ const UsersPage: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">{getClassBadge(user)}</td>
                 <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">{user.email}</td>
-                <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">{user.phone}</td>
+                <td className="px-6 py-4 whitespace-nowrap text-gray-600 font-medium">
+                  {user.phone ? `${user.phonePrefix} ${user.phone}` : '-'}
+                </td>
                 <td className="px-6 py-4 whitespace-nowrap text-right">
                   <div className="flex justify-end gap-3">
                     <button onClick={() => handleLoginAs(user)} className="text-palette-moss hover:text-palette-pine font-bold transition">Login As</button>
@@ -386,7 +406,6 @@ const UsersPage: React.FC = () => {
 
             <form onSubmit={handleSave} className="overflow-y-auto p-6 space-y-6">
 
-              {/* Inline error banner inside modal */}
               {modalError && (
                 <div className="bg-red-50 border border-red-200 text-red-700 rounded-xl px-4 py-3 text-sm font-semibold">
                   {modalError}
@@ -396,41 +415,77 @@ const UsersPage: React.FC = () => {
               <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                 <div>
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">First Name</label>
-                  <input type="text" required value={editingUser.firstName} onChange={e => setEditingUser({...editingUser, firstName: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
+                  <input type="text" required value={editingUser.firstName}
+                    onChange={e => setEditingUser({...editingUser, firstName: e.target.value})}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">Last Name</label>
-                  <input type="text" required value={editingUser.lastName} onChange={e => setEditingUser({...editingUser, lastName: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
+                  <input type="text" required value={editingUser.lastName}
+                    onChange={e => setEditingUser({...editingUser, lastName: e.target.value})}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">Username</label>
-                  <input type="text" required value={editingUser.username} onChange={e => setEditingUser({...editingUser, username: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
+                  <input type="text" required value={editingUser.username}
+                    onChange={e => setEditingUser({...editingUser, username: e.target.value})}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div>
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">Email</label>
-                  <input type="email" required value={editingUser.email} onChange={e => setEditingUser({...editingUser, email: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
+                  <input type="email" required value={editingUser.email}
+                    onChange={e => setEditingUser({...editingUser, email: e.target.value})}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
-                <div>
+
+                {/* Phone with prefix */}
+                <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">Phone</label>
-                  <input type="text" value={editingUser.phone} onChange={e => setEditingUser({...editingUser, phone: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
+                  <div className="flex gap-2">
+                    <select
+                      value={editingUser.phonePrefix}
+                      onChange={e => setEditingUser({...editingUser, phonePrefix: e.target.value})}
+                      className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition font-medium text-sm"
+                    >
+                      {PHONE_PREFIXES.map(p => (
+                        <option key={p.code} value={p.code}>{p.label}</option>
+                      ))}
+                    </select>
+                    <input
+                      type="text"
+                      inputMode="numeric"
+                      placeholder="123456789"
+                      value={editingUser.phone}
+                      onChange={e => setEditingUser({...editingUser, phone: e.target.value.replace(/\D/g, '')})}
+                      className="flex-1 p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition"
+                    />
+                  </div>
                 </div>
-                <div>
+
+                <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">Date of Birth *</label>
-                  <input type="date" required value={editingUser.birthday} onChange={e => setEditingUser({...editingUser, birthday: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
+                  <input type="date" required value={editingUser.birthday}
+                    onChange={e => setEditingUser({...editingUser, birthday: e.target.value})}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">Address</label>
-                  <input type="text" value={editingUser.adress} onChange={e => setEditingUser({...editingUser, adress: e.target.value})} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
+                  <input type="text" value={editingUser.adress}
+                    onChange={e => setEditingUser({...editingUser, adress: e.target.value})}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div className="md:col-span-2">
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">
                     {isNew ? 'Password *' : 'New Password (leave blank to keep current)'}
                   </label>
-                  <input type="password" required={isNew} value={newPassword} onChange={e => setNewPassword(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
+                  <input type="password" required={isNew} value={newPassword}
+                    onChange={e => setNewPassword(e.target.value)}
+                    className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition" />
                 </div>
                 <div className="md:col-span-2 pt-4 border-t border-gray-100">
                   <label className="block text-sm font-bold text-palette-pine mb-1.5">Role</label>
-                  <select value={editingUser.role} onChange={e => setEditingUser({...editingUser, role: e.target.value as Role, classId: null, childrenIds: [], subjectIds: []})}
+                  <select value={editingUser.role}
+                    onChange={e => setEditingUser({...editingUser, role: e.target.value as Role, classId: null, childrenIds: [], subjectIds: []})}
                     className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition font-medium">
                     <option value="student">Student</option>
                     <option value="teacher">Teacher</option>
@@ -438,13 +493,15 @@ const UsersPage: React.FC = () => {
                     <option value="admin">Admin</option>
                   </select>
                 </div>
+
                 {(editingUser.role === 'student' || editingUser.role === 'teacher') && (
                   <div className="md:col-span-2 bg-palette-mist/50 p-5 rounded-xl border border-palette-sage/30 space-y-5">
                     <div>
                       <label className="block text-sm font-bold text-palette-pine mb-1.5">
                         {editingUser.role === 'student' ? 'Assign to Class' : 'Head Teacher of Class (Optional)'}
                       </label>
-                      <select value={editingUser.classId || ''} onChange={e => setEditingUser({...editingUser, classId: e.target.value ? Number(e.target.value) : null})}
+                      <select value={editingUser.classId || ''}
+                        onChange={e => setEditingUser({...editingUser, classId: e.target.value ? Number(e.target.value) : null})}
                         className="w-full p-2.5 bg-white border border-gray-200 rounded-lg focus:ring-2 focus:ring-palette-meadow outline-none transition">
                         <option value="">-- No class assigned --</option>
                         {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
@@ -474,8 +531,12 @@ const UsersPage: React.FC = () => {
               </div>
 
               <div className="pt-6 mt-4 border-t border-gray-100 flex justify-end space-x-3">
-                <button type="button" onClick={() => setIsModalOpen(false)} className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition">Cancel</button>
-                <button type="submit" disabled={saving} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl shadow-soft hover:bg-palette-leaf hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
+                <button type="button" onClick={() => setIsModalOpen(false)}
+                  className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition">
+                  Cancel
+                </button>
+                <button type="submit" disabled={saving}
+                  className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl shadow-soft hover:bg-palette-leaf hover:-translate-y-0.5 transition-all disabled:opacity-50 disabled:cursor-not-allowed">
                   Save User
                 </button>
               </div>
