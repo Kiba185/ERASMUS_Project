@@ -18,11 +18,18 @@ interface ApiClass {
   students: { id: number; name: string; role?: string }[];
 }
 
+interface Group {
+  id: number;
+  name: string;
+  studentIds: number[];
+}
+
 interface UIClass {
   id: number;
   name: string;
   headTeacherId: number | null;
   studentIds: number[];
+  groups: Group[];
 }
 
 // --- HELPERS ---
@@ -46,6 +53,9 @@ const ClassesPage: React.FC = () => {
   const [selectedHeadTeacherId, setSelectedHeadTeacherId] = useState<number | null>(null);
   const [className, setClassName] = useState('');
   const [saving, setSaving] = useState(false);
+  const [groups, setGroups] = useState<Group[]>([]);
+  const [newGroupName, setNewGroupName] = useState('');
+  const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
 
   // --- FETCH ALL CLASSES + ALL USERS ---
   const fetchData = async () => {
@@ -95,13 +105,14 @@ const ClassesPage: React.FC = () => {
           id: c.id,
           name: c.name,
           headTeacherId: headTeacher?.id ?? null,
-          // studentIds = only the non-teacher members
           studentIds: c.students
             .filter((s) => {
               const found = users.find((u) => u.id === s.id);
               return found?.role !== 'teacher';
             })
             .map((s) => s.id),
+
+          groups: []
         };
       });
 
@@ -140,7 +151,9 @@ const ClassesPage: React.FC = () => {
     setClassName('');
     setSelectedStudentIds([]);
     setSelectedHeadTeacherId(null);
+    setGroups([]);
     setIsModalOpen(true);
+    
   };
 
   const openEditModal = (cls: UIClass) => {
@@ -149,6 +162,7 @@ const ClassesPage: React.FC = () => {
     setClassName(cls.name);
     setSelectedStudentIds([...cls.studentIds]);
     setSelectedHeadTeacherId(cls.headTeacherId);
+    setGroups(cls.groups || []);
     setIsModalOpen(true);
   };
 
@@ -163,6 +177,18 @@ const ClassesPage: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (editingClass) {
+      setClasses(
+        classes.map((c) =>
+          c.id === editingClass.id
+            ? {
+                ...c,
+                groups,
+              }
+            : c
+        )
+      );
+    }
     if (!className.trim()) return;
     setSaving(true);
     const payload = buildPayload();
@@ -188,7 +214,7 @@ const ClassesPage: React.FC = () => {
         if (!res.ok) throw new Error('Failed to update class');
       }
       setIsModalOpen(false);
-      await fetchData(); // Re-fetch to stay in sync
+      //await fetchData(); // Re-fetch to stay in sync
     } catch (e: any) {
       alert(e.message ?? 'Save failed');
     } finally {
@@ -214,6 +240,19 @@ const ClassesPage: React.FC = () => {
       setSaving(false);
     }
   };
+
+  const addGroup = () => {
+  if (!newGroupName.trim()) return;
+
+  const newGroup: Group = {
+    id: Date.now(),
+    name: newGroupName,
+    studentIds: [],
+  };
+
+  setGroups([...groups, newGroup]);
+  setNewGroupName('');
+};
 
   const getTeacherName = (id: number | null) => {
     if (!id) return 'No head teacher';
@@ -448,15 +487,155 @@ const ClassesPage: React.FC = () => {
                                   />
                                 </div>
                                 <div className="flex flex-col">
-                                  <span className={`text-sm font-bold ${isSelected ? 'text-palette-pine' : 'text-gray-800'}`}>
+                                  <span
+                                    className={`text-sm font-bold ${
+                                      isSelected
+                                        ? 'text-palette-pine'
+                                        : 'text-gray-800'
+                                    }`}
+                                  >
                                     {student.name}
                                   </span>
+
+                                  <div className="flex flex-wrap gap-1 mt-1">
+                                    {groups
+                                      .filter(group =>
+                                        group.studentIds.includes(student.id)
+                                      )
+                                      .map(group => (
+                                        <span
+                                          key={group.id}
+                                          className="px-2 py-0.5 text-xs rounded-full bg-blue-100 text-blue-800"
+                                        >
+                                          {group.name}
+                                        </span>
+                                      ))}
+                                  </div>
                                 </div>
                               </label>
                             );
                           })}
                         </div>
                       )}
+                    </div>
+                  </div>
+                  <div>
+                    <div className="flex justify-between items-end mb-4 border-b border-palette-mist pb-2">
+                      <h3 className="text-sm font-bold text-palette-fern uppercase tracking-wider">
+                        Groups
+                      </h3>
+                    </div>
+
+                    <div className="space-y-3">
+
+                      <div className="flex gap-2">
+                        <input
+                          value={newGroupName}
+                          onChange={(e) => setNewGroupName(e.target.value)}
+                          placeholder="Group name..."
+                          className="flex-1 p-2 border border-gray-300 rounded-lg"
+                        />
+
+                        <button
+                          type="button"
+                          onClick={addGroup}
+                          className="px-4 py-2 bg-palette-fern text-white rounded-lg"
+                        >
+                          Add Group
+                        </button>
+                      </div>
+
+                      {groups.map((group) => (
+                        <div
+                          key={group.id}
+                          className="border rounded-lg p-3 bg-gray-50"
+                        >
+                          <div className="flex justify-between items-center mb-2">
+                            <div>
+                              <div className="font-bold text-palette-pine">
+                                {group.name}
+                              </div>
+
+                              <div className="text-sm text-gray-500">
+                                {group.studentIds.length} students
+                              </div>
+                            </div>
+
+                            <div className="flex gap-2">
+                              <button
+                                type="button"
+                                onClick={() =>
+                                  setEditingGroupId(
+                                    editingGroupId === group.id ? null : group.id
+                                  )
+                                }
+                                className="px-3 py-1 bg-palette-mist rounded"
+                              >
+                                Edit
+                              </button>
+
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  setGroups(
+                                    groups.filter(
+                                      (g) => g.id !== group.id
+                                    )
+                                  );
+                                }}
+                                className="px-3 py-1 bg-red-100 text-red-600 rounded"
+                              >
+                                Delete
+                              </button>
+                            </div>
+                          </div>
+
+                          {editingGroupId === group.id && (
+                            <div className="mt-3 space-y-2">
+                              {selectedStudentIds.map((studentId) => {
+                                const student = students.find(
+                                  (s) => s.id === studentId
+                                );
+
+                                if (!student) return null;
+
+                                const checked =
+                                  group.studentIds.includes(studentId);
+
+                                return (
+                                  <label
+                                    key={studentId}
+                                    className="flex items-center gap-2"
+                                  >
+                                    <input
+                                      type="checkbox"
+                                      checked={checked}
+                                      onChange={(e) => {
+                                        setGroups(
+                                          groups.map((g) => {
+                                            if (g.id !== group.id) return g;
+
+                                            return {
+                                              ...g,
+                                              studentIds: e.target.checked
+                                                ? [...g.studentIds, studentId]
+                                                : g.studentIds.filter(
+                                                    (id) => id !== studentId
+                                                  ),
+                                            };
+                                          })
+                                        );
+                                      }}
+                                    />
+
+                                    <span>{student.name}</span>
+                                  </label>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      ))}
                     </div>
                   </div>
                 </div>
