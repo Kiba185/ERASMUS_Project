@@ -382,7 +382,7 @@ const UsersPage: React.FC = () => {
                   <span className={`px-3 py-1 text-xs font-bold rounded-full capitalize border
                     ${user.role === 'admin' ? 'bg-red-50 text-red-700 border-red-200' : ''}
                     ${user.role === 'teacher' ? 'bg-palette-mist text-palette-fern border-palette-sage' : ''}
-                    ${user.role === 'parent' ? 'bg-orange-50 text-orange-700 border-orange-200' : ''}
+                    ${user.role === 'parent' ? 'bg-palette-mist text-palette-moss border-palette-sage' : ''}
                     ${user.role === 'student' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}
                   `}>{user.role}</span>
                 </td>
@@ -487,18 +487,18 @@ const UsersPage: React.FC = () => {
                   </div>
                 )}
                 {editingUser.role === 'parent' && (
-                  <div className="md:col-span-2 bg-orange-50/70 p-5 rounded-xl border border-orange-200 space-y-3">
+                  <div className="md:col-span-2 bg-palette-mist/50 p-5 rounded-xl border border-palette-sage/30 space-y-3">
                     <label className="block text-sm font-bold text-palette-pine">Assign Children</label>
                     <div className="max-h-56 overflow-y-auto bg-white border border-gray-200 rounded-lg p-2 shadow-inner grid grid-cols-1 md:grid-cols-2 gap-1">
                       {childOptions.map(child => {
                         const isSelected = editingUser.childrenIds?.includes(child.id);
                         return (
-                          <label key={child.id} className={`flex items-center space-x-3 p-2.5 rounded-md cursor-pointer border transition ${isSelected ? 'bg-orange-50 border-orange-200' : 'border-transparent hover:bg-gray-50'}`}>
+                          <label key={child.id} className={`flex items-center space-x-3 p-2.5 rounded-md cursor-pointer border transition ${isSelected ? 'bg-palette-mist border-palette-sage' : 'border-transparent hover:bg-gray-50'}`}>
                             <input type="checkbox" checked={!!isSelected} onChange={(e) => {
                               const currentIds = editingUser.childrenIds || [];
                               if (e.target.checked) setEditingUser({...editingUser, childrenIds: [...currentIds, child.id]});
                               else setEditingUser({...editingUser, childrenIds: currentIds.filter(id => id !== child.id)});
-                            }} className="w-4 h-4 text-orange-600 border-gray-300 rounded focus:ring-orange-400 cursor-pointer" />
+                            }} className="w-4 h-4 text-palette-fern border-gray-300 rounded focus:ring-palette-meadow cursor-pointer" />
                             <span className="min-w-0 text-sm font-bold text-palette-pine">
                               <span>{child.name}</span>
                               {child.className && <span className="ml-1 font-medium text-palette-moss">({child.className})</span>}
