@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from 'react';
+import { createPortal } from 'react-dom';
 import { useAuth } from '../context/AuthContext';
 
 // Můžeš smazat import loadSetupMockData, už to nepotřebujeme
@@ -81,6 +82,8 @@ const ScheduleEditPage: React.FC = () => {
   const [isPermanentEditMode, setIsPermanentEditMode] = useState(false);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingLesson, setEditingLesson] = useState<Partial<Lesson> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savingLabel, setSavingLabel] = useState('Saving...');
 
   const currentWeekDates = getWeekDatesStrings(weekOffset);
   const viewedMondayDate = getMondayOfOffsetWeek(weekOffset);
@@ -247,6 +250,9 @@ const ScheduleEditPage: React.FC = () => {
     
     const method = isNewLesson ? 'POST' : 'PUT';
 
+    setSaving(true);
+    setSavingLabel('Saving...');
+
     try {
       const response = await fetch(url, {
         method: method,
@@ -290,6 +296,8 @@ const ScheduleEditPage: React.FC = () => {
     } catch (error) {
       console.error("Chyba:", error);
       alert("Nepodařilo se uložit data na server.");
+    } finally {
+      setSaving(false);
     }
   };
 
@@ -339,6 +347,15 @@ const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
 
   return (
     <div className="p-8">
+      {saving && createPortal(
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-[99999]">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
+            <p className="text-palette-pine font-bold text-lg">{savingLabel}</p>
+          </div>
+        </div>,
+        document.body
+      )}
       {/* Top Controller Management Panel */}
       <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
         <div className="flex flex-wrap items-center gap-6">
@@ -625,7 +642,8 @@ const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
                 </button>
                 <button
                   onClick={handleSaveLesson}
-                  className="px-6 py-2 bg-palette-pine text-white font-bold rounded-lg hover:bg-palette-leaf transition shadow-sm"
+                  disabled={saving}
+                  className="px-6 py-2 bg-palette-pine text-white font-bold rounded-lg hover:bg-palette-leaf transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Save Changes
                 </button>
