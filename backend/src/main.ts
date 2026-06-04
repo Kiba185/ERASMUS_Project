@@ -872,10 +872,32 @@ app.get('/api/messages/sent', async (req, res, next) => {
 // SEND MESSAGE
 app.post('/api/messages', async (req, res, next) => {
     if (await requireAuth(req, res, next, 1) !== true) { return; }
-    const { recipientId, body } = req.body;
-    if (!recipientId || !body) {
-        return res.status(400).json({ success: false, message: 'recipientId and body are required' });
+
+    const { recipientId, recipientIds, body } = req.body;
+
+    if (!body) {
+        return res.status(400).json({ success: false, message: 'body is required' });
     }
+
+    // Handle multiple recipients
+    if (recipientIds && Array.isArray(recipientIds)) {
+        await Promise.all(recipientIds.map((id: number) =>
+            prisma.message.create({
+                data: {
+                    senderId: req.session.userId!,
+                    recipientId: Number(id),
+                    body
+                }
+            })
+        ));
+        return res.status(201).json({ success: true });
+    }
+
+    // Handle single recipient
+    if (!recipientId) {
+        return res.status(400).json({ success: false, message: 'recipientId is required' });
+    }
+
     const message = await prisma.message.create({
         data: {
             senderId: req.session.userId!,
@@ -896,6 +918,14 @@ app.get('/api/messages/recipients', async (req, res, next) => {
     res.json(users);
 });
 
+// GET CLASSES FOR MESSAGING
+app.get('/api/messages/classes', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 1) !== true) { return; }
+    const classes = await prisma.class.findMany({
+        select: { id: true, name: true, students: { select: { id: true } } }
+    });
+    res.json(classes);
+});
 
 // TEMP - create message table
 app.get('/api/setup/messages', async (req, res) => {
