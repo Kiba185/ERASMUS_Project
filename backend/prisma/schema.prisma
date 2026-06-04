@@ -115,8 +115,9 @@ model LessonTopic {
 }
 
 model Room {
-  id   Int    @id @default(autoincrement())
-  name String @unique
+  id         Int         @id @default(autoincrement())
+  name       String      @unique
+  timeTables TimeTable[]
 }
 
 model Class {
@@ -132,12 +133,13 @@ model Class {
 model TimeTable {
   id           Int    @id @default(autoincrement())
   day          String
-  week String
+  week         String
   startTime    String
   endTime      String
   periodNumber Int
-  room         String
-  group        String   @default("Whole Class")
+  roomId       Int
+  room         Room   @relation(fields: [roomId], references: [id])
+  group        String @default("Whole Class")
 
   subjectId Int
   subject   Subject @relation(fields: [subjectId], references: [id])
@@ -147,8 +149,6 @@ model TimeTable {
 
   classId Int
   class   Class @relation(fields: [classId], references: [id])
-
-
 }
 
 model Event {
