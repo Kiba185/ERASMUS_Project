@@ -27,7 +27,7 @@ const SIDEBAR_LINKS: SidebarLink[] = [
   { label: 'Events', icon: 'map_pin_review', path: '/events', roles: ['admin', 'teacher', 'student', 'parent'] },
   { label: 'User info', icon: 'person', path: '/user', roles: ['parent', 'admin', 'student', 'teacher'] },
   { label: 'Edit Schedule', icon: 'edit_calendar', path: '/schedule-edit', roles: ['admin'] },
-  {label: 'School Info', icon: 'school', path: '/school-info', roles: ['admin'] },
+  {label: 'School Info', icon: 'school', path: '/school-info', roles: ['parent', 'admin', 'student', 'teacher'] },
 ];
 
 const Sidebar: React.FC = () => {
