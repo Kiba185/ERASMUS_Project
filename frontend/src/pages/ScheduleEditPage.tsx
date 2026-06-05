@@ -1,3 +1,4 @@
+import API_URL from '../config/config.tsx';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
@@ -91,7 +92,7 @@ const ScheduleEditPage: React.FC = () => {
   useEffect(() => {
     const fetchSetupOptions = async () => {
       try {
-        const response = await fetch('http://localhost:3000/api/setup-data');
+        const response = await fetch(`${API_URL}/api/setup-data`);
         const result = await response.json();
         
         if (result.success) {
@@ -119,7 +120,7 @@ const ScheduleEditPage: React.FC = () => {
     const fetchClassTimetable = async () => {
       try {
         // Zde voláme API backendu pro stažení hodin podle názvu třídy
-        const response = await fetch(`http://localhost:3000/api/timetables/class/${selectedClass}`);
+        const response = await fetch(`${API_URL}/api/timetables/class/${selectedClass}`);
         if (!response.ok) throw new Error('Chyba při načítání rozvrhu');
         
         const data = await response.json();
@@ -242,8 +243,8 @@ const ScheduleEditPage: React.FC = () => {
     const testAdminName = "admin";
     
     const url = isNewLesson 
-      ? `http://localhost:3000/api/timetables/edit/${testAdminName}` 
-      : `http://localhost:3000/api/timetables/edit/${testAdminName}/${editingLesson.id}`;
+      ? `${API_URL}/api/timetables/edit/${testAdminName}` 
+      : `${API_URL}/api/timetables/edit/${testAdminName}/${editingLesson.id}`;
     
     const method = isNewLesson ? 'POST' : 'PUT';
 
@@ -302,7 +303,7 @@ const ScheduleEditPage: React.FC = () => {
 
     try {
       const testAdminName = "admin";
-      const url = `http://localhost:3000/api/timetables/edit/${testAdminName}/${id}`;
+      const url = `${API_URL}/api/timetables/edit/${testAdminName}/${id}`;
       const response = await fetch(url, { method: 'DELETE' });
       const result = await response.json();
 
@@ -318,32 +319,23 @@ const ScheduleEditPage: React.FC = () => {
     }
   };
 
-  const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
+const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextSubject = e.target.value;
-    setEditingLesson((prev) => {
-      if (!prev) return null;
-      const allowedTeachers = subjectTeachersMap[nextSubject] || [];
-      const isSubstituted = prev.status === 'substituted';
-      let nextTeacher = prev.teacher || '';
-      if (!isSubstituted && nextSubject && !allowedTeachers.includes(nextTeacher)) {
-        nextTeacher = allowedTeachers[0] || '';
-      }
-      return { ...prev, subject: nextSubject, teacher: nextTeacher };
-    });
+    // Už nefiltrujeme podle mapy, prostě jen uložíme vybraný předmět
+    setEditingLesson((prev) => prev ? { ...prev, subject: nextSubject } : null);
   };
 
   const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const nextStatus = e.target.value as any;
-    setEditingLesson((prev) => {
-      if (!prev) return null;
-      let nextTeacher = prev.teacher || '';
-      const isSubstituted = nextStatus === 'substituted';
-      const allowedTeachers = subjectTeachersMap[prev.subject || ''] || [];
-      if (!isSubstituted && prev.subject && !allowedTeachers.includes(nextTeacher)) {
-        nextTeacher = allowedTeachers[0] || '';
-      }
-      return { ...prev, status: nextStatus, teacher: nextTeacher };
-    });
+    // Úplně stejné zjednodušení, jen uložíme nový status
+    setEditingLesson((prev) => prev ? { ...prev, status: nextStatus } : null);
+  };
+
+  const getFilteredTeachers = () => {
+    if (!editingLesson) return [];
+    // Ať už je to suplování nebo normální hodina, vždycky vypíšeme 
+    // VŠECHNY skutečné učitele z tvé databáze
+    return dbTeachers.map(t => `${t.firstName} ${t.lastName}`);
   };
 
   return (
@@ -416,7 +408,7 @@ const ScheduleEditPage: React.FC = () => {
       <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
         <div>
           <h1 className="text-4xl font-bold text-palette-pine">Schedule Matrix: Class {selectedClass}</h1>
-          <p className="text-gray-500 mt-2">
+          <p className="text-gray-500 mt-2">  
             {isPermanentEditMode
               ? 'Configuring master template cyclic rotations.'
               : `Displaying timeline window from ${currentWeekDates[0]} to ${currentWeekDates[4]}`

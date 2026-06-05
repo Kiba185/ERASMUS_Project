@@ -6,16 +6,8 @@ import { useAuth } from '../context/AuthContext';
 
 type Role = 'student' | 'teacher' | 'parent' | 'admin';
 
-interface MockSubject {
-  id: number;
-  name: string;
-}
-
-interface MockClass {
-  id: number;
-  name: string;
-}
-
+interface MockSubject { id: number; name: string; }
+interface MockClass   { id: number; name: string; }
 interface MockUser {
   id: number;
   firstName: string;
@@ -46,7 +38,7 @@ const PHONE_PREFIXES = [
 ];
 
 const UsersPage: React.FC = () => {
-  const navigate = useNavigate();
+  const navigate  = useNavigate();
   const { login } = useAuth();
 
   const [users,       setUsers]       = useState<MockUser[]>([]);
@@ -56,11 +48,11 @@ const UsersPage: React.FC = () => {
   const [saving,      setSaving]      = useState(false);
   const [error,       setError]       = useState<string | null>(null);
 
-  const [search, setSearch] = useState('');
-  const [roleFilter, setRoleFilter] = useState<Role | 'all'>('all');
+  const [search,      setSearch]      = useState('');
+  const [roleFilter,  setRoleFilter]  = useState<Role | 'all'>('all');
   const [classFilter, setClassFilter] = useState<number | 'all'>('all');
-  const [sortField, setSortField] = useState<keyof MockUser>('lastName');
-  const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('asc');
+  const [sortField,   setSortField]   = useState<keyof MockUser>('lastName');
+  const [sortOrder,   setSortOrder]   = useState<'asc' | 'desc'>('asc');
 
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [editingUser, setEditingUser] = useState<MockUser | null>(null);
@@ -84,6 +76,7 @@ const UsersPage: React.FC = () => {
         phone:       number,
         classId:     u.classes?.[0]?.id ?? null,
         subjectIds:  u.subjects?.map((s: any) => s.id) ?? [],
+        childrenIds: u.childrenIds ?? [],
       };
     }));
   };
@@ -112,11 +105,21 @@ const UsersPage: React.FC = () => {
     }
   };
 
-  useEffect(() => {
-    Promise.all([fetchUsers(), fetchClasses(), fetchSubjects()]).finally(() => setLoading(false));
-  }, []);
+  const loadAll = async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      await Promise.all([fetchUsers(), fetchClasses(), fetchSubjects()]);
+    } catch (e: any) {
+      setError(e.message ?? 'Failed to load data');
+    } finally {
+      setLoading(false);
+    }
+  };
 
-  // ── Derived state (hooks must be before any conditional returns) ───────────
+  useEffect(() => { loadAll(); }, []);
+
+  // --- FILTER + SORT ---
 
   const filteredAndSortedUsers = useMemo(() => {
     let result = users;
@@ -124,12 +127,12 @@ const UsersPage: React.FC = () => {
       const s = search.toLowerCase();
       result = result.filter(u =>
         u.firstName.toLowerCase().includes(s) ||
-        u.lastName.toLowerCase().includes(s) ||
-        u.username.toLowerCase().includes(s) ||
+        u.lastName.toLowerCase().includes(s)  ||
+        u.username.toLowerCase().includes(s)  ||
         u.email.toLowerCase().includes(s)
       );
     }
-    if (roleFilter !== 'all') result = result.filter(u => u.role === roleFilter);
+    if (roleFilter  !== 'all') result = result.filter(u => u.role    === roleFilter);
     if (classFilter !== 'all') result = result.filter(u => u.classId === classFilter);
     return [...result].sort((a, b) => {
       const aVal = String(a[sortField] ?? '');
@@ -147,10 +150,10 @@ const UsersPage: React.FC = () => {
     [users, classes]
   );
 
-  // ── Handlers ───────────────────────────────────────────────────────────────
+  // --- HANDLERS ---
 
   const handleSort = (field: keyof MockUser) => {
-    if (sortField === field) setSortOrder(sortOrder === 'asc' ? 'desc' : 'asc');
+    if (sortField === field) setSortOrder(o => o === 'asc' ? 'desc' : 'asc');
     else { setSortField(field); setSortOrder('asc'); }
   };
 
@@ -183,6 +186,7 @@ const UsersPage: React.FC = () => {
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
     if (!editingUser) return;
+    if (!editingUser.birthday) { setModalError('Date of birth is required.'); return; }
 
     const fullPhone = editingUser.phone
       ? `${editingUser.phonePrefix}${editingUser.phone}`
@@ -191,6 +195,7 @@ const UsersPage: React.FC = () => {
 
     setModalError(null);
     setSaving(true);
+    setSavingLabel('Saving...');
 
     try {
       if (isNew) {
@@ -206,14 +211,23 @@ const UsersPage: React.FC = () => {
           setModalError(err.message ?? 'Failed to create user.');
           return;
         }
-        const created = await res.json() as { user?: { id?: number }; id?: number };
-        const newId = created.user?.id ?? created.id;
-        if (newId && editingUser.classId) {
-          await fetch(`${API_URL}/api/admin/users/${newId}/classes`, {
-            method: 'PUT',
-            credentials: 'include',
+
+        const created = await res.json() as { user?: { id?: number } };
+        const newId = created.user?.id;
+
+        if (newId && editingUser.role === 'parent' && editingUser.childrenIds?.length) {
+          await fetch(`${API_URL}/api/admin/users/${newId}/children`, {
+            method: 'PUT', credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ classId: editingUser.classId }),
+            body: JSON.stringify({ childrenIds: editingUser.childrenIds }),
+          });
+        }
+
+        if (newId && editingUser.role === 'teacher' && editingUser.subjectIds?.length) {
+          await fetch(`${API_URL}/api/admin/users/${newId}/subjects`, {
+            method: 'PUT', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ subjectIds: editingUser.subjectIds }),
           });
         }
         if (newId && editingUser.role === 'parent' && editingUser.childrenIds) {
@@ -239,27 +253,33 @@ const UsersPage: React.FC = () => {
         }
 
         if (newPassword) {
-          const pwRes = await fetch(`${API_URL}/api/admin/users/${editingUser.id}/password`, {
+          await fetch(`${API_URL}/api/admin/users/${editingUser.id}/password`, {
             method: 'PUT', credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ newPassword }),
           });
         }
 
-        const clsRes = await fetch(`${API_URL}/api/admin/users/${editingUser.id}/classes`, {
+        await fetch(`${API_URL}/api/admin/users/${editingUser.id}/classes`, {
           method: 'PUT', credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ classId: editingUser.classId ?? null }),
         });
-        if (!clsRes.ok) throw new Error('Failed to update class assignment');
 
         if (editingUser.role === 'teacher') {
-          const subRes = await fetch(`${API_URL}/api/admin/users/${editingUser.id}/subjects`, {
+          await fetch(`${API_URL}/api/admin/users/${editingUser.id}/subjects`, {
             method: 'PUT', credentials: 'include',
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ subjectIds: editingUser.subjectIds ?? [] }),
           });
-          if (!subRes.ok) throw new Error('Failed to update subject assignments');
+        }
+
+        if (editingUser.role === 'parent') {
+          await fetch(`${API_URL}/api/admin/users/${editingUser.id}/children`, {
+            method: 'PUT', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ childrenIds: editingUser.childrenIds ?? [] }),
+          });
         }
 
         if (editingUser.role === 'parent' && editingUser.childrenIds) {
@@ -281,15 +301,18 @@ const UsersPage: React.FC = () => {
     }
   };
 
+  // --- DELETE ---
+
   const handleDelete = async (id: number) => {
-    if (!confirm('Opravdu smazat uživatele?')) return;
+    if (!confirm('Are you sure you want to delete this user?')) return;
     setSaving(true);
+    setSavingLabel('Deleting...');
     try {
       const res = await fetch(`${API_URL}/api/admin/users/${id}`, { method: 'DELETE', credentials: 'include' });
       if (!res.ok) throw new Error(`Delete failed (${res.status})`);
       await fetchUsers();
-    } catch (err: any) {
-      alert(err.message ?? 'Failed to delete user.');
+    } catch (e: any) {
+      alert(e.message ?? 'Failed to delete user.');
     } finally {
       setSaving(false);
     }
@@ -311,10 +334,12 @@ const UsersPage: React.FC = () => {
     }
   };
 
+  // --- HELPERS ---
+
   const getClassBadge = (user: MockUser) => {
-    const c = classes.find(c => c.id === user.classId);
-    if ((user.role === 'student' || user.role === 'teacher') && c) {
-      return <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-fern rounded-full border border-palette-sage">{c.name}</span>;
+    if (user.role === 'student' || user.role === 'teacher') {
+      const c = classes.find(c => c.id === user.classId);
+      if (c) return <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-fern rounded-full border border-palette-sage">{c.name}</span>;
     }
     if (user.role === 'parent' && user.childrenIds?.length) {
       return <span className="px-2 py-1 text-xs font-semibold bg-palette-mist text-palette-moss rounded-full border border-palette-sage">{user.childrenIds.length} children</span>;
@@ -322,8 +347,10 @@ const UsersPage: React.FC = () => {
     return <span className="text-gray-400">-</span>;
   };
 
+  // --- RENDER ---
+
   if (loading) return (
-    <div className="flex items-center justify-center gap-3 p-12 text-palette-pine font-bold text-lg">
+    <div className="p-8 flex items-center justify-center gap-3 text-palette-pine font-bold text-lg">
       <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
         <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
@@ -345,16 +372,15 @@ const UsersPage: React.FC = () => {
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-6">
 
       {saving && createPortal(
-        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-50">
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-[99999]">
           <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
-            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin"></div>
-            <p className="text-palette-pine font-bold text-lg">Saving...</p>
+            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
+            <p className="text-palette-pine font-bold text-lg">{savingLabel}</p>
           </div>
         </div>,
         document.body
       )}
 
-      {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <h1 className="text-3xl font-bold text-palette-pine">User Management</h1>
         <button onClick={openAddModal} className="px-5 py-2.5 bg-palette-fern text-white font-semibold rounded-xl shadow-soft hover:bg-palette-leaf hover:-translate-y-0.5 transition-all flex items-center gap-2">
@@ -363,29 +389,38 @@ const UsersPage: React.FC = () => {
         </button>
       </div>
 
+      {/* Filters */}
       <div className="bg-white p-5 rounded-2xl shadow-soft border border-palette-mist flex flex-wrap gap-4 items-center">
         <div className="flex-1 min-w-[200px]">
-          <input type="text" placeholder="Search by name, email..." value={search} onChange={e => setSearch(e.target.value)} className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow focus:border-palette-meadow outline-none transition" />
+          <input type="text" placeholder="Search by name, email..." value={search} onChange={e => setSearch(e.target.value)}
+            className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow focus:border-palette-meadow outline-none transition" />
         </div>
-        <select value={roleFilter} onChange={e => setRoleFilter(e.target.value as Role | 'all')} className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition text-palette-pine font-medium">
+        <select value={roleFilter} onChange={e => setRoleFilter(e.target.value as any)}
+          className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition text-palette-pine font-medium">
           <option value="all">All Roles</option>
           <option value="student">Student</option>
           <option value="teacher">Teacher</option>
           <option value="parent">Parent</option>
           <option value="admin">Admin</option>
         </select>
-        <select value={classFilter} onChange={e => setClassFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))} className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition text-palette-pine font-medium">
+        <select value={classFilter} onChange={e => setClassFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+          className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition text-palette-pine font-medium">
           <option value="all">All Classes</option>
           {classes.map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
         </select>
       </div>
 
+      {/* Table */}
       <div className="bg-white rounded-2xl shadow-soft border border-palette-mist overflow-hidden overflow-x-auto">
         <table className="min-w-full divide-y divide-gray-100 text-sm">
           <thead className="bg-palette-mist">
             <tr>
-              <th className="px-6 py-4 text-left font-bold text-palette-pine cursor-pointer hover:bg-palette-sage hover:text-white transition" onClick={() => handleSort('lastName')}>Name {sortField === 'lastName' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
-              <th className="px-6 py-4 text-left font-bold text-palette-pine cursor-pointer hover:bg-palette-sage hover:text-white transition" onClick={() => handleSort('role')}>Role {sortField === 'role' && (sortOrder === 'asc' ? '↑' : '↓')}</th>
+              <th className="px-6 py-4 text-left font-bold text-palette-pine cursor-pointer hover:bg-palette-sage hover:text-white transition" onClick={() => handleSort('lastName')}>
+                Name {sortField === 'lastName' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </th>
+              <th className="px-6 py-4 text-left font-bold text-palette-pine cursor-pointer hover:bg-palette-sage hover:text-white transition" onClick={() => handleSort('role')}>
+                Role {sortField === 'role' && (sortOrder === 'asc' ? '↑' : '↓')}
+              </th>
               <th className="px-6 py-4 text-left font-bold text-palette-pine">Class / Assigned</th>
               <th className="px-6 py-4 text-left font-bold text-palette-pine">Email</th>
               <th className="px-6 py-4 text-left font-bold text-palette-pine">Phone</th>
@@ -401,9 +436,9 @@ const UsersPage: React.FC = () => {
                 </td>
                 <td className="px-6 py-4 whitespace-nowrap">
                   <span className={`px-3 py-1 text-xs font-bold rounded-full capitalize border
-                    ${user.role === 'admin' ? 'bg-red-50 text-red-700 border-red-200' : ''}
+                    ${user.role === 'admin'   ? 'bg-red-50 text-red-700 border-red-200' : ''}
                     ${user.role === 'teacher' ? 'bg-palette-mist text-palette-fern border-palette-sage' : ''}
-                    ${user.role === 'parent' ? 'bg-palette-mist text-palette-moss border-palette-sage' : ''}
+                    ${user.role === 'parent'  ? 'bg-orange-50 text-orange-700 border-orange-200' : ''}
                     ${user.role === 'student' ? 'bg-blue-50 text-blue-700 border-blue-200' : ''}
                   `}>{user.role}</span>
                 </td>
@@ -428,13 +463,15 @@ const UsersPage: React.FC = () => {
         </table>
       </div>
 
+      {/* Modal */}
       {isModalOpen && editingUser && createPortal(
-        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center p-4 z-50 animate-in fade-in duration-200">
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center p-4 z-50">
           <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden border border-palette-mist">
             <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-palette-mist/30">
               <h2 className="text-2xl font-bold text-palette-pine">{isNew ? 'Add New User' : 'Edit User'}</h2>
               <button onClick={() => setIsModalOpen(false)} className="text-palette-moss hover:text-palette-pine text-3xl font-light leading-none">&times;</button>
             </div>
+
             <form onSubmit={handleSave} className="overflow-y-auto p-6 space-y-6">
 
               {modalError && (
@@ -476,7 +513,7 @@ const UsersPage: React.FC = () => {
                     <select
                       value={editingUser.phonePrefix}
                       onChange={e => setEditingUser({...editingUser, phonePrefix: e.target.value})}
-                      className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition font-medium text-sm"
+                      className="p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow focus:border-palette-meadow accent-palette-meadow outline-none transition font-medium text-sm"
                     >
                       {PHONE_PREFIXES.map(p => (
                         <option key={p.code} value={p.code}>{p.label}</option>
@@ -525,6 +562,7 @@ const UsersPage: React.FC = () => {
                   </select>
                 </div>
 
+                {/* Student / Teacher — class + subjects */}
                 {(editingUser.role === 'student' || editingUser.role === 'teacher') && (
                   <div className="md:col-span-2 bg-palette-mist/50 p-5 rounded-xl border border-palette-sage/30 space-y-5">
                     <div>
@@ -560,6 +598,7 @@ const UsersPage: React.FC = () => {
                   </div>
                 )}
 
+                {/* Parent — assign children */}
                 {editingUser.role === 'parent' && (
                   <div className="md:col-span-2 bg-palette-mist/50 p-5 rounded-xl border border-palette-sage/30 space-y-3">
                     <label className="block text-sm font-bold text-palette-pine">Assign Children (students)</label>
@@ -579,11 +618,14 @@ const UsersPage: React.FC = () => {
                           </label>
                         );
                       })}
-                      {studentOptions.length === 0 && <p className="p-3 text-sm font-medium text-palette-moss">No students available.</p>}
+                      {studentOptions.length === 0 && (
+                        <p className="p-3 text-sm font-medium text-palette-moss">No students available.</p>
+                      )}
                     </div>
                   </div>
                 )}
               </div>
+
               <div className="pt-6 mt-4 border-t border-gray-100 flex justify-end space-x-3">
                 <button type="button" onClick={() => setIsModalOpen(false)}
                   className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-50 transition">

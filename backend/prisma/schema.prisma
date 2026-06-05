@@ -184,6 +184,7 @@ model Message {
   senderId    Int
   recipientId Int
   body        String
+  subject   String  @default("")
   createdAt   DateTime @default(now())
   read        Boolean  @default(false)
 
