@@ -1,27 +1,15 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
-import AttendancePopUp from '../components/ui/AttendancePopUp';
-import { ALL_FILTER_VALUE, Filter, type FilterOption } from '../components/ui/Filter';
+import API_URL from '../config/config.tsx';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-const CLASSES = ['4.B', '4.C', '4.D'] as const;
+// ─── Types ────────────────────────────────────────────────────────────────────
 
 type AttendanceStatus = 'present' | 'absent';
-type ClassName = (typeof CLASSES)[number];
-type Subject =
-  | 'Maths'
-  | 'Physics'
-  | 'Chemistry'
-  | 'Biology'
-  | 'History'
-  | 'Geography'
-  | 'English'
-  | 'PE'
-  | 'Art'
-  | 'Computer Science'
-  | 'Music';
+type Subject = string;
+type ClassName = string;
 
 interface StudentProfile {
-  id: string;
+  id: number;
   name: string;
   className: ClassName;
 }
@@ -31,7 +19,7 @@ interface AttendanceStudent extends StudentProfile {
 }
 
 interface PendingAbsence {
-  studentId: string;
+  studentId: number;
   studentName: string;
   subject: Subject;
 }
@@ -43,328 +31,227 @@ interface Period {
   endTime: string;
 }
 
-const DEFAULT_PERIODS: Period[] = [
-  { id: 1, periodNumber: 1, startTime: '08:00', endTime: '08:45' },
-  { id: 2, periodNumber: 2, startTime: '08:55', endTime: '09:40' },
-  { id: 3, periodNumber: 3, startTime: '10:00', endTime: '10:45' },
-  { id: 4, periodNumber: 4, startTime: '10:55', endTime: '11:40' },
-  { id: 5, periodNumber: 5, startTime: '11:50', endTime: '12:35' },
-  { id: 6, periodNumber: 6, startTime: '12:45', endTime: '13:30' },
-];
+interface DbEntity { id: number; name: string; }
 
-const DEFAULT_TEACHER_LESSONS = [
-  { id: 101, day: 'Monday', periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Maths' as Subject, class: '4.B' as ClassName, room: '101' },
-  { id: 102, day: 'Monday', periodNumber: 3, startTime: '10:00', endTime: '10:45', subject: 'Maths' as Subject, class: '4.D' as ClassName, room: '103' },
-  { id: 103, day: 'Tuesday', periodNumber: 2, startTime: '08:55', endTime: '09:40', subject: 'Maths' as Subject, class: '4.B' as ClassName, room: '101' },
-  { id: 104, day: 'Wednesday', periodNumber: 4, startTime: '10:55', endTime: '11:40', subject: 'Maths' as Subject, class: '4.D' as ClassName, room: '103' },
-  { id: 105, day: 'Thursday', periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Maths' as Subject, class: '4.B' as ClassName, room: '101' },
-  { id: 106, day: 'Thursday', periodNumber: 5, startTime: '11:50', endTime: '12:35', subject: 'Maths' as Subject, class: '4.D' as ClassName, room: '103' },
-  { id: 107, day: 'Friday', periodNumber: 2, startTime: '08:55', endTime: '09:40', subject: 'Maths' as Subject, class: '4.B' as ClassName, room: '101' },
-  { id: 108, day: 'Friday', periodNumber: 3, startTime: '10:00', endTime: '10:45', subject: 'Maths' as Subject, class: '4.D' as ClassName, room: '103' },
-];
+interface TeacherLesson {
+  id: number;
+  day: string;
+  periodNumber: number;
+  startTime: string;
+  endTime: string;
+  subject: DbEntity;
+  class: DbEntity;
+  room: DbEntity;
+}
 
-const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
+type FilterOption = { value: string; label: string };
+type ViewState = 'menu' | 'teacher_schedule' | 'class_absence' | 'log_lesson';
+
+// ─── Constants ────────────────────────────────────────────────────────────────
+
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
 
 const DAY_LABELS: Record<string, string> = {
-  Monday: 'Monday',
-  Tuesday: 'Tuesday',
-  Wednesday: 'Wednesday',
-  Thursday: 'Thursday',
-  Friday: 'Friday',
+  Monday: 'Mon', Tuesday: 'Tue', Wednesday: 'Wed', Thursday: 'Thu', Friday: 'Fri',
 };
 
-const CLASS_SCHEDULES: Record<ClassName, Subject[]> = {
-  '4.B': ['Maths', 'Chemistry', 'History', 'English', 'PE', 'Art'],
-  '4.C': ['Physics', 'Chemistry', 'Geography', 'English', 'Computer Science', 'Music'],
-  '4.D': ['Biology', 'Chemistry', 'Maths', 'Geography', 'PE', 'Computer Science'],
-};
+const STATUS_LABELS: Record<AttendanceStatus, string> = { present: 'Present', absent: 'Absent' };
 
-const STUDENTS: StudentProfile[] = [
-  { id: 'kanye-west', name: 'Kanye West', className: '4.B' },
-  { id: 'walter-white', name: 'Walter White', className: '4.B' },
-  { id: 'michal-džeksn', name: 'Michal Džeksn', className: '4.B' },
-  { id: 'tomas-gregorik', name: 'Tomas Gregorik', className: '4.B' },
-  { id: 'saul-goodman', name: 'Saul Goodman', className: '4.B' },
-  { id: 'hank-schrader', name: 'Hank Schrader', className: '4.B' },
-  { id: 'lil-tito', name: 'LiL Tito', className: '4.B' },
-  { id: 'prophet-brohammed', name: 'ProphetBrohammed', className: '4.C' },
-  { id: 'jane-doe', name: 'Jane Doe', className: '4.C' },
-  { id: 'linda-brown', name: 'Linda Brown', className: '4.C' },
-  { id: 'tomas-benes', name: 'Tomas Benes', className: '4.C' },
-  { id: 'lucie-vesela', name: 'Lucie Vesela', className: '4.C' },
-  { id: 'adam-kolar', name: 'Adam Kolar', className: '4.C' },
-  { id: 'natalie-cerna', name: 'Natalie Cerna', className: '4.C' },
-  { id: 'david-smith', name: 'David Smith', className: '4.D' },
-  { id: 'emily-davis', name: 'Emily Davis', className: '4.D' },
-  { id: 'michael-brown', name: 'Michael Brown', className: '4.D' },
-  { id: 'karolina-pokorna', name: 'Karolina Pokorna', className: '4.D' },
-  { id: 'jakub-hruby', name: 'Jakub Hruby', className: '4.D' },
-  { id: 'veronika-mala', name: 'Veronika Mala', className: '4.D' },
-  { id: 'daniel-prochazka', name: 'Daniel Prochazka', className: '4.D' },
-];
-
-const STATUS_LABELS: Record<AttendanceStatus, string> = {
-  present: 'Present',
-  absent: 'Absent',
-};
-
-const ABSENCE_STATUS_LABELS = {
-  Late: 'Late',
+const ABSENCE_STATUS_LABELS: Record<string, string> = {
   'Unexcused absence': 'Unexcused',
   'Excused absence': 'Excused',
-} as const;
-
-const ABSENCE_STATUS_CLASS_NAMES: Record<keyof typeof ABSENCE_STATUS_LABELS, string> = {
-  Late: 'bg-orange-100 text-orange-700',
-  'Unexcused absence': 'bg-red-100 text-red-700',
-  'Excused absence': 'bg-blue-100 text-blue-700',
+  'Late': 'Late',
+  'Early departure': 'Early departure',
+  'School event': 'School event',
 };
 
-const CLASS_OPTIONS: FilterOption<ClassName>[] = CLASSES.map((className) => ({
-  value: className,
-  label: className,
-}));
+const ABSENCE_STATUS_CLASS_NAMES: Record<string, string> = {
+  'Unexcused absence': 'bg-red-100 text-red-800 border-red-200',
+  'Excused absence': 'bg-green-100 text-green-800 border-green-200',
+  'Late': 'bg-yellow-100 text-yellow-800 border-yellow-200',
+  'Early departure': 'bg-orange-100 text-orange-800 border-orange-200',
+  'School event': 'bg-blue-100 text-blue-800 border-blue-200',
+};
 
-const formatDateValue = (date: Date) => date.toISOString().slice(0, 10);
+const ALL_FILTER_VALUE = '__all__';
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
+
+const formatDateValue = (date: Date): string => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
 const TODAY_DATE_VALUE = formatDateValue(new Date());
 
-const getDateLabel = (dateValue: string) => {
-  const date = new Date(`${dateValue}T00:00:00`);
-
-  if (Number.isNaN(date.getTime())) {
-    return dateValue;
-  }
-
-  const formattedDate = date.toLocaleDateString('cs-CZ');
-  return dateValue === TODAY_DATE_VALUE ? `Today (${formattedDate})` : formattedDate;
+const getDateLabel = (dateValue: string): string => {
+  if (dateValue === TODAY_DATE_VALUE) return 'Today';
+  const [y, m, d] = dateValue.split('-').map(Number);
+  const date = new Date(y, m - 1, d);
+  const options: Intl.DateTimeFormatOptions = { weekday: 'short', month: 'short', day: 'numeric' };
+  return date.toLocaleDateString('en-US', options);
 };
 
-const getLessonLabel = (className: ClassName, subject: Subject) => {
-  const lessonIndex = CLASS_SCHEDULES[className].indexOf(subject);
-  return lessonIndex === -1 ? subject : `${lessonIndex + 1}. ${subject}`;
+const getLessonTopicKeyForValues = (date: string, className: ClassName, subject: Subject): string =>
+  `${date}--${className}--${subject}`;
+
+const getAttendanceControlKey = (studentId: number, subject: Subject): string =>
+  `${studentId}-${subject}`;
+
+const parseTimeToMinutes = (timeStr: string): number => {
+  const [h, m] = timeStr.split(':').map(Number);
+  return h * 60 + m;
 };
 
-const getAbsenceStatus = (absenceReason?: string) => {
+const getAbsenceStatus = (absenceReason: string | undefined): string | null => {
   const possibleStatus = absenceReason?.split(': ')[0] ?? '';
-  return possibleStatus in ABSENCE_STATUS_LABELS ? (possibleStatus as keyof typeof ABSENCE_STATUS_LABELS) : null;
+  return possibleStatus in ABSENCE_STATUS_LABELS ? possibleStatus : null;
 };
 
-const getStatusMeta = (status: AttendanceStatus, absenceReason?: string) => {
-  if (status === 'present') {
-    return {
-      label: STATUS_LABELS.present,
-      className: 'bg-palette-sage/25 text-palette-leaf',
-      showWarningIcon: false,
-      warningIconClassName: '',
-    };
-  }
-
-  const absenceStatus = getAbsenceStatus(absenceReason);
-
-  if (!absenceStatus) {
-    return {
-      label: STATUS_LABELS.absent,
-      className: 'bg-red-100 text-red-700',
-      showWarningIcon: false,
-      warningIconClassName: '',
-    };
-  }
-
-  const showWarningIcon = absenceStatus === 'Unexcused absence' || absenceStatus === 'Late';
-
-  return {
-    label: ABSENCE_STATUS_LABELS[absenceStatus],
-    className: ABSENCE_STATUS_CLASS_NAMES[absenceStatus],
-    showWarningIcon,
-    warningIconClassName: absenceStatus === 'Late' ? 'bg-orange-600' : 'bg-red-600',
-  };
+const getStatusMeta = (
+  student: AttendanceStudent,
+  subject: Subject,
+  absenceReasons: Record<string, string>,
+  getAbsenceKey: (id: number, subj: Subject) => string,
+): { status: AttendanceStatus; absenceStatus: string | null; absenceReason: string | undefined } => {
+  const status = student.attendance[subject] ?? 'present';
+  const rawReason = status === 'absent' ? absenceReasons[getAbsenceKey(student.id, subject)] : undefined;
+  const absenceStatus = getAbsenceStatus(rawReason);
+  return { status, absenceStatus, absenceReason: rawReason };
 };
 
 const getStatusButtonClassName = (
   buttonStatus: AttendanceStatus,
   currentStatus: AttendanceStatus,
-  absenceReason?: string,
-) =>
-  buttonStatus === currentStatus
-    ? getStatusMeta(buttonStatus, absenceReason).className
-    : 'bg-palette-mist text-palette-moss hover:bg-palette-sage/15';
+): string => {
+  const isActive = buttonStatus === currentStatus;
+  if (buttonStatus === 'present') {
+    return isActive
+      ? 'bg-green-500 text-white border-green-500'
+      : 'bg-white text-gray-500 border-gray-200 hover:border-green-300 hover:text-green-600';
+  }
+  return isActive
+    ? 'bg-red-500 text-white border-red-500'
+    : 'bg-white text-gray-500 border-gray-200 hover:border-red-300 hover:text-red-600';
+};
 
-const WarningIcon = ({ className = 'bg-red-600' }: { className?: string }) => (
-  <span
-    aria-hidden="true"
-    className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold leading-none text-white ${className}`}
-  >
-    !
-  </span>
+function getTeacherAssignedClass(user: any): string | null {
+  if (!user || user.role !== 'teacher') return null;
+  if (user.taughtClass?.name) return user.taughtClass.name;
+  const cls = user.classes;
+  return Array.isArray(cls) && cls.length > 0 ? cls[0].name : null;
+}
+
+// ─── Sub-components ───────────────────────────────────────────────────────────
+
+const WarningIcon: React.FC<{ className?: string }> = ({ className = '' }) => (
+  <svg className={`w-4 h-4 ${className}`} fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
+    <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v3.75m-9.303 3.376c-.866 1.5.217 3.374 1.948 3.374h14.71c1.73 0 2.813-1.874 1.948-3.374L13.949 3.378c-.866-1.5-3.032-1.5-3.898 0L2.697 16.126zM12 15.75h.007v.008H12v-.008z" />
+  </svg>
 );
 
-const getStableMockNumber = (seed: string) => {
-  let hash = 0;
+const Filter: React.FC<{ label: string; value: string; onChange: (v: string) => void; options: FilterOption[]; disabled?: boolean }> =
+  ({ label, value, onChange, options, disabled }) => (
+    <div className="flex items-center gap-2">
+      {label && <span className="text-xs font-bold text-gray-500 uppercase tracking-wider">{label}</span>}
+      <select
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        disabled={disabled}
+        className="border border-gray-200 rounded-lg px-3 py-1.5 text-sm font-semibold bg-white text-gray-800 focus:outline-none focus:ring-2 focus:ring-blue-300 disabled:opacity-50 disabled:cursor-not-allowed"
+      >
+        {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+      </select>
+    </div>
+  );
 
-  for (let index = 0; index < seed.length; index += 1) {
-    hash = (hash * 31 + seed.charCodeAt(index)) % 100000;
-  }
+// ─── Component ────────────────────────────────────────────────────────────────
 
-  return hash;
-};
-
-const getMockAttendanceStatus = (date: string, student: StudentProfile, subject: Subject): AttendanceStatus => {
-  const lessonNumber = CLASS_SCHEDULES[student.className].indexOf(subject) + 1;
-  const seed = getStableMockNumber(`${date}-${student.id}-${subject}-${lessonNumber}`);
-  const absenceChance = subject === 'PE' ? 18 : lessonNumber >= 5 ? 16 : 12;
-
-  return seed % 100 < absenceChance ? 'absent' : 'present';
-};
-
-const loadMockAttendanceForDate = (date: string): AttendanceStudent[] =>
-  STUDENTS.map((student) => ({
-    ...student,
-    attendance: Object.fromEntries(
-      CLASS_SCHEDULES[student.className].map((subject) => [
-        subject,
-        getMockAttendanceStatus(date, student, subject),
-      ]),
-    ) as Partial<Record<Subject, AttendanceStatus>>,
-  }));
-
-const getLessonTopicKeyForValues = (date: string, className: string, subject: string) =>
-  `${date}-${className}-${subject}`;
-
-const getAttendanceControlKey = (studentId: string, subject: Subject) => `${studentId}-${subject}`;
-
-const parseTimeToMinutes = (timeStr: string): number => {
-  const [hours, minutes] = timeStr.split(':').map(Number);
-  return hours * 60 + minutes;
-};
-
-const getTeacherAssignedClass = (user: any): ClassName | null => {
-  if (!user || user.role !== 'teacher') return null;
-  const classesList = user.classes || user.user?.classes;
-  if (Array.isArray(classesList) && classesList.length > 0) {
-    const className = classesList[0].name;
-    const matched = CLASSES.find((c) => c === className);
-    if (matched) {
-      return matched;
-    }
-  }
-  // Fallback for mock/local development
-  return '4.B';
-};
-
-const AttendancePage = () => {
+const AttendancePage: React.FC = () => {
   const { user } = useAuth();
   const attendanceControlRefs = useRef<Record<string, HTMLDivElement | null>>({});
-  
-  // Navigation & View states
-  const [viewState, setViewState] = useState<'menu' | 'class_absence' | 'teacher_schedule' | 'log_lesson'>('menu');
+
+  // ── Navigation state ───────────────────────────────────────────────────────
+  const [viewState, setViewState] = useState<ViewState>('menu');
   const [selectedLesson, setSelectedLesson] = useState<{
-    class: ClassName;
-    subject: Subject;
-    periodNumber: number;
-    startTime: string;
-    endTime: string;
+    class: string; subject: string; periodNumber: number; startTime: string; endTime: string;
   } | null>(null);
-  
-  // Timetables and periods configuration (Fully offline, no backend hooks)
-  const periodsToShow = DEFAULT_PERIODS;
-  const lessonsToShow = DEFAULT_TEACHER_LESSONS;
   const [isDemoMode, setIsDemoMode] = useState(false);
 
-  // Classic filters
+  // ── DB data state ──────────────────────────────────────────────────────────
+  const [dbPeriods, setDbPeriods] = useState<Period[]>([]);
+  const [dbLessons, setDbLessons] = useState<TeacherLesson[]>([]);
+  const [dbClasses, setDbClasses] = useState<DbEntity[]>([]);
+  const [allSubjects, setAllSubjects] = useState<DbEntity[]>([]);
+  const [classSubjectsMap, setClassSubjectsMap] = useState<Record<number, DbEntity[]>>({});
+  const [allStudents, setAllStudents] = useState<StudentProfile[]>([]);
+  const [currentAttendanceStudents, setCurrentAttendanceStudents] = useState<AttendanceStudent[]>([]);
+  const [initialLoading, setInitialLoading] = useState(true);
+  const [attendanceLoading, setAttendanceLoading] = useState(false);
+
+  // ── Filter state ───────────────────────────────────────────────────────────
   const [dateFilter, setDateFilter] = useState(TODAY_DATE_VALUE);
-  const [classFilter, setClassFilter] = useState<ClassName>(CLASSES[0]);
-  const [subjectFilter, setSubjectFilter] = useState(ALL_FILTER_VALUE);
-  
+  const [classFilter, setClassFilter] = useState<ClassName>('');
+  const [subjectFilter, setSubjectFilter] = useState<Subject | typeof ALL_FILTER_VALUE>(ALL_FILTER_VALUE);
+
+  // ── Absence / topic state ──────────────────────────────────────────────────
   const [pendingAbsence, setPendingAbsence] = useState<PendingAbsence | null>(null);
   const [absenceReasons, setAbsenceReasons] = useState<Record<string, string>>({});
-  
-  // Local state for lesson topics & student attendance data
   const [lessonTopics, setLessonTopics] = useState<Record<string, string>>({});
   const [lessonTopicDrafts, setLessonTopicDrafts] = useState<Record<string, string>>({});
   const [editingLessonTopics, setEditingLessonTopics] = useState<Record<string, boolean>>({});
-  const [studentsByDate, setStudentsByDate] = useState<Record<string, AttendanceStudent[]>>(() => ({
-    [TODAY_DATE_VALUE]: loadMockAttendanceForDate(TODAY_DATE_VALUE),
-  }));
 
-  // Resolve assigned class for the class teacher
+  // ── Derived ────────────────────────────────────────────────────────────────
   const assignedClass = useMemo(() => getTeacherAssignedClass(user), [user]);
-
-  // Determine permissions
   const isTeacher = user?.role === 'teacher';
   const isAdmin = user?.role === 'admin';
   const isStudentOrParent = user?.role === 'student' || user?.role === 'parent';
-
-  // Quick Action calculation
-  const activeLesson = useMemo(() => {
-    if (user?.role !== 'teacher') return null;
-    let now = new Date();
-    
-    if (isDemoMode) {
-      // Simulate Friday at 10:15 AM (inside Period 3)
-      const simulatedDate = new Date();
-      const currentDay = simulatedDate.getDay();
-      const distance = 5 - currentDay;
-      simulatedDate.setDate(simulatedDate.getDate() + distance);
-      simulatedDate.setHours(10, 15, 0, 0);
-      now = simulatedDate;
-    }
-
-    const currentDayIndex = now.getDay();
-    if (currentDayIndex === 0 || currentDayIndex === 6) return null; // Weekend
-
-    const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-    const currentDayName = DAYS[currentDayIndex];
-    const currentMinutes = now.getHours() * 60 + now.getMinutes();
-
-    const activePeriod = periodsToShow.find((p) => {
-      const start = parseTimeToMinutes(p.startTime);
-      const end = parseTimeToMinutes(p.endTime);
-      return currentMinutes >= start && currentMinutes <= end;
-    });
-
-    if (!activePeriod) return null;
-
-    const matchedLesson = lessonsToShow.find(
-      (l) => l.day === currentDayName && l.periodNumber === activePeriod.periodNumber
-    );
-
-    if (matchedLesson) {
-      return {
-        ...matchedLesson,
-        period: activePeriod,
-      };
-    }
-    return null;
-  }, [user, lessonsToShow, periodsToShow, isDemoMode]);
-
-  // Dynamic values
   const canEditAttendance = isAdmin || isTeacher;
-  
-  // Rules for Class Absence View: Class teachers can only edit absences, NOT topics. Admins can edit both.
-  // Rules for Log Lesson View: The logging teacher can edit both their subject's attendance and topic.
   const canEditTopic = viewState === 'log_lesson' || isAdmin;
 
-  const availableSubjects = CLASS_SCHEDULES[classFilter];
-
-  const activeSubjectFilter = useMemo(() => {
-    return subjectFilter !== ALL_FILTER_VALUE && availableSubjects.includes(subjectFilter as Subject)
-      ? (subjectFilter as Subject)
-      : ALL_FILTER_VALUE;
-  }, [subjectFilter, availableSubjects]);
-
-  // In log_lesson mode, force subjectsToShow to be all subjects of that class's day schedule, ignoring the filter
-  const subjectsToShow = useMemo(() => {
-    if (viewState === 'log_lesson') {
-      return availableSubjects;
-    }
-    return activeSubjectFilter === ALL_FILTER_VALUE ? availableSubjects : [activeSubjectFilter];
-  }, [viewState, activeSubjectFilter, availableSubjects]);
-
-  const students = useMemo(
-    () => studentsByDate[dateFilter] ?? loadMockAttendanceForDate(dateFilter),
-    [dateFilter, studentsByDate],
+  const currentClassId = useMemo(
+    () => dbClasses.find((c) => c.name === classFilter)?.id ?? 0,
+    [dbClasses, classFilter],
   );
-  const selectedDateLabel = getDateLabel(dateFilter);
+
+  const availableSubjects = useMemo(
+    () => (classSubjectsMap[currentClassId] ?? []).map((s) => s.name),
+    [classSubjectsMap, currentClassId],
+  );
+
+  const getLessonLabel = useCallback(
+    (className: ClassName, subject: Subject): string => {
+      const classId = dbClasses.find((c) => c.name === className)?.id;
+      if (!classId) return subject;
+      const subjects = classSubjectsMap[classId] ?? [];
+      const idx = subjects.findIndex((s) => s.name === subject);
+      return idx === -1 ? subject : `${idx + 1}. ${subject}`;
+    },
+    [dbClasses, classSubjectsMap],
+  );
+
+  const activeSubjectFilter = useMemo(
+    () => subjectFilter !== ALL_FILTER_VALUE && availableSubjects.includes(subjectFilter) ? subjectFilter : ALL_FILTER_VALUE,
+    [subjectFilter, availableSubjects],
+  );
+
+  const subjectsToShow = useMemo(
+    () => viewState === 'log_lesson'
+      ? availableSubjects
+      : activeSubjectFilter === ALL_FILTER_VALUE
+        ? availableSubjects
+        : [activeSubjectFilter],
+    [viewState, activeSubjectFilter, availableSubjects],
+  );
+
+  const studentsToShow = currentAttendanceStudents;
+
+  const classOptions = useMemo<FilterOption[]>(
+    () => dbClasses.map((c) => ({ value: c.name, label: c.name })),
+    [dbClasses],
+  );
 
   const subjectOptions = useMemo<FilterOption[]>(
     () => [
@@ -374,753 +261,756 @@ const AttendancePage = () => {
         label: getLessonLabel(classFilter, subject),
       })),
     ],
-    [availableSubjects, classFilter],
+    [availableSubjects, classFilter, getLessonLabel],
   );
 
-  const studentsToShow = useMemo(
-    () => students.filter((student) => student.className === classFilter),
-    [classFilter, students],
-  );
+  const selectedDateLabel = getDateLabel(dateFilter);
+  const periodsToShow = dbPeriods;
+  const lessonsToShow = dbLessons;
 
-  const focusAttendanceControlAt = (controlIndex: number) => {
-    if (subjectsToShow.length === 0) {
-      return;
+  const activeLesson = useMemo(() => {
+    if (user?.role !== 'teacher') return null;
+    let now = new Date();
+    if (isDemoMode) {
+      const d = new Date();
+      d.setDate(d.getDate() + (5 - d.getDay()));
+      d.setHours(10, 15, 0, 0);
+      now = d;
     }
-
-    const studentIndex = Math.floor(controlIndex / subjectsToShow.length);
-    const subjectIndex = controlIndex % subjectsToShow.length;
-    const student = studentsToShow[studentIndex];
-    const subject = subjectsToShow[subjectIndex];
-
-    if (!student || !subject) {
-      return;
-    }
-
-    attendanceControlRefs.current[getAttendanceControlKey(student.id, subject)]?.focus();
-  };
-
-  const getAbsenceKey = (studentId: string, subject: Subject) => `${dateFilter}-${studentId}-${subject}`;
-  const getLessonTopicKey = (subject: Subject) => getLessonTopicKeyForValues(dateFilter, classFilter, subject);
-
-  const getLessonTopicDraftValue = (subject: Subject) => {
-    const topicKey = getLessonTopicKey(subject);
-    return lessonTopicDrafts[topicKey] ?? lessonTopics[topicKey] ?? '';
-  };
-
-  const updateLessonTopicDraft = (subject: Subject, topic: string) => {
-    const topicKey = getLessonTopicKey(subject);
-
-    setLessonTopicDrafts((currentDrafts) => ({
-      ...currentDrafts,
-      [topicKey]: topic,
-    }));
-  };
-
-  const saveLessonTopic = async (subject: Subject) => {
-    const topicKey = getLessonTopicKey(subject);
-    const savedTopic = getLessonTopicDraftValue(subject).trim();
-
-    // Directly save to React state for fully offline functionality
-    setLessonTopics((currentTopics) => ({
-      ...currentTopics,
-      [topicKey]: savedTopic,
-    }));
-
-    setLessonTopicDrafts((currentDrafts) => ({
-      ...currentDrafts,
-      [topicKey]: savedTopic,
-    }));
-
-    setEditingLessonTopics((currentTopics) => ({
-      ...currentTopics,
-      [topicKey]: false,
-    }));
-  };
-
-  const editLessonTopic = (subject: Subject) => {
-    const topicKey = getLessonTopicKey(subject);
-
-    setLessonTopicDrafts((currentDrafts) => ({
-      ...currentDrafts,
-      [topicKey]: currentDrafts[topicKey] ?? lessonTopics[topicKey] ?? '',
-    }));
-
-    setEditingLessonTopics((currentTopics) => ({
-      ...currentTopics,
-      [topicKey]: true,
-    }));
-  };
-
-  const updateAttendanceStatus = (studentId: string, subject: Subject, status: AttendanceStatus) => {
-    setStudentsByDate((currentStudentsByDate) => {
-      const studentsForDate = currentStudentsByDate[dateFilter] ?? loadMockAttendanceForDate(dateFilter);
-
-      return {
-        ...currentStudentsByDate,
-        [dateFilter]: studentsForDate.map((student) =>
-          student.id === studentId
-            ? {
-                ...student,
-                attendance: { ...student.attendance, [subject]: status },
-              }
-            : student,
-        ),
-      };
+    const dayIdx = now.getDay();
+    if (dayIdx === 0 || dayIdx === 6) return null;
+    const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentMins = now.getHours() * 60 + now.getMinutes();
+    const activePeriod = dbPeriods.find((p) => {
+      const s = parseTimeToMinutes(p.startTime);
+      const e = parseTimeToMinutes(p.endTime);
+      return currentMins >= s && currentMins <= e;
     });
+    if (!activePeriod) return null;
+    const matched = dbLessons.find((l) => l.day === DAYS[dayIdx] && l.periodNumber === activePeriod.periodNumber);
+    return matched ? { ...matched, period: activePeriod } : null;
+  }, [user, dbLessons, dbPeriods, isDemoMode]);
 
-    if (status === 'present') {
-      const absenceKey = getAbsenceKey(studentId, subject);
+  // ── Data loading ───────────────────────────────────────────────────────────
 
-      setAbsenceReasons((currentReasons) => {
-        const remainingReasons = { ...currentReasons };
-        delete remainingReasons[absenceKey];
-        return remainingReasons;
-      });
+  const loadInitialData = async () => {
+    setInitialLoading(true);
+    try {
+      const [periodsRes, classesRes, subjectsRes] = await Promise.all([
+        fetch(`${API_URL}/api/periods`, { credentials: 'include' }),
+        fetch(`${API_URL}/api/classes`, { credentials: 'include' }),
+        fetch(`${API_URL}/api/subjects`, { credentials: 'include' }),
+      ]);
+      const [periodsData, classesData, subjectsData] = await Promise.all([
+        periodsRes.json(), classesRes.json(), subjectsRes.json(),
+      ]);
+
+      if (periodsData.success) setDbPeriods(periodsData.data);
+
+      if (Array.isArray(classesData)) {
+        setDbClasses(classesData.map((c: any) => ({ id: c.id, name: c.name })));
+        setAllStudents(
+          classesData.flatMap((c: any) =>
+            (c.students ?? []).map((s: any) => ({ id: s.id, name: s.name, className: c.name })),
+          ),
+        );
+      }
+
+      if (Array.isArray(subjectsData)) {
+        setAllSubjects(subjectsData.map((s: any) => ({ id: s.id, name: s.name })));
+      }
+
+      if (isTeacher || isAdmin) {
+        const lessonsRes = await fetch(`${API_URL}/api/teacher-timetable`, { credentials: 'include' });
+        const lessonsData = await lessonsRes.json();
+        if (lessonsData.success) setDbLessons(lessonsData.data);
+      }
+    } catch (e) {
+      console.error('Failed to load initial data:', e);
+    } finally {
+      setInitialLoading(false);
     }
   };
 
-  const handleAttendanceStatusClick = (
-    student: AttendanceStudent,
-    subject: Subject,
-    status: AttendanceStatus,
-  ) => {
-    if (status === 'absent') {
-      setPendingAbsence({
-        studentId: student.id,
-        studentName: student.name,
-        subject,
+  const loadAttendanceData = useCallback(
+    async (className: ClassName, date: string, currentViewState: ViewState, currentLesson: typeof selectedLesson) => {
+      const classObj = dbClasses.find((c) => c.name === className);
+      if (!classObj) return;
+
+      setAttendanceLoading(true);
+      try {
+        const needsSubjects = !classSubjectsMap[classObj.id];
+        const fetches: Promise<Response>[] = [
+          fetch(`${API_URL}/api/attendance/${classObj.id}/${date}`, { credentials: 'include' }),
+          fetch(`${API_URL}/api/lesson-topics/${classObj.id}/${date}`, { credentials: 'include' }),
+          ...(needsSubjects
+            ? [fetch(`${API_URL}/api/class-subjects/${classObj.id}`, { credentials: 'include' })]
+            : []),
+        ];
+
+        const responses = await Promise.all(fetches);
+        const [attendanceData, topicsData, classSubjectsData] = await Promise.all(
+          responses.map((r) => r.json()),
+        );
+
+        let subjects: DbEntity[] = classSubjectsMap[classObj.id] ?? [];
+        if (classSubjectsData?.success) {
+          subjects = classSubjectsData.data;
+          setClassSubjectsMap((prev) => ({ ...prev, [classObj.id]: subjects }));
+        }
+
+        const relevantPeriod = currentViewState === 'log_lesson' ? (currentLesson?.periodNumber ?? 0) : 0;
+        const attendanceByStudent: Record<number, Record<string, AttendanceStatus>> = {};
+        const newAbsenceReasons: Record<string, string> = {};
+
+        if (attendanceData.success) {
+          for (const rec of attendanceData.data) {
+            if (rec.periodNumber !== relevantPeriod) continue;
+            if (!attendanceByStudent[rec.studentId]) attendanceByStudent[rec.studentId] = {};
+            attendanceByStudent[rec.studentId][rec.subject.name] = rec.status;
+            if (rec.status === 'absent' && rec.absenceReason) {
+              newAbsenceReasons[`${date}-${rec.studentId}-${rec.subject.name}`] = rec.absenceReason;
+            }
+          }
+        }
+
+        const studentsForClass = allStudents.filter((s) => s.className === className);
+        const attendanceStudents: AttendanceStudent[] = studentsForClass.map((student) => ({
+          ...student,
+          attendance: Object.fromEntries(
+            subjects.map((subj) => [
+              subj.name,
+              attendanceByStudent[student.id]?.[subj.name] ?? 'present',
+            ]),
+          ),
+        }));
+
+        setCurrentAttendanceStudents(attendanceStudents);
+        setAbsenceReasons((prev) => ({ ...prev, ...newAbsenceReasons }));
+
+        if (topicsData.success) {
+          const newTopics: Record<string, string> = {};
+          for (const topic of topicsData.data) {
+            newTopics[getLessonTopicKeyForValues(date, className, topic.subject.name)] = topic.topic;
+          }
+          setLessonTopics((prev) => ({ ...prev, ...newTopics }));
+        }
+      } catch (e) {
+        console.error('Failed to load attendance data:', e);
+      } finally {
+        setAttendanceLoading(false);
+      }
+    },
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [dbClasses, allStudents, classSubjectsMap],
+  );
+
+  // ── Effects ────────────────────────────────────────────────────────────────
+
+  useEffect(() => { loadInitialData(); }, []); // eslint-disable-line react-hooks/exhaustive-deps
+
+  useEffect(() => {
+    if (dbClasses.length > 0 && !classFilter) {
+      setClassFilter(assignedClass ?? dbClasses[0].name);
+    }
+  }, [dbClasses, assignedClass, classFilter]);
+
+  useEffect(() => {
+    if (
+      (viewState === 'class_absence' || viewState === 'log_lesson') &&
+      classFilter && dateFilter &&
+      dbClasses.length > 0 && allStudents.length > 0
+    ) {
+      loadAttendanceData(classFilter, dateFilter, viewState, selectedLesson);
+    }
+  }, [viewState, classFilter, dateFilter, dbClasses.length, allStudents.length]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // ── Key builders ───────────────────────────────────────────────────────────
+
+  const getAbsenceKey = (studentId: number, subject: Subject) => `${dateFilter}-${studentId}-${subject}`;
+  const getLessonTopicKey = (subject: Subject) => getLessonTopicKeyForValues(dateFilter, classFilter, subject);
+  const getLessonTopicDraftValue = (subject: Subject) => {
+    const k = getLessonTopicKey(subject);
+    return lessonTopicDrafts[k] ?? lessonTopics[k] ?? '';
+  };
+
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
+  const updateAttendanceStatus = (studentId: number, subject: Subject, status: AttendanceStatus, reason?: string) => {
+    setCurrentAttendanceStudents((prev) =>
+      prev.map((s) => s.id === studentId ? { ...s, attendance: { ...s.attendance, [subject]: status } } : s),
+    );
+    if (status === 'present') {
+      setAbsenceReasons((prev) => {
+        const updated = { ...prev };
+        delete updated[getAbsenceKey(studentId, subject)];
+        return updated;
       });
+    }
+    const classObj = dbClasses.find((c) => c.name === classFilter);
+    const subjectObj = allSubjects.find((s) => s.name === subject);
+    if (classObj && subjectObj) {
+      fetch(`${API_URL}/api/attendance`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentId,
+          subjectId: subjectObj.id,
+          classId: classObj.id,
+          date: dateFilter,
+          periodNumber: viewState === 'log_lesson' ? (selectedLesson?.periodNumber ?? 0) : 0,
+          status,
+          absenceType: reason ? reason.split(': ')[0] : null,
+          absenceReason: reason ?? null,
+        }),
+      }).catch(console.error);
+    }
+  };
+
+  const handleAttendanceStatusClick = (student: AttendanceStudent, subject: Subject, status: AttendanceStatus) => {
+    if (!canEditAttendance) return;
+    if (status === 'absent') {
+      setPendingAbsence({ studentId: student.id, studentName: student.name, subject });
       return;
     }
-
     updateAttendanceStatus(student.id, subject, status);
   };
 
   const confirmAbsence = (reason: string) => {
-    if (!pendingAbsence) {
-      return;
-    }
-
-    updateAttendanceStatus(pendingAbsence.studentId, pendingAbsence.subject, 'absent');
-    setAbsenceReasons((currentReasons) => ({
-      ...currentReasons,
+    if (!pendingAbsence) return;
+    updateAttendanceStatus(pendingAbsence.studentId, pendingAbsence.subject, 'absent', reason);
+    setAbsenceReasons((prev) => ({
+      ...prev,
       [getAbsenceKey(pendingAbsence.studentId, pendingAbsence.subject)]: reason,
     }));
     setPendingAbsence(null);
   };
 
-  const handleAttendanceControlKeyDown = (
-    event: KeyboardEvent<HTMLDivElement>,
-    student: AttendanceStudent,
-    subject: Subject,
-    currentStatus: AttendanceStatus,
-    controlIndex: number,
-  ) => {
-    if (
-      event.key === 'ArrowRight' ||
-      event.key === 'ArrowLeft' ||
-      event.key === 'ArrowDown' ||
-      event.key === 'ArrowUp'
-    ) {
-      event.preventDefault();
-
-      const direction =
-        event.key === 'ArrowRight'
-          ? 1
-          : event.key === 'ArrowLeft'
-            ? -1
-            : event.key === 'ArrowDown'
-              ? subjectsToShow.length
-              : -subjectsToShow.length;
-      const nextControlIndex = controlIndex + direction;
-      const controlCount = studentsToShow.length * subjectsToShow.length;
-
-      if (nextControlIndex >= 0 && nextControlIndex < controlCount) {
-        focusAttendanceControlAt(nextControlIndex);
-      }
-
-      return;
-    }
-
-    if (event.key === 'Enter' && event.currentTarget === event.target) {
-      event.preventDefault();
-      updateAttendanceStatus(student.id, subject, currentStatus === 'present' ? 'absent' : 'present');
+  const saveLessonTopic = async (subject: Subject) => {
+    const k = getLessonTopicKey(subject);
+    const saved = getLessonTopicDraftValue(subject).trim();
+    setLessonTopics((prev) => ({ ...prev, [k]: saved }));
+    setLessonTopicDrafts((prev) => ({ ...prev, [k]: saved }));
+    setEditingLessonTopics((prev) => ({ ...prev, [k]: false }));
+    const classObj = dbClasses.find((c) => c.name === classFilter);
+    const subjectObj = allSubjects.find((s) => s.name === subject);
+    if (classObj && subjectObj) {
+      try {
+        await fetch(`${API_URL}/api/lesson-topics`, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            classId: classObj.id,
+            subjectId: subjectObj.id,
+            date: dateFilter,
+            periodNumber: viewState === 'log_lesson' ? (selectedLesson?.periodNumber ?? 0) : 0,
+            topic: saved,
+          }),
+        });
+      } catch (e) { console.error('Failed to save topic:', e); }
     }
   };
 
-  const handleSelectLessonToLog = (lesson: any) => {
+  const editLessonTopic = (subject: Subject) => {
+    const k = getLessonTopicKey(subject);
+    setLessonTopicDrafts((prev) => ({ ...prev, [k]: prev[k] ?? lessonTopics[k] ?? '' }));
+    setEditingLessonTopics((prev) => ({ ...prev, [k]: true }));
+  };
+
+  const handleSelectLessonToLog = (lesson: TeacherLesson & { period?: Period }) => {
     setSelectedLesson({
-      class: lesson.class as ClassName,
-      subject: lesson.subject as Subject,
+      class: lesson.class.name,
+      subject: lesson.subject.name,
       periodNumber: lesson.periodNumber,
       startTime: lesson.startTime,
       endTime: lesson.endTime,
     });
     setDateFilter(TODAY_DATE_VALUE);
-    setClassFilter(lesson.class as ClassName);
-    setSubjectFilter(lesson.subject);
+    setClassFilter(lesson.class.name);
+    setSubjectFilter(lesson.subject.name);
     setViewState('log_lesson');
   };
 
-  // -------------------------------------------------------------
-  // RENDERING HELPERS
-  // -------------------------------------------------------------
+  const focusAttendanceControlAt = (index: number) => {
+    const controlCount = studentsToShow.length * subjectsToShow.length;
+    if (controlCount === 0) return;
+    const clampedIndex = ((index % controlCount) + controlCount) % controlCount;
+    const targetStudent = studentsToShow[Math.floor(clampedIndex / subjectsToShow.length)];
+    const targetSubject = subjectsToShow[clampedIndex % subjectsToShow.length];
+    if (!targetStudent || !targetSubject) return;
+    const key = getAttendanceControlKey(targetStudent.id, targetSubject);
+    attendanceControlRefs.current[key]?.focus();
+  };
 
-  // Guard view for students and parents
+  const handleAttendanceControlKeyDown = (
+    event: React.KeyboardEvent<HTMLDivElement>,
+    student: AttendanceStudent,
+    subject: Subject,
+    currentStatus: AttendanceStatus,
+    controlIndex: number,
+  ) => {
+    const colCount = subjectsToShow.length;
+    const rowCount = studentsToShow.length;
+    const row = Math.floor(controlIndex / colCount);
+    const col = controlIndex % colCount;
+
+    if (event.key === 'ArrowRight') { event.preventDefault(); focusAttendanceControlAt(controlIndex + 1); }
+    else if (event.key === 'ArrowLeft') { event.preventDefault(); focusAttendanceControlAt(controlIndex - 1); }
+    else if (event.key === 'ArrowDown') { event.preventDefault(); focusAttendanceControlAt(Math.min(row + 1, rowCount - 1) * colCount + col); }
+    else if (event.key === 'ArrowUp') { event.preventDefault(); focusAttendanceControlAt(Math.max(row - 1, 0) * colCount + col); }
+    else if (event.key === 'Enter' && event.currentTarget === event.target) {
+      event.preventDefault();
+      updateAttendanceStatus(student.id, subject, currentStatus === 'present' ? 'absent' : 'present');
+    }
+  };
+
+  // ── Loading guard ──────────────────────────────────────────────────────────
+
+  if (initialLoading) {
+    return (
+      <div className="flex items-center justify-center gap-3 p-12 text-palette-pine font-bold text-lg">
+        <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
+          <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+          <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+        </svg>
+        Loading attendance data...
+      </div>
+    );
+  }
+
+  // ── Student/parent guard ───────────────────────────────────────────────────
+
   if (isStudentOrParent) {
     return (
-      <div className="flex flex-col items-center justify-center p-8 bg-white rounded-2xl border border-palette-sage/20 shadow-soft max-w-2xl mx-auto my-12 text-center">
-        <span className="material-symbols-outlined text-6xl text-palette-moss mb-4">lock</span>
-        <h1 className="text-2xl font-bold text-palette-pine">Access Denied</h1>
-        <p className="mt-2 text-palette-moss font-semibold">
-          This page is only accessible for teachers and administrators. You can view your absences on the Absences page.
-        </p>
-        <a
-          href="/absence"
-          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-palette-fern px-6 py-3 font-extrabold text-white shadow-soft transition hover:bg-palette-leaf"
-        >
-          <span className="material-symbols-outlined">calendar_today</span>
-          Go to Absences
-        </a>
+      <div className="p-8 flex items-center justify-center min-h-[50vh]">
+        <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-2xl shadow-soft max-w-md text-center space-y-3">
+          <span className="material-symbols-outlined text-[48px] text-red-500 mx-auto">lock</span>
+          <h2 className="text-2xl font-bold text-red-800">Access Restricted</h2>
+          <p className="text-red-700 font-medium">Attendance management is only available to teachers and administrators.</p>
+        </div>
       </div>
     );
   }
 
-  // View: Main Menu
+  // ── Menu ───────────────────────────────────────────────────────────────────
+
   if (viewState === 'menu') {
-    const isClassTeacher = isAdmin || (isTeacher && assignedClass !== null);
-
     return (
-      <div className="space-y-8 max-w-4xl mx-auto p-4">
-        <div className="text-center space-y-2">
-          <h1 className="text-4xl font-black text-palette-pine tracking-tight">Class Log and Attendance</h1>
-          <p className="text-palette-moss font-semibold max-w-lg mx-auto">
-            Select one of the options below to manage school attendance, absences, and class log records.
-          </p>
+      <div className="p-4 md:p-8 max-w-5xl mx-auto space-y-8 animate-in fade-in duration-300">
+        <div className="flex items-start justify-between">
+          <div>
+            <h1 className="text-4xl font-extrabold text-palette-pine tracking-tight">Attendance</h1>
+            <p className="text-palette-moss font-semibold mt-1">Manage student attendance and lesson topics.</p>
+          </div>
+          {isTeacher && (
+            <button
+              onClick={() => setIsDemoMode((p) => !p)}
+              className={`text-xs font-bold px-3 py-1.5 rounded-lg border transition ${isDemoMode ? 'bg-orange-100 text-orange-800 border-orange-300' : 'bg-gray-100 text-gray-500 border-gray-200 hover:bg-gray-200'}`}
+            >
+              {isDemoMode ? '🧪 Demo ON' : 'Demo'}
+            </button>
+          )}
         </div>
 
-        {/* Quick Action (Highlight Center Button) */}
+        {isTeacher && assignedClass && (
+          <div className="bg-blue-50 border border-blue-200 rounded-xl p-4 text-sm text-blue-800 font-semibold">
+            You are the class teacher of: <strong>{assignedClass}</strong>
+          </div>
+        )}
+
         {activeLesson && (
-          <div className="flex justify-center">
-            <div className="relative group">
-              {/* Pulsing glow background */}
-              <div className="absolute -inset-1.5 bg-gradient-to-r from-palette-leaf to-palette-meadow rounded-2xl blur-lg opacity-75 group-hover:opacity-100 transition duration-300 animate-pulse"></div>
-              
-              <button
-                type="button"
-                onClick={() => handleSelectLessonToLog(activeLesson)}
-                className="relative flex flex-col md:flex-row items-center gap-4 bg-palette-pine text-white px-8 py-5 rounded-2xl shadow-lg border border-palette-leaf/25 transition duration-300 hover:scale-[1.02] text-left active:scale-[0.98]"
-              >
-                <div className="bg-palette-fern/70 text-palette-mist p-3 rounded-full flex items-center justify-center shrink-0">
-                  <span className="material-symbols-outlined text-3xl animate-bounce">bolt</span>
-                </div>
-                <div>
-                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-palette-leaf text-[10px] font-black uppercase tracking-wider mb-1">
-                    Quick Action: You are currently teaching
-                  </span>
-                  <h2 className="text-xl font-extrabold leading-tight">
-                    Log Lesson: {activeLesson.subject} in Class {activeLesson.class}
-                  </h2>
-                  <p className="text-xs text-palette-lichen font-semibold mt-0.5">
-                    {activeLesson.period?.startTime} - {activeLesson.period?.endTime} ({activeLesson.periodNumber}. period, classroom {activeLesson.room})
-                  </p>
-                </div>
-              </button>
+          <div className="bg-amber-50 border border-amber-300 rounded-2xl p-5 shadow-sm flex items-start gap-4">
+            <span className="material-symbols-outlined text-amber-500 text-3xl mt-0.5">notifications_active</span>
+            <div className="flex-1">
+              <p className="font-bold text-amber-900 text-base">Lesson in progress</p>
+              <p className="text-amber-800 font-semibold mt-0.5">
+                Log Lesson: {activeLesson.subject.name} in Class {activeLesson.class.name}
+              </p>
+              <p className="text-amber-700 text-sm mt-0.5">
+                {activeLesson.period?.startTime} – {activeLesson.period?.endTime} ({activeLesson.periodNumber}. period, classroom {activeLesson.room.name})
+              </p>
             </div>
+            <button
+              onClick={() => handleSelectLessonToLog(activeLesson)}
+              className="px-5 py-2.5 bg-amber-500 text-white font-bold rounded-xl hover:bg-amber-600 transition text-sm shrink-0"
+            >
+              Log Now
+            </button>
           </div>
         )}
 
-        {/* Main Grid Options */}
-        <div className="grid gap-6 md:grid-cols-2">
-          {/* Card 1: Class Absence */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+          {/* Class Absence */}
           <div
-            className={`flex flex-col justify-between p-6 rounded-2xl border bg-white shadow-soft transition-all duration-300 ${
-              isClassTeacher
-                ? 'border-palette-sage/30 hover:shadow-md hover:scale-[1.01]'
-                : 'border-palette-sage/10 opacity-60'
-            }`}
+            onClick={() => { setDateFilter(TODAY_DATE_VALUE); setViewState('class_absence'); }}
+            className="group bg-white rounded-2xl border border-palette-mist/60 shadow-soft p-7 cursor-pointer hover:shadow-md hover:border-blue-200 transition-all duration-200"
           >
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <span className="material-symbols-outlined text-3xl text-palette-fern bg-palette-mist p-2.5 rounded-xl">
-                  groups
-                </span>
-                <h3 className="text-xl font-extrabold text-palette-pine">Class Absence</h3>
-              </div>
-              <p className="text-palette-moss font-semibold text-sm leading-relaxed mb-4">
-                Full overview and editing of attendance for the entire class. Available for class teachers and administrators.
-              </p>
-              {isTeacher && assignedClass && (
-                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-palette-mist text-xs font-bold text-palette-moss">
-                  <span className="material-symbols-outlined text-sm">assignment_ind</span>
-                  You are the class teacher of: <strong className="text-palette-pine">{assignedClass}</strong>
-                </div>
-              )}
-            </div>
-            
-            <div className="mt-6 pt-4 border-t border-palette-sage/10">
-              {isClassTeacher ? (
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (isTeacher && assignedClass) {
-                      setClassFilter(assignedClass);
-                    }
-                    setViewState('class_absence');
-                  }}
-                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-palette-fern py-3 font-extrabold text-white transition hover:bg-palette-leaf shadow-soft"
-                >
-                  Open Class Absence
-                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
-                </button>
-              ) : (
-                <div className="text-xs text-red-700 bg-red-50 p-3 rounded-lg flex items-start gap-1.5 font-bold">
-                  <span className="material-symbols-outlined text-sm shrink-0">info</span>
-                  Access restricted to class teachers and administrators.
-                </div>
-              )}
-            </div>
+            <span className="material-symbols-outlined text-4xl text-blue-500 mb-4 block">group</span>
+            <h2 className="text-xl font-extrabold text-palette-pine mb-1">Class Absence Overview</h2>
+            <p className="text-palette-moss font-medium text-sm">View and record attendance for an entire class across all subjects for any date.</p>
+            {isTeacher && assignedClass && (
+              <p className="text-xs text-blue-700 font-bold mt-3 bg-blue-50 inline-block px-2 py-0.5 rounded">Class {assignedClass}</p>
+            )}
           </div>
 
-          {/* Card 2: Log Lesson */}
-          <div className="flex flex-col justify-between p-6 rounded-2xl border border-palette-sage/30 bg-white shadow-soft transition-all duration-300 hover:shadow-md hover:scale-[1.01]">
-            <div>
-              <div className="flex items-center gap-3 mb-4">
-                <span className="material-symbols-outlined text-3xl text-palette-fern bg-palette-mist p-2.5 rounded-xl">
-                  edit_calendar
-                </span>
-                <h3 className="text-xl font-extrabold text-palette-pine">Log Lesson</h3>
-              </div>
-              <p className="text-palette-moss font-semibold text-sm leading-relaxed mb-4">
-                Allows teachers to select a specific lesson from their personal timetable and log attendance and the lesson topic.
-              </p>
+          {/* Log Lesson */}
+          {isTeacher && (
+            <div
+              onClick={() => setViewState('teacher_schedule')}
+              className="group bg-white rounded-2xl border border-palette-mist/60 shadow-soft p-7 cursor-pointer hover:shadow-md hover:border-green-200 transition-all duration-200"
+            >
+              <span className="material-symbols-outlined text-4xl text-green-500 mb-4 block">edit_note</span>
+              <h2 className="text-xl font-extrabold text-palette-pine mb-1">Log Lesson Attendance</h2>
+              <p className="text-palette-moss font-medium text-sm">Select a lesson from your timetable to log attendance and set the lesson topic.</p>
             </div>
-            
-            <div className="mt-6 pt-4 border-t border-palette-sage/10">
-              <button
-                type="button"
-                onClick={() => setViewState('teacher_schedule')}
-                className="w-full flex items-center justify-center gap-2 rounded-xl bg-palette-fern py-3 font-extrabold text-white transition hover:bg-palette-leaf shadow-soft"
-              >
-                View Timetable
-                <span className="material-symbols-outlined text-sm">calendar_today</span>
-              </button>
-            </div>
-          </div>
+          )}
         </div>
-
-        {/* Demo Mode Toggle (Developer Helper) */}
-        {isTeacher && (
-          <div className="pt-6 border-t border-palette-sage/15 flex justify-center">
-            <label className="inline-flex items-center gap-3 cursor-pointer bg-palette-mist px-4 py-2 rounded-xl border border-palette-sage/20 shadow-sm hover:bg-palette-mist/80 transition duration-150">
-              <input
-                type="checkbox"
-                checked={isDemoMode}
-                onChange={(e) => setIsDemoMode(e.target.checked)}
-                className="w-4.5 h-4.5 text-palette-leaf border-palette-lichen rounded focus:ring-palette-leaf"
-              />
-              <div className="text-left">
-                <span className="block text-xs font-bold text-palette-pine">Schedule Demo Mode</span>
-                <span className="block text-[10px] text-palette-moss font-semibold leading-none">Simulates Friday 10:15 AM (to display the Quick Action button)</span>
-              </div>
-            </label>
-          </div>
-        )}
       </div>
     );
   }
 
-  // View: Teacher Timetable Grid Select
+  // ── Teacher Schedule ───────────────────────────────────────────────────────
+
   if (viewState === 'teacher_schedule') {
     return (
-      <div className="space-y-6 max-w-[1600px] mx-auto p-4">
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+      <div className="p-4 md:p-8 max-w-6xl mx-auto space-y-6 animate-in fade-in duration-300">
+        <div className="flex items-center gap-4">
+          <button onClick={() => setViewState('menu')} className="p-2 bg-white rounded-xl border border-gray-200 hover:bg-gray-50 transition">
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
           <div>
-            <button
-              onClick={() => setViewState('menu')}
-              className="inline-flex items-center gap-1.5 text-palette-moss hover:text-palette-pine font-black text-sm mb-2 transition"
-            >
-              <span className="material-symbols-outlined text-base">arrow_back</span>
-              Back to menu
-            </button>
-            <h1 className="text-3xl font-black text-palette-pine tracking-tight">Your Teaching Timetable</h1>
-            <p className="text-palette-moss font-semibold mt-1">
-              Select a lesson to log attendance and the lesson topic.
-            </p>
+            <h1 className="text-3xl font-extrabold text-palette-pine">Your Timetable</h1>
+            <p className="text-palette-moss font-semibold text-sm mt-0.5">Select a lesson to log attendance for.</p>
           </div>
         </div>
 
-        <div className="overflow-x-auto rounded-2xl border border-palette-sage/30 shadow-soft bg-white">
+        {periodsToShow.length === 0 ? (
+          <div className="text-center py-16 text-palette-moss font-semibold">No lessons found in your timetable.</div>
+        ) : (
+          <div className="overflow-x-auto rounded-2xl border border-palette-sage/30 shadow-soft bg-white">
+            <table className="w-full border-collapse text-left">
+              <thead>
+                <tr className="bg-palette-mist/80 border-b border-palette-sage/30">
+                  <th className="p-4 font-black text-palette-pine text-xs tracking-wider uppercase min-w-[100px]">Period</th>
+                  {DAYS_OF_WEEK.map((day) => (
+                    <th key={day} className="p-4 font-black text-palette-pine text-xs tracking-wider uppercase text-center min-w-[160px] border-l border-palette-sage/20">
+                      {DAY_LABELS[day]}
+                    </th>
+                  ))}
+                </tr>
+              </thead>
+              <tbody>
+                {periodsToShow.map((period) => (
+                  <tr key={period.periodNumber} className="border-b border-palette-sage/20 last:border-0">
+                    <td className="p-3 bg-palette-mist/40 border-r border-palette-sage/30 text-center">
+                      <div className="font-black text-palette-pine text-sm">{period.periodNumber}.</div>
+                      <div className="text-[10px] text-palette-moss font-bold">{period.startTime}</div>
+                      <div className="text-[10px] text-palette-moss font-bold">{period.endTime}</div>
+                    </td>
+                    {DAYS_OF_WEEK.map((day) => {
+                      const cellLessons = lessonsToShow.filter(
+                        (l) => l.day === day && l.periodNumber === period.periodNumber,
+                      );
+                      return (
+                        <td key={day} className="p-2 border-l border-palette-sage/20 align-middle">
+                          <div className="space-y-1.5">
+                            {cellLessons.map((lesson) => (
+                              <button
+                                key={lesson.id}
+                                onClick={() => handleSelectLessonToLog(lesson)}
+                                className="w-full text-left rounded-xl border-l-4 border-green-400 bg-green-50/70 text-green-950 p-3 shadow-sm cursor-pointer hover:bg-green-100/80 hover:shadow-md hover:-translate-y-0.5 transition-all duration-150"
+                              >
+                                <h3 className="font-extrabold text-sm">{lesson.subject.name}</h3>
+                                <p className="text-[10px] font-semibold text-green-800 mt-1">Class {lesson.class.name}</p>
+                                <p className="text-[10px] text-green-700">Room {lesson.room.name}</p>
+                              </button>
+                            ))}
+                            {cellLessons.length === 0 && (
+                              <div className="min-h-[80px] flex items-center justify-center text-palette-lichen text-xs">–</div>
+                            )}
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // ── Attendance view (class_absence + log_lesson) ───────────────────────────
+
+  const isLogLesson = viewState === 'log_lesson';
+  const totalAbsent = studentsToShow.filter((s) =>
+    subjectsToShow.some((subj) => s.attendance[subj] === 'absent'),
+  ).length;
+
+  return (
+    <div className="p-4 md:p-8 max-w-[1400px] mx-auto space-y-0 animate-in fade-in duration-300">
+
+      {/* Header */}
+      <div className="bg-white p-6 rounded-2xl border border-palette-mist/60 shadow-soft flex flex-col xl:flex-row xl:items-center xl:justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <button
+            onClick={() => setViewState(isLogLesson ? 'teacher_schedule' : 'menu')}
+            className="p-2 bg-gray-50 rounded-xl border border-gray-200 hover:bg-gray-100 transition"
+          >
+            <span className="material-symbols-outlined">arrow_back</span>
+          </button>
+          <div>
+            <h1 className="text-2xl font-extrabold text-palette-pine">
+              {isLogLesson ? 'Log Lesson Attendance' : 'Class Absence Overview'}
+            </h1>
+            {isLogLesson && selectedLesson && (
+              <p className="text-sm font-semibold text-palette-moss mt-0.5">
+                {selectedLesson.subject} · Class {selectedLesson.class} · Period {selectedLesson.periodNumber} · {selectedLesson.startTime}–{selectedLesson.endTime}
+              </p>
+            )}
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-4">
+          {/* Date picker */}
+          <div>
+            <label className="block text-xs font-bold text-palette-moss uppercase tracking-wider mb-1.5">Date</label>
+            <input
+              type="date"
+              value={dateFilter}
+              onChange={(e) => setDateFilter(e.target.value)}
+              className="border border-gray-200 rounded-xl px-4 py-2 text-sm font-semibold text-palette-pine bg-gray-50 outline-none focus:ring-2 focus:ring-palette-meadow"
+            />
+          </div>
+
+          {/* Class filter */}
+          {!isLogLesson && (
+            <div>
+              <label className="block text-xs font-bold text-palette-moss uppercase tracking-wider mb-1.5">Class</label>
+              <Filter label="" value={classFilter} onChange={setClassFilter} options={classOptions} disabled={isTeacher} />
+            </div>
+          )}
+
+          {/* Subject filter (class_absence only) */}
+          {!isLogLesson && (
+            <div>
+              <label className="block text-xs font-bold text-palette-moss uppercase tracking-wider mb-1.5">Subject</label>
+              <Filter label="" value={activeSubjectFilter} onChange={setSubjectFilter} options={subjectOptions} />
+            </div>
+          )}
+
+          {/* Stats badge */}
+          <div className="flex items-center gap-2 bg-palette-mist/70 p-2 pr-4 rounded-xl border border-palette-sage/30">
+            <span className="text-xs font-bold text-palette-moss uppercase tracking-wider pl-1">{selectedDateLabel}</span>
+            <span className="w-px h-5 bg-palette-sage/40" />
+            <span className="text-sm font-black text-red-700 flex items-center gap-1">
+              <WarningIcon className="text-red-500" />
+              {totalAbsent} absent
+            </span>
+          </div>
+        </div>
+      </div>
+
+      {/* Attendance table */}
+      <div className="relative overflow-x-auto rounded-2xl border border-palette-sage/30 shadow-soft bg-white mt-0">
+        {attendanceLoading && (
+          <div className="absolute inset-0 bg-white/70 flex items-center justify-center z-20 rounded-2xl">
+            <svg className="w-7 h-7 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
+              <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+              <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            </svg>
+          </div>
+        )}
+
+        {subjectsToShow.length === 0 || studentsToShow.length === 0 ? (
+          <div className="text-center py-16 text-palette-moss font-semibold">
+            {subjectsToShow.length === 0 ? 'No subjects found for this class.' : 'No students found for this class.'}
+          </div>
+        ) : (
           <table className="w-full border-collapse text-left">
             <thead>
               <tr className="bg-palette-mist/80 border-b border-palette-sage/30">
-                <th className="p-4 font-black text-palette-pine text-xs tracking-wider uppercase min-w-[125px]">
-                  Day
+                <th className="p-4 font-black text-palette-pine text-xs tracking-wider uppercase min-w-[180px] sticky left-0 bg-palette-mist/80 z-10">
+                  Student
                 </th>
-                {periodsToShow.map((p) => (
-                  <th key={p.periodNumber} className="p-4 font-black text-palette-pine text-xs tracking-wider uppercase text-center min-w-[170px] border-l border-palette-sage/20">
-                    <div className="text-palette-leaf text-[11px] font-black tracking-normal lowercase first-letter:uppercase">{p.periodNumber}. period</div>
-                    <div className="text-[10px] text-palette-moss font-bold mt-0.5">{p.startTime} - {p.endTime}</div>
+                {subjectsToShow.map((subject) => (
+                  <th key={subject} className="p-4 font-black text-palette-pine text-xs tracking-wider uppercase text-center min-w-[160px] border-l border-palette-sage/20">
+                    <div className="text-palette-leaf text-[11px] font-black lowercase first-letter:uppercase">{getLessonLabel(classFilter, subject)}</div>
+                    {isLogLesson && canEditTopic && (
+                      <div className="mt-2">
+                        {editingLessonTopics[getLessonTopicKey(subject)] ? (
+                          <div className="flex flex-col gap-1">
+                            <input
+                              type="text"
+                              value={getLessonTopicDraftValue(subject)}
+                              onChange={(e) => {
+                                const k = getLessonTopicKey(subject);
+                                setLessonTopicDrafts((prev) => ({ ...prev, [k]: e.target.value }));
+                              }}
+                              onKeyDown={(e) => { if (e.key === 'Enter') void saveLessonTopic(subject); }}
+                              autoFocus
+                              placeholder="Lesson topic…"
+                              className="w-full text-xs font-normal text-gray-800 border border-blue-300 rounded px-2 py-1 outline-none focus:ring-1 focus:ring-blue-400 bg-white"
+                            />
+                            <button onClick={() => void saveLessonTopic(subject)} className="text-[9px] font-black text-white bg-blue-500 hover:bg-blue-600 rounded px-2 py-0.5 transition">
+                              Save
+                            </button>
+                          </div>
+                        ) : (
+                          <button
+                            onClick={() => editLessonTopic(subject)}
+                            className="text-[10px] font-semibold text-palette-moss hover:text-palette-pine rounded px-1 py-0.5 hover:bg-white/50 transition flex items-center gap-0.5 mx-auto"
+                          >
+                            <span className="material-symbols-outlined text-[11px]">edit</span>
+                            {lessonTopics[getLessonTopicKey(subject)] || 'Add topic'}
+                          </button>
+                        )}
+                      </div>
+                    )}
+                    {!isLogLesson && lessonTopics[getLessonTopicKey(subject)] && (
+                      <div className="text-[10px] font-normal text-palette-moss mt-1 truncate max-w-[140px] mx-auto">
+                        {lessonTopics[getLessonTopicKey(subject)]}
+                      </div>
+                    )}
                   </th>
                 ))}
               </tr>
             </thead>
             <tbody>
-              {DAYS_OF_WEEK.map((day) => (
-                <tr key={day} className="border-b border-palette-sage/20 last:border-0 hover:bg-palette-mist/20 transition duration-150">
-                  <td className="p-4 font-black text-palette-pine align-middle bg-palette-mist/40 text-center border-r border-palette-sage/30">
-                    <span className="text-base font-extrabold">{DAY_LABELS[day] || day}</span>
-                  </td>
-
-                  {periodsToShow.map((p) => {
-                    const cellLessons = lessonsToShow.filter(
-                      (l) => l.day === day && l.periodNumber === p.periodNumber
-                    );
-
-                    return (
-                      <td key={p.periodNumber} className="p-3 border-r border-palette-sage/20 last:border-r-0 align-middle">
-                        <div className="space-y-2">
-                          {cellLessons.map((lesson) => (
-                            <button
-                              key={lesson.id}
-                              type="button"
-                              onClick={() => handleSelectLessonToLog(lesson)}
-                              className="w-full text-left rounded-xl border-l-4 border-palette-leaf bg-palette-mist/80 p-3 shadow-xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-150 flex flex-col justify-between min-h-[90px]"
-                            >
-                              <div>
-                                  <h3 className="font-extrabold text-palette-pine text-sm leading-tight">
-                                    {lesson.subject}
-                                  </h3>
-                              </div>
-
-                              <div className="mt-2 text-[10px] space-y-0.5 bg-white/40 p-1.5 rounded border border-white/50 text-gray-700 font-semibold w-full">
-                                <p className="flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-[12px] text-palette-moss">groups</span>
-                                  <span>Class: {lesson.class}</span>
-                                </p>
-                                <p className="flex items-center gap-1">
-                                  <span className="material-symbols-outlined text-[12px] text-palette-moss">meeting_room</span>
-                                  <span>Room: {lesson.room}</span>
-                                </p>
-                              </div>
-                            </button>
-                          ))}
-
-                          {cellLessons.length === 0 && (
-                            <div className="text-center py-6 text-palette-lichen/50 select-none font-semibold text-xs italic">
-                              Free Time
-                            </div>
-                          )}
+              {studentsToShow.map((student, studentIdx) => {
+                const hasAnyAbsence = subjectsToShow.some((s) => student.attendance[s] === 'absent');
+                return (
+                  <tr key={student.id} className={`border-b border-palette-sage/20 last:border-0 transition duration-150 ${hasAnyAbsence ? 'bg-red-50/30' : 'hover:bg-palette-mist/20'}`}>
+                    <td className="p-4 align-middle sticky left-0 bg-white border-r border-palette-sage/30 z-10">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-8 h-8 rounded-full flex items-center justify-center text-xs font-black shrink-0 ${hasAnyAbsence ? 'bg-red-100 text-red-700' : 'bg-palette-mist text-palette-pine'}`}>
+                          {student.name.split(' ').map((n) => n[0]).join('').slice(0, 2).toUpperCase()}
                         </div>
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </div>
-    );
-  }
-
-  // Views: class_absence (general sheet) OR log_lesson (focused log view)
-  const isFocusedLog = viewState === 'log_lesson';
-
-  return (
-    <div className="space-y-6">
-      <div>
-        <button
-          onClick={() => {
-            if (isFocusedLog) {
-              setViewState('teacher_schedule');
-            } else {
-              setViewState('menu');
-            }
-          }}
-          className="inline-flex items-center gap-1.5 text-palette-moss hover:text-palette-pine font-black text-sm mb-2 transition"
-        >
-          <span className="material-symbols-outlined text-base">arrow_back</span>
-          {isFocusedLog ? 'Back to timetable' : 'Back to menu'}
-        </button>
-
-        <h1 className="text-3xl font-bold text-palette-pine">
-          {isFocusedLog ? `Log Lesson: ${selectedLesson?.subject}` : 'Attendance & Class Log'}
-        </h1>
-        <p className="mt-2 text-sm text-palette-moss">
-          {isFocusedLog 
-            ? `Logging attendance and topic for lesson ${selectedLesson?.subject} in Class ${selectedLesson?.class} (${selectedLesson?.startTime} - ${selectedLesson?.endTime}) held on ${selectedDateLabel}.`
-            : `Managing absences and logs for class {classFilter} on ${selectedDateLabel}.`
-          }
-        </p>
-      </div>
-
-      <section className="rounded-lg border border-palette-lichen/45 bg-palette-mist shadow-soft">
-        <div className="border-b border-palette-lichen/45 p-5">
-          <h2 className="mb-4 text-xl font-semibold text-palette-pine">
-            {isFocusedLog ? `Lesson: ${selectedLesson?.subject}` : `Class: ${classFilter}`}
-          </h2>
-          
-          <div className="grid gap-4 md:grid-cols-3">
-            <label htmlFor="attendance-date-filter" className="flex flex-col gap-2 text-sm font-medium text-palette-pine">
-              <span>Date</span>
-              <input
-                id="attendance-date-filter"
-                type="date"
-                value={dateFilter}
-                onChange={(event) => setDateFilter(event.target.value)}
-                className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-palette-pine focus:outline-hidden focus:ring-1 focus:ring-emerald-500 cursor-pointer"
-                required
-              />
-            </label>
-
-            {isFocusedLog ? (
-              <>
-                <div className="flex flex-col gap-2 text-sm font-medium text-palette-pine">
-                  <span>Class</span>
-                  <div className="h-10 flex items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-sm text-palette-pine/70 font-semibold cursor-not-allowed">
-                    {selectedLesson?.class}
-                  </div>
-                </div>
-                
-                <div className="flex flex-col gap-2 text-sm font-medium text-palette-pine">
-                  <span>Subject Taught</span>
-                  <div className="h-10 flex items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-sm text-palette-pine/70 font-semibold cursor-not-allowed">
-                    {selectedLesson?.subject}
-                  </div>
-                </div>
-              </>
-            ) : (
-              <>
-                {/* For general class absence view, if admin they can change class, if teacher it is locked */}
-                <div className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-palette-pine">Class</span>
-                  <Filter 
-                    label="" 
-                    value={classFilter} 
-                    onChange={setClassFilter} 
-                    options={CLASS_OPTIONS} 
-                    disabled={isTeacher} // Locked for class teachers to their class
-                  />
-                </div>
-                
-                <div className="flex flex-col gap-2">
-                  <span className="text-sm font-medium text-palette-pine">Subject</span>
-                  <Filter 
-                    label="" 
-                    value={activeSubjectFilter} 
-                    onChange={setSubjectFilter} 
-                    options={subjectOptions} 
-                  />
-                </div>
-              </>
-            )}
-          </div>
-        </div>
-
-        <div className="overflow-x-auto p-5">
-          <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
-            <thead>
-              <tr className="border-b border-palette-lichen/60 text-palette-pine">
-                <th className="w-56 px-4 py-3 font-semibold">Student</th>
-                <th className="w-24 px-4 py-3 font-semibold">Class</th>
-                
-                {subjectsToShow.map((subject) => {
-                  const topicKey = getLessonTopicKey(subject);
-                  const savedTopic = lessonTopics[topicKey];
-                  const isEditingTopic = editingLessonTopics[topicKey] ?? true;
-                  const isCollapsed = isFocusedLog && subject !== selectedLesson?.subject;
-
-                  if (isCollapsed) {
-                    return (
-                      <th key={subject} className="w-16 min-w-[70px] max-w-[70px] px-2 py-3 text-center align-top font-semibold border-l border-palette-sage/20 bg-palette-mist/40">
-                        <span className="block text-[11px] text-palette-moss leading-tight truncate" title={subject}>
-                          {getLessonLabel(classFilter, subject)}
-                        </span>
-                        <span className="block text-[9px] text-palette-lichen font-bold mt-1 uppercase select-none">
-                          Locked
-                        </span>
-                      </th>
-                    );
-                  }
-
-                  return (
-                    <th key={subject} className="min-w-64 px-4 py-3 align-top font-semibold border-l border-palette-sage/20">
-                      <span className="block">{getLessonLabel(classFilter, subject)}</span>
-                      {canEditAttendance && canEditTopic ? (
-                        <div className="mt-2">
-                          {isEditingTopic ? (
-                            <div className="flex gap-2">
-                              <input
-                                type="text"
-                                value={getLessonTopicDraftValue(subject)}
-                                onChange={(event) => updateLessonTopicDraft(subject, event.target.value)}
-                                placeholder="Lesson topic..."
-                                className="h-9 min-w-0 flex-1 rounded-md border border-palette-lichen/60 bg-white px-2 text-xs font-semibold text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:ring-2 focus:ring-palette-leaf/20"
-                              />
-                              <button
-                                type="button"
-                                onClick={() => {
-                                  void saveLessonTopic(subject);
-                                }}
-                                className="h-9 rounded-md bg-palette-fern px-3 text-xs font-black text-white transition hover:bg-palette-leaf"
-                              >
-                                Save
-                              </button>
-                            </div>
-                          ) : (
-                            <div className="flex min-h-9 items-center gap-2">
-                              <span
-                                className="min-w-0 flex-1 truncate text-xs font-medium text-palette-moss"
-                                title={savedTopic || 'No topic'}
-                              >
-                                {savedTopic || 'No topic'}
-                              </span>
-                              <button
-                                type="button"
-                                onClick={() => editLessonTopic(subject)}
-                                className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-palette-moss transition hover:bg-palette-sage/15 hover:text-palette-pine"
-                                aria-label={`Edit topic for ${subject}`}
-                                title="Edit topic"
-                              >
-                                <span className="material-symbols-outlined text-sm">edit</span>
-                              </button>
-                            </div>
-                          )}
+                        <div>
+                          <p className="font-bold text-palette-pine text-sm">{student.name}</p>
+                          <p className="text-[10px] text-palette-moss font-semibold">{student.className}</p>
                         </div>
-                      ) : (
-                        <span className="mt-1 block max-w-56 truncate text-xs font-semibold text-palette-moss italic bg-white/50 px-2 py-1.5 rounded border border-palette-sage/10 mt-2">
-                          {savedTopic || 'No topic registered'}
-                        </span>
-                      )}
-                    </th>
-                  );
-                })}
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-palette-lichen/35 text-palette-moss">
-              {studentsToShow.map((student, studentIndex) => (
-                <tr key={student.id} className="hover:bg-palette-sage/10">
-                  <td className="px-4 py-3 font-medium text-palette-pine">{student.name}</td>
-                  <td className="px-4 py-3">{student.className}</td>
-                  
-                  {subjectsToShow.map((subject, subjectIndex) => {
-                    const status = student.attendance[subject] ?? 'present'; 
-                    const absenceReason = absenceReasons[getAbsenceKey(student.id, subject)];
-                    const statusMeta = getStatusMeta(status, absenceReason);
-                    const controlIndex = studentIndex * subjectsToShow.length + subjectIndex;
-                    const absentTitle =
-                      status === 'absent'
-                        ? absenceReason
-                          ? absenceReason
-                          : 'No reason provided'
-                        : undefined;
-                    
-                    const isCollapsed = isFocusedLog && subject !== selectedLesson?.subject;
+                      </div>
+                    </td>
 
-                    // Collapsed cell for locked subjects in concentrated log mode
-                    if (isCollapsed) {
-                      const absenceStatus = getAbsenceStatus(absenceReason);
+                    {subjectsToShow.map((subject, subjectIdx) => {
+                      const controlIndex = studentIdx * subjectsToShow.length + subjectIdx;
+                      const { status, absenceStatus, absenceReason } = getStatusMeta(student, subject, absenceReasons, getAbsenceKey);
+                      const controlKey = getAttendanceControlKey(student.id, subject);
+
                       return (
-                        <td key={subject} className="w-16 min-w-[70px] max-w-[70px] px-2 py-3 text-center border-l border-palette-sage/10 bg-palette-mist/20">
-                          <span
-                            title={status === 'absent' ? (absenceReason || 'Absent') : 'Present'}
-                            className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-extrabold select-none ${
-                              status === 'present'
-                                ? 'bg-palette-sage/20 text-palette-leaf'
-                                : absenceStatus === 'Late'
-                                ? 'bg-orange-100 text-orange-700'
-                                : absenceStatus === 'Excused absence'
-                                ? 'bg-blue-100 text-blue-700'
-                                : 'bg-red-100 text-red-700'
-                            }`}
+                        <td key={subject} className="p-3 border-l border-palette-sage/20 align-middle text-center">
+                          <div
+                            ref={(el) => { attendanceControlRefs.current[controlKey] = el; }}
+                            tabIndex={canEditAttendance ? 0 : -1}
+                            onKeyDown={(e) => handleAttendanceControlKeyDown(e, student, subject, status, controlIndex)}
+                            className="focus:outline-none focus:ring-2 focus:ring-blue-400 focus:ring-offset-1 rounded-xl"
                           >
-                            {status === 'present'
-                              ? '✓'
-                              : absenceStatus === 'Late'
-                              ? 'L'
-                              : absenceStatus === 'Excused absence'
-                              ? 'E'
-                              : 'A'
-                            }
-                          </span>
+                            {canEditAttendance ? (
+                              <div className="flex flex-col gap-2">
+                                <div className="flex justify-center gap-1">
+                                  {(['present', 'absent'] as AttendanceStatus[]).map((s) => (
+                                    <button
+                                      key={s}
+                                      onClick={() => handleAttendanceStatusClick(student, subject, s)}
+                                      className={`px-3 py-1.5 text-[10px] font-black rounded-lg border transition ${getStatusButtonClassName(s, status)}`}
+                                    >
+                                      {STATUS_LABELS[s]}
+                                    </button>
+                                  ))}
+                                </div>
+                                {status === 'absent' && (
+                                  <div className="flex flex-col items-center gap-1">
+                                    {absenceStatus && (
+                                      <span className={`text-[9px] font-black px-1.5 py-0.5 rounded border ${ABSENCE_STATUS_CLASS_NAMES[absenceStatus] ?? 'bg-gray-100 text-gray-700 border-gray-200'}`}>
+                                        {ABSENCE_STATUS_LABELS[absenceStatus]}
+                                      </span>
+                                    )}
+                                    <button
+                                      onClick={() => setPendingAbsence({ studentId: student.id, studentName: student.name, subject })}
+                                      className="text-[9px] text-gray-400 hover:text-gray-700 font-semibold underline"
+                                    >
+                                      {absenceReason ? 'Edit reason' : 'Add reason'}
+                                    </button>
+                                  </div>
+                                )}
+                              </div>
+                            ) : (
+                              <span className={`text-xs font-bold px-2 py-1 rounded-lg ${status === 'absent' ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                {STATUS_LABELS[status]}
+                              </span>
+                            )}
+                          </div>
                         </td>
                       );
-                    }
-
-                    return (
-                      <td key={subject} className="px-4 py-3 border-l border-palette-sage/10">
-                        {canEditAttendance ? (
-                          <div
-                            ref={(element) => {
-                              attendanceControlRefs.current[getAttendanceControlKey(student.id, subject)] = element;
-                            }}
-                            role="group"
-                            tabIndex={0}
-                            onKeyDown={(event) =>
-                              handleAttendanceControlKeyDown(event, student, subject, status, controlIndex)
-                            }
-                            aria-label={`${student.name}, ${subject}: ${STATUS_LABELS[status]}`}
-                            className="inline-flex rounded-md border border-palette-lichen/60 bg-palette-mist p-1 outline-none transition focus:ring-2 focus:ring-palette-leaf/35"
-                          >
-                            {(['present', 'absent'] as const).map((option) => {
-                              const optionMeta = getStatusMeta(option, option === 'absent' ? absenceReason : undefined);
-                              const isSelectedOption = option === status;
-
-                              return (
-                                <button
-                                  key={option}
-                                  type="button"
-                                  tabIndex={-1}
-                                  onClick={() => handleAttendanceStatusClick(student, subject, option)}
-                                  className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded px-3 py-1 text-xs font-semibold transition ${getStatusButtonClassName(
-                                    option,
-                                    status,
-                                    option === 'absent' ? absenceReason : undefined,
-                                  )}`}
-                                  title={option === 'absent' ? absentTitle : undefined}
-                                  aria-label={`Mark ${student.name} as ${STATUS_LABELS[option]} for ${subject}`}
-                                >
-                                  {isSelectedOption && optionMeta.showWarningIcon && (
-                                    <WarningIcon className={optionMeta.warningIconClassName} />
-                                  )}
-                                  <span>{isSelectedOption ? optionMeta.label : STATUS_LABELS[option]}</span>
-                                </button>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <span
-                            title={absentTitle}
-                            className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${statusMeta.className}`}
-                          >
-                            {statusMeta.showWarningIcon && (
-                              <WarningIcon className={statusMeta.warningIconClassName} />
-                            )}
-                            <span>{statusMeta.label}</span>
-                          </span>
-                        )}
-                      </td>
-                    );
-                  })}
-                </tr>
-              ))}
+                    })}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
-        </div>
-      </section>
+        )}
+      </div>
 
-      <AttendancePopUp
-        isOpen={pendingAbsence !== null}
-        studentName={pendingAbsence?.studentName ?? ''}
-        subjectLabel={pendingAbsence ? getLessonLabel(classFilter, pendingAbsence.subject) : ''}
-        dateLabel={selectedDateLabel}
-        initialReason={
-          pendingAbsence ? absenceReasons[getAbsenceKey(pendingAbsence.studentId, pendingAbsence.subject)] : ''
-        }
-        onConfirm={confirmAbsence}
-        onClose={() => setPendingAbsence(null)}
-      />
+      {/* Absence reason modal */}
+      {pendingAbsence && (
+        <div
+          className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-50 p-4"
+          onClick={() => setPendingAbsence(null)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-sm shadow-2xl border border-palette-mist animate-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <h2 className="text-xl font-bold text-palette-pine mb-1">Mark Absent</h2>
+            <p className="text-sm text-palette-moss mb-4">
+              <strong>{pendingAbsence.studentName}</strong> · {getLessonLabel(classFilter, pendingAbsence.subject)}
+            </p>
+
+            <div className="space-y-2 mb-4">
+              {Object.entries(ABSENCE_STATUS_LABELS).map(([key, label]) => (
+                <button
+                  key={key}
+                  onClick={() => confirmAbsence(`${key}: `)}
+                  className={`w-full text-left px-4 py-2.5 rounded-xl border font-semibold text-sm transition ${ABSENCE_STATUS_CLASS_NAMES[key] ?? ''} hover:opacity-80`}
+                >
+                  {label}
+                </button>
+              ))}
+            </div>
+
+            <div className="border-t pt-4 space-y-2">
+              <label className="text-xs font-bold text-palette-pine uppercase tracking-wider">Custom reason</label>
+              <div className="flex gap-2">
+                <input
+                  id="absence-reason-input"
+                  type="text"
+                  placeholder="e.g. Doctor's appointment…"
+                  defaultValue={absenceReasons[getAbsenceKey(pendingAbsence.studentId, pendingAbsence.subject)]?.split(': ').slice(1).join(': ') ?? ''}
+                  className="flex-1 border border-gray-200 rounded-xl px-3 py-2 text-sm outline-none focus:ring-2 focus:ring-palette-meadow"
+                />
+                <button
+                  onClick={() => {
+                    const input = document.getElementById('absence-reason-input') as HTMLInputElement;
+                    confirmAbsence(`Unexcused absence: ${input.value.trim() || '–'}`);
+                  }}
+                  className="px-4 py-2 bg-red-500 text-white font-bold rounded-xl hover:bg-red-600 transition text-sm"
+                >
+                  Confirm
+                </button>
+              </div>
+            </div>
+
+            <button onClick={() => setPendingAbsence(null)} className="mt-4 w-full text-sm text-gray-400 hover:text-gray-600 font-semibold transition">
+              Cancel
+            </button>
+          </div>
+        </div>
+      )}
     </div>
   );
 };

@@ -1,6 +1,3 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
 generator client {
   provider = "prisma-client-js"
 }
@@ -33,22 +30,21 @@ model User {
   classes    Class[]
   timeTables TimeTable[]
 
-  // Messaging relations
   sentMessages     Message[] @relation("SentMessages")
   receivedMessages Message[] @relation("ReceivedMessages")
 
-  // Parent-child relationship
   parentId Int?
   parent   User?  @relation("ParentChild", fields: [parentId], references: [id])
   children User[] @relation("ParentChild")
 
-  // Other relations
   events   Event[]
   subjects Subject[]
-  groups   Group[]       @relation("GroupStudents")
+  groups   Group[]  @relation("GroupStudents")
 
   attendances  Attendance[]  @relation("StudentAttendance")
   absenceNotes AbsenceNote[] @relation("StudentAbsenceNotes")
+
+  taughtClass Class? @relation("ClassTeacher")
 }
 
 model Subject {
@@ -96,25 +92,28 @@ model Attendance {
   subject       Subject       @relation("AttendanceSubject", fields: [subjectId], references: [id])
   classId       Int
   class         Class         @relation("AttendanceClass", fields: [classId], references: [id])
+  periodNumber  Int           @default(0)
   status        String
+  absenceType   String?
   absenceReason String?
   createdAt     DateTime      @default(now())
   absenceNotes  AbsenceNote[]
 
-  @@unique([date, studentId, subjectId])
+  @@unique([date, studentId, subjectId, periodNumber])
 }
 
 model LessonTopic {
-  id        Int      @id @default(autoincrement())
-  date      DateTime
-  classId   Int
-  class     Class    @relation("LessonTopicClass", fields: [classId], references: [id])
-  subjectId Int
-  subject   Subject  @relation("LessonTopicSubject", fields: [subjectId], references: [id])
-  topic     String
-  createdAt DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  date         DateTime
+  classId      Int
+  class        Class    @relation("LessonTopicClass", fields: [classId], references: [id])
+  subjectId    Int
+  subject      Subject  @relation("LessonTopicSubject", fields: [subjectId], references: [id])
+  periodNumber Int      @default(0)
+  topic        String
+  createdAt    DateTime @default(now())
 
-  @@unique([date, classId, subjectId])
+  @@unique([date, classId, subjectId, periodNumber])
 }
 
 model AbsenceNote {
@@ -143,22 +142,25 @@ model Class {
   attendances  Attendance[]  @relation("AttendanceClass")
   lessonTopics LessonTopic[] @relation("LessonTopicClass")
   groups       Group[]
+
+  classTeacherId Int?  @unique
+  classTeacher   User? @relation("ClassTeacher", fields: [classTeacherId], references: [id])
 }
 
 model TimeTable {
-  id           Int     @id @default(autoincrement())
-  day          String
-  week         String
-  startTime    String
-  endTime      String
-  periodNumber Int
-  roomId       Int
-  room         Room    @relation(fields: [roomId], references: [id])
-  group        String  @default("Whole Class")
-  isPermanent  Boolean @default(true)
+  id            Int     @id @default(autoincrement())
+  day           String
+  week          String
+  startTime     String
+  endTime       String
+  periodNumber  Int
+  roomId        Int
+  room          Room    @relation(fields: [roomId], references: [id])
+  group         String  @default("Whole Class")
+  isPermanent   Boolean @default(true)
   exceptionDate String?
-  status       String  @default("active")
-  templateId   Int?
+  status        String  @default("active")
+  templateId    Int?
 
   subjectId Int
   subject   Subject @relation(fields: [subjectId], references: [id])
@@ -188,7 +190,7 @@ model Message {
   senderId    Int
   recipientId Int
   body        String
-  subject   String  @default("")
+  subject     String   @default("")
   createdAt   DateTime @default(now())
   read        Boolean  @default(false)
 
@@ -197,11 +199,11 @@ model Message {
 }
 
 model Group {
-  id        Int     @id @default(autoincrement())
-  name      String
-  classId   Int
-  class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
-  students  User[]  @relation("GroupStudents")
+  id       Int    @id @default(autoincrement())
+  name     String
+  classId  Int
+  class    Class  @relation(fields: [classId], references: [id], onDelete: Cascade)
+  students User[] @relation("GroupStudents")
 }
 
 model Period {
