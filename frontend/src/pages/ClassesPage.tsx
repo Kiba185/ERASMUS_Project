@@ -155,7 +155,7 @@ const ClassesPage: React.FC = () => {
     setSelectedHeadTeacherId(null);
     setGroups([]);
     setIsModalOpen(true);
-    
+
   };
 
   const openEditModal = (cls: UIClass) => {
@@ -184,9 +184,9 @@ const ClassesPage: React.FC = () => {
         classes.map((c) =>
           c.id === editingClass.id
             ? {
-                ...c,
-                groups,
-              }
+              ...c,
+              groups,
+            }
             : c
         )
       );
@@ -208,12 +208,12 @@ const ClassesPage: React.FC = () => {
         const savedClass = await res.json();
         const classId = savedClass.id;
         for (const ng of groups) {
-            await fetch(`${API_URL}/api/classes/${classId}/groups`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ name: ng.name, studentIds: ng.studentIds })
-            });
+          await fetch(`${API_URL}/api/classes/${classId}/groups`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ name: ng.name, studentIds: ng.studentIds })
+          });
         }
       } else if (editingClass) {
         // PUT
@@ -224,7 +224,7 @@ const ClassesPage: React.FC = () => {
           body: JSON.stringify(payload),
         });
         if (!res.ok) throw new Error('Failed to update class');
-        
+
         const classId = editingClass.id;
         const oldGroups = editingClass.groups || [];
         const newGroups = groups;
@@ -283,17 +283,17 @@ const ClassesPage: React.FC = () => {
   };
 
   const addGroup = () => {
-  if (!newGroupName.trim()) return;
+    if (!newGroupName.trim()) return;
 
-  const newGroup: Group = {
-    id: Date.now(),
-    name: newGroupName,
-    studentIds: [],
+    const newGroup: Group = {
+      id: Date.now(),
+      name: newGroupName,
+      studentIds: [],
+    };
+
+    setGroups([...groups, newGroup]);
+    setNewGroupName('');
   };
-
-  setGroups([...groups, newGroup]);
-  setNewGroupName('');
-};
 
   const getTeacherName = (id: number | null) => {
     if (!id) return 'No head teacher';
@@ -301,26 +301,41 @@ const ClassesPage: React.FC = () => {
     return t ? t.name : 'Unknown';
   };
 
-  // --- RENDER ---
-  if (loading) {
-    return (
-      <div className="p-8 flex items-center justify-center min-h-[50vh]">
-        <LoadingSpinner />
-      </div>
-    );
-  }
+  if (loading) return (
+    <div className="flex items-center justify-center gap-3 p-12 text-palette-pine font-bold text-lg">
+      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      </svg>
+      Loading classes...
+    </div>
+  );
 
-  if (error) {
-    return (
-      <div className="p-8 text-red-600 font-bold">
-        Error: {error}
-        <button onClick={fetchData} className="ml-4 underline text-palette-fern">Retry</button>
-      </div>
-    );
-  }
+  if (error) return (
+    <div className="p-8 text-center space-y-4">
+      <p className="text-red-600 font-bold">{error}</p>
+      <button onClick={fetchData} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl hover:bg-palette-leaf transition">
+        Retry
+      </button>
+    </div>
+  );
 
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
+
+      // Make this above all other elements with a portal, so it covers the entire screen
+      
+      
+      {saving && createPortal(
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-[1000]">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-palette-pine font-bold text-lg">Saving...</p>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* Header */}
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
         <div>
@@ -419,7 +434,7 @@ const ClassesPage: React.FC = () => {
       {/* MODAL */}
       {isModalOpen &&
         createPortal(
-          <div className="fixed inset-0 z-[99999] flex items-center justify-center overflow-y-auto bg-palette-sage/45 px-4 py-6 backdrop-blur-[1px]">
+          <div className="fixed inset-0 z-[999] flex items-center justify-center overflow-y-auto bg-palette-sage/45 px-4 py-6 backdrop-blur-[1px]">
             <div className="bg-white rounded-2xl shadow-2xl w-full max-w-3xl max-h-[90vh] flex flex-col overflow-hidden border border-palette-mist">
               <div className="px-6 py-5 border-b border-gray-100 flex justify-between items-center bg-palette-mist/30">
                 <h2 className="text-2xl font-bold text-palette-pine">
@@ -497,15 +512,15 @@ const ClassesPage: React.FC = () => {
                               <label
                                 key={student.id}
                                 className={`flex items-center p-3 rounded-lg border cursor-pointer transition-all ${isSelected
-                                    ? 'bg-palette-mist border-palette-sage shadow-sm'
-                                    : 'bg-white border-transparent hover:border-gray-200 hover:bg-gray-50'
+                                  ? 'bg-palette-mist border-palette-sage shadow-sm'
+                                  : 'bg-white border-transparent hover:border-gray-200 hover:bg-gray-50'
                                   }`}
                               >
                                 <div className="flex-shrink-0 mr-3">
                                   <div
                                     className={`w-5 h-5 rounded flex items-center justify-center border transition-colors ${isSelected
-                                        ? 'bg-palette-fern border-palette-fern text-white'
-                                        : 'border-gray-300 bg-white'
+                                      ? 'bg-palette-fern border-palette-fern text-white'
+                                      : 'border-gray-300 bg-white'
                                       }`}
                                   >
                                     {isSelected && (
@@ -529,11 +544,10 @@ const ClassesPage: React.FC = () => {
                                 </div>
                                 <div className="flex flex-col">
                                   <span
-                                    className={`text-sm font-bold ${
-                                      isSelected
+                                    className={`text-sm font-bold ${isSelected
                                         ? 'text-palette-pine'
                                         : 'text-gray-800'
-                                    }`}
+                                      }`}
                                   >
                                     {student.name}
                                   </span>
@@ -661,8 +675,8 @@ const ClassesPage: React.FC = () => {
                                               studentIds: e.target.checked
                                                 ? [...g.studentIds, studentId]
                                                 : g.studentIds.filter(
-                                                    (id) => id !== studentId
-                                                  ),
+                                                  (id) => id !== studentId
+                                                ),
                                             };
                                           })
                                         );
