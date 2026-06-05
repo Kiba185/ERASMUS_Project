@@ -27,6 +27,63 @@ router.get('/api/admin/users', async (req, res, next) => {
     res.json(saveUsers);
 });
 
+// CREATE USER - ADMIN ONLY
+router.post('/api/admin/users', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const { firstName, lastName, birthday, username, password, email, phone, adress, role, classId } = req.body;
+
+    if (!username || !password) {
+        return res.status(400).json({ success: false, message: 'Username and password are required' });
+    }
+
+    if (phone && !isValidPhone(phone)) {
+        return res.status(400).json({ success: false, message: 'Phone number must contain only digits' });
+    }
+
+    if (await prisma.user.findFirst({ where: { username } })) {
+        return res.status(400).json({ success: false, message: 'Username already exists' });
+    }
+
+    const hashedPassword = await bcrypt.hash(password, 10);
+
+    const newUser = await prisma.user.create({
+        data: {
+            firstName, lastName,
+            birthday: new Date(birthday),
+            username, email, phone, adress,
+            role: role ?? 'student',
+            password: hashedPassword,
+            ...(classId && {
+                classes: { connect: { id: Number(classId) } }
+            })
+        }
+    });
+
+    const { password: _, ...saveUser } = newUser;
+    res.status(201).json({ success: true, user: saveUser });
+});
+
+// LOGIN AS - ADMIN ONLY
+router.post('/api/admin/loginas/:id', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const userId = parseInt(req.params.id);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
+    
+    if (!user) {
+        return res.status(404).json({ success: false, message: 'User not found' });
+    }
+
+    // Přepíše session na tohoto uživatele
+    req.session.userId = userId;
+    req.session.save((err) => {
+        if (err) return res.status(500).json({ success: false });
+        const { password: _, ...safeUser } = user;
+        res.json({ success: true, user: safeUser });
+    });
+});
+
 
 // UPDATE USER - ADMIN ONLY
 router.put('/api/admin/users/:id', async (req, res, next) => {
@@ -66,44 +123,85 @@ router.put('/api/admin/users/:id', async (req, res, next) => {
     res.json({ success: true, user: saveUser });
 });
 
-
-// CREATE USER - ADMIN ONLY
-router.post('/api/admin/users', async (req, res, next) => {
+// CHANGE PASSWORD - ADMIN ONLY
+router.put('/api/admin/users/:id/password', async (req, res, next) => {
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
-    const { firstName, lastName, birthday, username, password, email, phone, adress, role, classId } = req.body;
+    const userId = parseInt(req.params.id);
+    const { newPassword } = req.body;
 
-    if (!username || !password) {
-        return res.status(400).json({ success: false, message: 'Username and password are required' });
+    if (!newPassword) {
+        return res.status(400).json({ success: false, message: 'Password is required' });
     }
 
-    if (phone && !isValidPhone(phone)) {
-        return res.status(400).json({ success: false, message: 'Phone number must contain only digits' });
-    }
-
-    if (await prisma.user.findFirst({ where: { username } })) {
-        return res.status(400).json({ success: false, message: 'Username already exists' });
-    }
-
-    const hashedPassword = await bcrypt.hash(password, 10);
-
-    const newUser = await prisma.user.create({
-        data: {
-            firstName, lastName,
-            birthday: new Date(birthday),
-            username, email, phone, adress,
-            role: role ?? 'student',
-            password: hashedPassword,
-            ...(classId && {
-                classes: { connect: { id: Number(classId) } }
-            })
-        }
+    const hashed = await bcrypt.hash(newPassword, 10);
+    await prisma.user.update({
+        where: { id: userId },
+        data: { password: hashed }
     });
 
-    const { password: _, ...saveUser } = newUser;
-    res.status(201).json({ success: true, user: saveUser });
+    res.json({ success: true, message: 'Password updated' });
 });
 
+// UPDATE USER CLASS - ADMIN ONLY
+router.put('/api/admin/users/:id/classes', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const userId = parseInt(req.params.id);
+    const { classId } = req.body;
+
+    await prisma.user.update({
+        where: { id: userId },
+        data: {
+            classes: classId
+                ? { set: [{ id: Number(classId) }] }
+                : { set: [] }
+        },
+        include: { classes: true }
+    });
+
+    res.json({ success: true, message: 'Class updated' });
+});
+
+// UPDATE TEACHER SUBJECTS - ADMIN ONLY
+router.put('/api/admin/users/:id/subjects', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const userId = parseInt(req.params.id);
+    const { subjectIds } = req.body;
+
+    const result = await prisma.user.update({
+        where: { id: userId },
+        data: {
+            subjects: {
+                set: subjectIds.map((id: number) => ({ id }))
+            }
+        },
+        include: { subjects: true }
+    });
+
+    res.json({ success: true, subjects: result.subjects });
+});
+
+// ASSIGN CHILDREN TO PARENT - ADMIN ONLY
+router.put('/api/admin/users/:id/children', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) { return; }
+
+    const userId = parseInt(req.params.id);
+    const { childrenIds } = req.body;
+
+    const result = await prisma.user.update({
+        where: { id: userId },
+        data: {
+            children: {
+                set: (childrenIds ?? []).map((id: number) => ({ id }))
+            }
+        },
+        include: { children: true }
+    });
+
+    res.json({ success: true, children: result.children });
+});
 
 // DELETE USER - ADMIN ONLY
 router.delete('/api/admin/users/:id', async (req, res, next) => {
@@ -133,49 +231,6 @@ router.delete('/api/admin/users/:id', async (req, res, next) => {
     }
 });
 
-
-// CHANGE PASSWORD - ADMIN ONLY
-router.put('/api/admin/users/:id/password', async (req, res, next) => {
-    if (await requireAuth(req, res, next, 10) !== true) { return; }
-
-    const userId = parseInt(req.params.id);
-    const { newPassword } = req.body;
-
-    if (!newPassword) {
-        return res.status(400).json({ success: false, message: 'Password is required' });
-    }
-
-    const hashed = await bcrypt.hash(newPassword, 10);
-    await prisma.user.update({
-        where: { id: userId },
-        data: { password: hashed }
-    });
-
-    res.json({ success: true, message: 'Password updated' });
-});
-
-
-// UPDATE USER CLASS - ADMIN ONLY
-router.put('/api/admin/users/:id/classes', async (req, res, next) => {
-    if (await requireAuth(req, res, next, 10) !== true) { return; }
-
-    const userId = parseInt(req.params.id);
-    const { classId } = req.body;
-
-    await prisma.user.update({
-        where: { id: userId },
-        data: {
-            classes: classId
-                ? { set: [{ id: Number(classId) }] }
-                : { set: [] }
-        },
-        include: { classes: true }
-    });
-
-    res.json({ success: true, message: 'Class updated' });
-});
-
-
 // REMOVE USER FROM CLASS - ADMIN ONLY
 router.delete('/api/admin/users/:id/classes/:classId', async (req, res, next) => {
     if (await requireAuth(req, res, next, 10) !== true) { return; }
@@ -189,69 +244,6 @@ router.delete('/api/admin/users/:id/classes/:classId', async (req, res, next) =>
     });
 
     res.json({ success: true, message: 'User removed from class' });
-});
-
-
-// UPDATE TEACHER SUBJECTS - ADMIN ONLY
-router.put('/api/admin/users/:id/subjects', async (req, res, next) => {
-    if (await requireAuth(req, res, next, 10) !== true) { return; }
-
-    const userId = parseInt(req.params.id);
-    const { subjectIds } = req.body;
-
-    const result = await prisma.user.update({
-        where: { id: userId },
-        data: {
-            subjects: {
-                set: subjectIds.map((id: number) => ({ id }))
-            }
-        },
-        include: { subjects: true }
-    });
-
-    res.json({ success: true, subjects: result.subjects });
-});
-
-
-// ASSIGN CHILDREN TO PARENT - ADMIN ONLY
-router.put('/api/admin/users/:id/children', async (req, res, next) => {
-    if (await requireAuth(req, res, next, 10) !== true) { return; }
-
-    const userId = parseInt(req.params.id);
-    const { childrenIds } = req.body;
-
-    const result = await prisma.user.update({
-        where: { id: userId },
-        data: {
-            children: {
-                set: (childrenIds ?? []).map((id: number) => ({ id }))
-            }
-        },
-        include: { children: true }
-    });
-
-    res.json({ success: true, children: result.children });
-});
-
-
-// LOGIN AS - ADMIN ONLY
-router.post('/api/admin/loginas/:id', async (req, res, next) => {
-    if (await requireAuth(req, res, next, 10) !== true) { return; }
-
-    const userId = parseInt(req.params.id);
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    
-    if (!user) {
-        return res.status(404).json({ success: false, message: 'User not found' });
-    }
-
-    // Přepíše session na tohoto uživatele
-    req.session.userId = userId;
-    req.session.save((err) => {
-        if (err) return res.status(500).json({ success: false });
-        const { password: _, ...safeUser } = user;
-        res.json({ success: true, user: safeUser });
-    });
 });
 
 export default router;
