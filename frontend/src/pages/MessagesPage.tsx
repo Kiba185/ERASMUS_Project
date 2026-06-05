@@ -218,6 +218,17 @@ const MessagesPage: React.FC = () => {
     }
   };
 
+    const handleViewMessage = (msg: Message) => {
+    setViewingMessage(msg);
+  };
+
+  const handleReplyFromView = () => {
+    if (viewingMessage) {
+      handleReply(viewingMessage);
+      setViewingMessage(null);
+    }
+  };
+
   const toggleExpand = (id: number) => {
     setExpandedMessageId(prev => prev === id ? null : id);
   };

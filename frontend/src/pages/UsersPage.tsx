@@ -46,6 +46,7 @@ const UsersPage: React.FC = () => {
   const [subjects,    setSubjects]    = useState<MockSubject[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [saving,      setSaving]      = useState(false);
+  const [savingLabel, setSavingLabel] = useState('Saving...');
   const [error,       setError]       = useState<string | null>(null);
 
   const [search,      setSearch]      = useState('');
