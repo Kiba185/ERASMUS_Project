@@ -22,7 +22,6 @@ const privileges = {
 };
 
 
-
 app.use(cors({
   origin: (origin, callback) => {
     if (!origin) return callback(null, true);

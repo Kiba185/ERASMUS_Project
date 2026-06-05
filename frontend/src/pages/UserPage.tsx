@@ -2,6 +2,7 @@ import API_URL from '../config/config.tsx';
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { useNavigate } from 'react-router-dom';
+import { createPortal } from 'react-dom';
 
 interface UserInfoRowProps {
     label: string;
@@ -55,7 +56,10 @@ const UserPage: React.FC = () => {
     const [savingProfile, setSavingProfile] = useState(false);
     const [savingPassword, setSavingPassword] = useState(false);
 
-    useEffect(() => {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const fetchProfile = async () => {
         if (user) {
             setFormData({
                 firstName: user.firstName || '',
@@ -66,9 +70,21 @@ const UserPage: React.FC = () => {
                 adress: user.adress || '',
             });
         }
+    }
+
+    useEffect(() => {
+        if (user) {
+            fetchProfile().then(() => setLoading(false)).catch(err => {
+                setError(err.message);
+                setLoading(false);
+            });
+        } else {
+            setLoading(false);
+        }
     }, [user]);
 
     if (!user) {
+        setLoading(false);
         return (
             <div className="p-8 text-center">
                 <h1 className="text-2xl font-bold text-gray-700">User not found</h1>
@@ -109,6 +125,7 @@ const UserPage: React.FC = () => {
             setMessage({ type: 'success', text: 'Profile updated successfully!' });
             setIsEditing(false);
         } catch (err: any) {
+            setError(err.message);
             setMessage({ type: 'error', text: err.message });
         } finally {
             setSavingProfile(false);
@@ -155,8 +172,38 @@ const UserPage: React.FC = () => {
         return `${parts[2]}.${parts[1]}.${parts[0]}`;
     };
 
+    if (loading) return (
+        <div className="flex items-center justify-center gap-3 p-12 text-palette-pine font-bold text-lg">
+            <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            </svg>
+            Loading profile...
+        </div>
+    );
+
+    if (error) return (
+        <div className="p-8 text-center space-y-4">
+            <p className="text-red-600 font-bold">{error}</p>
+            <button onClick={fetchProfile} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl hover:bg-palette-leaf transition">
+                Retry
+            </button>
+        </div>
+    );
+
     return (
         <div className="p-4 md:p-8 max-w-4xl mx-auto space-y-8">
+
+            {savingPassword && createPortal(
+                <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-50">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+                        <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin"></div>
+                        <p className="text-palette-pine font-bold text-lg">Saving...</p>
+                    </div>
+                </div>,
+                document.body
+            )}
+
             <div className="flex justify-between items-center">
                 <h1 className="text-3xl font-bold text-palette-pine">User Profile</h1>
                 <button
@@ -195,13 +242,13 @@ const UserPage: React.FC = () => {
                 <form onSubmit={handleProfileSubmit}>
                     <div className="border-t border-gray-200">
                         <dl className="divide-y divide-gray-200">
-                            <UserInfoRow label="First Name"    value={formData.firstName} name="firstName" isEditing={isEditing} inputValue={formData.firstName} onChange={handleFormChange} />
-                            <UserInfoRow label="Last Name"     value={formData.lastName}  name="lastName"  isEditing={isEditing} inputValue={formData.lastName}  onChange={handleFormChange} />
-                            <UserInfoRow label="Email Address" value={formData.email}     name="email"     isEditing={isEditing} inputValue={formData.email}     onChange={handleFormChange} type="email" />
+                            <UserInfoRow label="First Name" value={formData.firstName} name="firstName" isEditing={isEditing} inputValue={formData.firstName} onChange={handleFormChange} />
+                            <UserInfoRow label="Last Name" value={formData.lastName} name="lastName" isEditing={isEditing} inputValue={formData.lastName} onChange={handleFormChange} />
+                            <UserInfoRow label="Email Address" value={formData.email} name="email" isEditing={isEditing} inputValue={formData.email} onChange={handleFormChange} type="email" />
                             <UserInfoRow label="Date of Birth" value={formatDisplayDate(formData.birthday)} name="birthday" isEditing={isEditing} inputValue={formData.birthday} onChange={handleFormChange} type="date" />
-                            <UserInfoRow label="Phone Number"  value={formData.phone}     name="phone"     isEditing={isEditing} inputValue={formData.phone}     onChange={handleFormChange} type="tel" />
-                            <UserInfoRow label="Address"       value={formData.adress}    name="adress"    isEditing={isEditing} inputValue={formData.adress}    onChange={handleFormChange} />
-                            <UserInfoRow label="Role"    value={user.role} />
+                            <UserInfoRow label="Phone Number" value={formData.phone} name="phone" isEditing={isEditing} inputValue={formData.phone} onChange={handleFormChange} type="tel" />
+                            <UserInfoRow label="Address" value={formData.adress} name="adress" isEditing={isEditing} inputValue={formData.adress} onChange={handleFormChange} />
+                            <UserInfoRow label="Role" value={user.role} />
                             <UserInfoRow label="User ID" value={user.id} />
                         </dl>
                     </div>

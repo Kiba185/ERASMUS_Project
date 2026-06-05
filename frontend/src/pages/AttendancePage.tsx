@@ -36,23 +36,41 @@ interface PendingAbsence {
   subject: Subject;
 }
 
-interface LessonTopicPayload {
-  date: string;
-  className: string;
-  subject: string;
-  topic: string;
+interface Period {
+  id: number;
+  periodNumber: number;
+  startTime: string;
+  endTime: string;
 }
 
-const lessonTopicStorage = {
-  async load(filters: Pick<LessonTopicPayload, 'date' | 'className'>): Promise<LessonTopicPayload[]> {
-    void filters;
-    // TODO for database hookup: replace this with API/DB loading and return saved lesson topics.
-    return [];
-  },
-  async save(lessonTopic: LessonTopicPayload): Promise<LessonTopicPayload> {
-    // TODO for database hookup: replace this with API/DB saving and return the saved lesson topic.
-    return lessonTopic;
-  },
+const DEFAULT_PERIODS: Period[] = [
+  { id: 1, periodNumber: 1, startTime: '08:00', endTime: '08:45' },
+  { id: 2, periodNumber: 2, startTime: '08:55', endTime: '09:40' },
+  { id: 3, periodNumber: 3, startTime: '10:00', endTime: '10:45' },
+  { id: 4, periodNumber: 4, startTime: '10:55', endTime: '11:40' },
+  { id: 5, periodNumber: 5, startTime: '11:50', endTime: '12:35' },
+  { id: 6, periodNumber: 6, startTime: '12:45', endTime: '13:30' },
+];
+
+const DEFAULT_TEACHER_LESSONS = [
+  { id: 101, day: 'Monday', periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Maths' as Subject, class: '4.B' as ClassName, room: '101' },
+  { id: 102, day: 'Monday', periodNumber: 3, startTime: '10:00', endTime: '10:45', subject: 'Maths' as Subject, class: '4.D' as ClassName, room: '103' },
+  { id: 103, day: 'Tuesday', periodNumber: 2, startTime: '08:55', endTime: '09:40', subject: 'Maths' as Subject, class: '4.B' as ClassName, room: '101' },
+  { id: 104, day: 'Wednesday', periodNumber: 4, startTime: '10:55', endTime: '11:40', subject: 'Maths' as Subject, class: '4.D' as ClassName, room: '103' },
+  { id: 105, day: 'Thursday', periodNumber: 1, startTime: '08:00', endTime: '08:45', subject: 'Maths' as Subject, class: '4.B' as ClassName, room: '101' },
+  { id: 106, day: 'Thursday', periodNumber: 5, startTime: '11:50', endTime: '12:35', subject: 'Maths' as Subject, class: '4.D' as ClassName, room: '103' },
+  { id: 107, day: 'Friday', periodNumber: 2, startTime: '08:55', endTime: '09:40', subject: 'Maths' as Subject, class: '4.B' as ClassName, room: '101' },
+  { id: 108, day: 'Friday', periodNumber: 3, startTime: '10:00', endTime: '10:45', subject: 'Maths' as Subject, class: '4.D' as ClassName, room: '103' },
+];
+
+const DAYS_OF_WEEK = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'] as const;
+
+const DAY_LABELS: Record<string, string> = {
+  Monday: 'Monday',
+  Tuesday: 'Tuesday',
+  Wednesday: 'Wednesday',
+  Thursday: 'Thursday',
+  Friday: 'Friday',
 };
 
 const CLASS_SCHEDULES: Record<ClassName, Subject[]> = {
@@ -214,14 +232,53 @@ const getLessonTopicKeyForValues = (date: string, className: string, subject: st
 
 const getAttendanceControlKey = (studentId: string, subject: Subject) => `${studentId}-${subject}`;
 
+const parseTimeToMinutes = (timeStr: string): number => {
+  const [hours, minutes] = timeStr.split(':').map(Number);
+  return hours * 60 + minutes;
+};
+
+const getTeacherAssignedClass = (user: any): ClassName | null => {
+  if (!user || user.role !== 'teacher') return null;
+  const classesList = user.classes || user.user?.classes;
+  if (Array.isArray(classesList) && classesList.length > 0) {
+    const className = classesList[0].name;
+    const matched = CLASSES.find((c) => c === className);
+    if (matched) {
+      return matched;
+    }
+  }
+  // Fallback for mock/local development
+  return '4.B';
+};
+
 const AttendancePage = () => {
   const { user } = useAuth();
   const attendanceControlRefs = useRef<Record<string, HTMLDivElement | null>>({});
+  
+  // Navigation & View states
+  const [viewState, setViewState] = useState<'menu' | 'class_absence' | 'teacher_schedule' | 'log_lesson'>('menu');
+  const [selectedLesson, setSelectedLesson] = useState<{
+    class: ClassName;
+    subject: Subject;
+    periodNumber: number;
+    startTime: string;
+    endTime: string;
+  } | null>(null);
+  
+  // Timetables and periods configuration (Fully offline, no backend hooks)
+  const periodsToShow = DEFAULT_PERIODS;
+  const lessonsToShow = DEFAULT_TEACHER_LESSONS;
+  const [isDemoMode, setIsDemoMode] = useState(false);
+
+  // Classic filters
   const [dateFilter, setDateFilter] = useState(TODAY_DATE_VALUE);
   const [classFilter, setClassFilter] = useState<ClassName>(CLASSES[0]);
   const [subjectFilter, setSubjectFilter] = useState(ALL_FILTER_VALUE);
+  
   const [pendingAbsence, setPendingAbsence] = useState<PendingAbsence | null>(null);
   const [absenceReasons, setAbsenceReasons] = useState<Record<string, string>>({});
+  
+  // Local state for lesson topics & student attendance data
   const [lessonTopics, setLessonTopics] = useState<Record<string, string>>({});
   const [lessonTopicDrafts, setLessonTopicDrafts] = useState<Record<string, string>>({});
   const [editingLessonTopics, setEditingLessonTopics] = useState<Record<string, boolean>>({});
@@ -229,68 +286,85 @@ const AttendancePage = () => {
     [TODAY_DATE_VALUE]: loadMockAttendanceForDate(TODAY_DATE_VALUE),
   }));
 
-  const canEditAttendance = user?.role === 'teacher' || user?.role === 'admin';
+  // Resolve assigned class for the class teacher
+  const assignedClass = useMemo(() => getTeacherAssignedClass(user), [user]);
+
+  // Determine permissions
+  const isTeacher = user?.role === 'teacher';
+  const isAdmin = user?.role === 'admin';
+  const isStudentOrParent = user?.role === 'student' || user?.role === 'parent';
+
+  // Quick Action calculation
+  const activeLesson = useMemo(() => {
+    if (user?.role !== 'teacher') return null;
+    let now = new Date();
+    
+    if (isDemoMode) {
+      // Simulate Friday at 10:15 AM (inside Period 3)
+      const simulatedDate = new Date();
+      const currentDay = simulatedDate.getDay();
+      const distance = 5 - currentDay;
+      simulatedDate.setDate(simulatedDate.getDate() + distance);
+      simulatedDate.setHours(10, 15, 0, 0);
+      now = simulatedDate;
+    }
+
+    const currentDayIndex = now.getDay();
+    if (currentDayIndex === 0 || currentDayIndex === 6) return null; // Weekend
+
+    const DAYS = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const currentDayName = DAYS[currentDayIndex];
+    const currentMinutes = now.getHours() * 60 + now.getMinutes();
+
+    const activePeriod = periodsToShow.find((p) => {
+      const start = parseTimeToMinutes(p.startTime);
+      const end = parseTimeToMinutes(p.endTime);
+      return currentMinutes >= start && currentMinutes <= end;
+    });
+
+    if (!activePeriod) return null;
+
+    const matchedLesson = lessonsToShow.find(
+      (l) => l.day === currentDayName && l.periodNumber === activePeriod.periodNumber
+    );
+
+    if (matchedLesson) {
+      return {
+        ...matchedLesson,
+        period: activePeriod,
+      };
+    }
+    return null;
+  }, [user, lessonsToShow, periodsToShow, isDemoMode]);
+
+  // Dynamic values
+  const canEditAttendance = isAdmin || isTeacher;
+  
+  // Rules for Class Absence View: Class teachers can only edit absences, NOT topics. Admins can edit both.
+  // Rules for Log Lesson View: The logging teacher can edit both their subject's attendance and topic.
+  const canEditTopic = viewState === 'log_lesson' || isAdmin;
+
   const availableSubjects = CLASS_SCHEDULES[classFilter];
-  const activeSubjectFilter =
-    subjectFilter !== ALL_FILTER_VALUE && availableSubjects.includes(subjectFilter as Subject)
+
+  const activeSubjectFilter = useMemo(() => {
+    return subjectFilter !== ALL_FILTER_VALUE && availableSubjects.includes(subjectFilter as Subject)
       ? (subjectFilter as Subject)
       : ALL_FILTER_VALUE;
+  }, [subjectFilter, availableSubjects]);
+
+  // In log_lesson mode, force subjectsToShow to be all subjects of that class's day schedule, ignoring the filter
+  const subjectsToShow = useMemo(() => {
+    if (viewState === 'log_lesson') {
+      return availableSubjects;
+    }
+    return activeSubjectFilter === ALL_FILTER_VALUE ? availableSubjects : [activeSubjectFilter];
+  }, [viewState, activeSubjectFilter, availableSubjects]);
+
   const students = useMemo(
     () => studentsByDate[dateFilter] ?? loadMockAttendanceForDate(dateFilter),
     [dateFilter, studentsByDate],
   );
   const selectedDateLabel = getDateLabel(dateFilter);
-
-  useEffect(() => {
-    let ignoreResponse = false;
-
-    const loadLessonTopics = async () => {
-      try {
-        const loadedTopics = await lessonTopicStorage.load({
-          date: dateFilter,
-          className: classFilter,
-        });
-
-        if (ignoreResponse) {
-          return;
-        }
-
-        const loadedTopicEntries = Object.fromEntries(
-          loadedTopics.map((lessonTopic) => [
-            getLessonTopicKeyForValues(lessonTopic.date, lessonTopic.className, lessonTopic.subject),
-            lessonTopic.topic,
-          ]),
-        );
-        const loadedEditEntries = Object.fromEntries(
-          loadedTopics.map((lessonTopic) => [
-            getLessonTopicKeyForValues(lessonTopic.date, lessonTopic.className, lessonTopic.subject),
-            false,
-          ]),
-        );
-
-        setLessonTopics((currentTopics) => ({
-          ...currentTopics,
-          ...loadedTopicEntries,
-        }));
-        setLessonTopicDrafts((currentDrafts) => ({
-          ...currentDrafts,
-          ...loadedTopicEntries,
-        }));
-        setEditingLessonTopics((currentTopics) => ({
-          ...currentTopics,
-          ...loadedEditEntries,
-        }));
-      } catch (error) {
-        console.error('Failed to load lesson topics', error);
-      }
-    };
-
-    void loadLessonTopics();
-
-    return () => {
-      ignoreResponse = true;
-    };
-  }, [classFilter, dateFilter]);
 
   const subjectOptions = useMemo<FilterOption[]>(
     () => [
@@ -301,11 +375,6 @@ const AttendancePage = () => {
       })),
     ],
     [availableSubjects, classFilter],
-  );
-
-  const subjectsToShow = useMemo(
-    () => (activeSubjectFilter === ALL_FILTER_VALUE ? availableSubjects : [activeSubjectFilter]),
-    [activeSubjectFilter, availableSubjects],
   );
 
   const studentsToShow = useMemo(
@@ -351,33 +420,21 @@ const AttendancePage = () => {
     const topicKey = getLessonTopicKey(subject);
     const savedTopic = getLessonTopicDraftValue(subject).trim();
 
-    try {
-      const savedLessonTopic = await lessonTopicStorage.save({
-        date: dateFilter,
-        className: classFilter,
-        subject,
-        topic: savedTopic,
-      });
-      const savedTopicFromDatabase = savedLessonTopic.topic;
+    // Directly save to React state for fully offline functionality
+    setLessonTopics((currentTopics) => ({
+      ...currentTopics,
+      [topicKey]: savedTopic,
+    }));
 
-      setLessonTopics((currentTopics) => ({
-        ...currentTopics,
-        [topicKey]: savedTopicFromDatabase,
-      }));
+    setLessonTopicDrafts((currentDrafts) => ({
+      ...currentDrafts,
+      [topicKey]: savedTopic,
+    }));
 
-      setLessonTopicDrafts((currentDrafts) => ({
-        ...currentDrafts,
-        [topicKey]: savedTopicFromDatabase,
-      }));
-
-      setEditingLessonTopics((currentTopics) => ({
-        ...currentTopics,
-        [topicKey]: false,
-      }));
-    } catch (error) {
-      console.error('Failed to save lesson topic', error);
-      window.alert('Topic could not be saved.');
-    }
+    setEditingLessonTopics((currentTopics) => ({
+      ...currentTopics,
+      [topicKey]: false,
+    }));
   };
 
   const editLessonTopic = (subject: Subject) => {
@@ -491,18 +548,319 @@ const AttendancePage = () => {
     }
   };
 
+  const handleSelectLessonToLog = (lesson: any) => {
+    setSelectedLesson({
+      class: lesson.class as ClassName,
+      subject: lesson.subject as Subject,
+      periodNumber: lesson.periodNumber,
+      startTime: lesson.startTime,
+      endTime: lesson.endTime,
+    });
+    setDateFilter(TODAY_DATE_VALUE);
+    setClassFilter(lesson.class as ClassName);
+    setSubjectFilter(lesson.subject);
+    setViewState('log_lesson');
+  };
+
+  // -------------------------------------------------------------
+  // RENDERING HELPERS
+  // -------------------------------------------------------------
+
+  // Guard view for students and parents
+  if (isStudentOrParent) {
+    return (
+      <div className="flex flex-col items-center justify-center p-8 bg-white rounded-2xl border border-palette-sage/20 shadow-soft max-w-2xl mx-auto my-12 text-center">
+        <span className="material-symbols-outlined text-6xl text-palette-moss mb-4">lock</span>
+        <h1 className="text-2xl font-bold text-palette-pine">Access Denied</h1>
+        <p className="mt-2 text-palette-moss font-semibold">
+          This page is only accessible for teachers and administrators. You can view your absences on the Absences page.
+        </p>
+        <a
+          href="/absence"
+          className="mt-6 inline-flex items-center gap-2 rounded-xl bg-palette-fern px-6 py-3 font-extrabold text-white shadow-soft transition hover:bg-palette-leaf"
+        >
+          <span className="material-symbols-outlined">calendar_today</span>
+          Go to Absences
+        </a>
+      </div>
+    );
+  }
+
+  // View: Main Menu
+  if (viewState === 'menu') {
+    const isClassTeacher = isAdmin || (isTeacher && assignedClass !== null);
+
+    return (
+      <div className="space-y-8 max-w-4xl mx-auto p-4">
+        <div className="text-center space-y-2">
+          <h1 className="text-4xl font-black text-palette-pine tracking-tight">Class Log and Attendance</h1>
+          <p className="text-palette-moss font-semibold max-w-lg mx-auto">
+            Select one of the options below to manage school attendance, absences, and class log records.
+          </p>
+        </div>
+
+        {/* Quick Action (Highlight Center Button) */}
+        {activeLesson && (
+          <div className="flex justify-center">
+            <div className="relative group">
+              {/* Pulsing glow background */}
+              <div className="absolute -inset-1.5 bg-gradient-to-r from-palette-leaf to-palette-meadow rounded-2xl blur-lg opacity-75 group-hover:opacity-100 transition duration-300 animate-pulse"></div>
+              
+              <button
+                type="button"
+                onClick={() => handleSelectLessonToLog(activeLesson)}
+                className="relative flex flex-col md:flex-row items-center gap-4 bg-palette-pine text-white px-8 py-5 rounded-2xl shadow-lg border border-palette-leaf/25 transition duration-300 hover:scale-[1.02] text-left active:scale-[0.98]"
+              >
+                <div className="bg-palette-fern/70 text-palette-mist p-3 rounded-full flex items-center justify-center shrink-0">
+                  <span className="material-symbols-outlined text-3xl animate-bounce">bolt</span>
+                </div>
+                <div>
+                  <span className="inline-block px-2.5 py-0.5 rounded-full bg-palette-leaf text-[10px] font-black uppercase tracking-wider mb-1">
+                    Quick Action: You are currently teaching
+                  </span>
+                  <h2 className="text-xl font-extrabold leading-tight">
+                    Log Lesson: {activeLesson.subject} in Class {activeLesson.class}
+                  </h2>
+                  <p className="text-xs text-palette-lichen font-semibold mt-0.5">
+                    {activeLesson.period?.startTime} - {activeLesson.period?.endTime} ({activeLesson.periodNumber}. period, classroom {activeLesson.room})
+                  </p>
+                </div>
+              </button>
+            </div>
+          </div>
+        )}
+
+        {/* Main Grid Options */}
+        <div className="grid gap-6 md:grid-cols-2">
+          {/* Card 1: Class Absence */}
+          <div
+            className={`flex flex-col justify-between p-6 rounded-2xl border bg-white shadow-soft transition-all duration-300 ${
+              isClassTeacher
+                ? 'border-palette-sage/30 hover:shadow-md hover:scale-[1.01]'
+                : 'border-palette-sage/10 opacity-60'
+            }`}
+          >
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="material-symbols-outlined text-3xl text-palette-fern bg-palette-mist p-2.5 rounded-xl">
+                  groups
+                </span>
+                <h3 className="text-xl font-extrabold text-palette-pine">Class Absence</h3>
+              </div>
+              <p className="text-palette-moss font-semibold text-sm leading-relaxed mb-4">
+                Full overview and editing of attendance for the entire class. Available for class teachers and administrators.
+              </p>
+              {isTeacher && assignedClass && (
+                <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded bg-palette-mist text-xs font-bold text-palette-moss">
+                  <span className="material-symbols-outlined text-sm">assignment_ind</span>
+                  You are the class teacher of: <strong className="text-palette-pine">{assignedClass}</strong>
+                </div>
+              )}
+            </div>
+            
+            <div className="mt-6 pt-4 border-t border-palette-sage/10">
+              {isClassTeacher ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (isTeacher && assignedClass) {
+                      setClassFilter(assignedClass);
+                    }
+                    setViewState('class_absence');
+                  }}
+                  className="w-full flex items-center justify-center gap-2 rounded-xl bg-palette-fern py-3 font-extrabold text-white transition hover:bg-palette-leaf shadow-soft"
+                >
+                  Open Class Absence
+                  <span className="material-symbols-outlined text-sm">arrow_forward</span>
+                </button>
+              ) : (
+                <div className="text-xs text-red-700 bg-red-50 p-3 rounded-lg flex items-start gap-1.5 font-bold">
+                  <span className="material-symbols-outlined text-sm shrink-0">info</span>
+                  Access restricted to class teachers and administrators.
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Card 2: Log Lesson */}
+          <div className="flex flex-col justify-between p-6 rounded-2xl border border-palette-sage/30 bg-white shadow-soft transition-all duration-300 hover:shadow-md hover:scale-[1.01]">
+            <div>
+              <div className="flex items-center gap-3 mb-4">
+                <span className="material-symbols-outlined text-3xl text-palette-fern bg-palette-mist p-2.5 rounded-xl">
+                  edit_calendar
+                </span>
+                <h3 className="text-xl font-extrabold text-palette-pine">Log Lesson</h3>
+              </div>
+              <p className="text-palette-moss font-semibold text-sm leading-relaxed mb-4">
+                Allows teachers to select a specific lesson from their personal timetable and log attendance and the lesson topic.
+              </p>
+            </div>
+            
+            <div className="mt-6 pt-4 border-t border-palette-sage/10">
+              <button
+                type="button"
+                onClick={() => setViewState('teacher_schedule')}
+                className="w-full flex items-center justify-center gap-2 rounded-xl bg-palette-fern py-3 font-extrabold text-white transition hover:bg-palette-leaf shadow-soft"
+              >
+                View Timetable
+                <span className="material-symbols-outlined text-sm">calendar_today</span>
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Demo Mode Toggle (Developer Helper) */}
+        {isTeacher && (
+          <div className="pt-6 border-t border-palette-sage/15 flex justify-center">
+            <label className="inline-flex items-center gap-3 cursor-pointer bg-palette-mist px-4 py-2 rounded-xl border border-palette-sage/20 shadow-sm hover:bg-palette-mist/80 transition duration-150">
+              <input
+                type="checkbox"
+                checked={isDemoMode}
+                onChange={(e) => setIsDemoMode(e.target.checked)}
+                className="w-4.5 h-4.5 text-palette-leaf border-palette-lichen rounded focus:ring-palette-leaf"
+              />
+              <div className="text-left">
+                <span className="block text-xs font-bold text-palette-pine">Schedule Demo Mode</span>
+                <span className="block text-[10px] text-palette-moss font-semibold leading-none">Simulates Friday 10:15 AM (to display the Quick Action button)</span>
+              </div>
+            </label>
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  // View: Teacher Timetable Grid Select
+  if (viewState === 'teacher_schedule') {
+    return (
+      <div className="space-y-6 max-w-[1600px] mx-auto p-4">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+          <div>
+            <button
+              onClick={() => setViewState('menu')}
+              className="inline-flex items-center gap-1.5 text-palette-moss hover:text-palette-pine font-black text-sm mb-2 transition"
+            >
+              <span className="material-symbols-outlined text-base">arrow_back</span>
+              Back to menu
+            </button>
+            <h1 className="text-3xl font-black text-palette-pine tracking-tight">Your Teaching Timetable</h1>
+            <p className="text-palette-moss font-semibold mt-1">
+              Select a lesson to log attendance and the lesson topic.
+            </p>
+          </div>
+        </div>
+
+        <div className="overflow-x-auto rounded-2xl border border-palette-sage/30 shadow-soft bg-white">
+          <table className="w-full border-collapse text-left">
+            <thead>
+              <tr className="bg-palette-mist/80 border-b border-palette-sage/30">
+                <th className="p-4 font-black text-palette-pine text-xs tracking-wider uppercase min-w-[125px]">
+                  Day
+                </th>
+                {periodsToShow.map((p) => (
+                  <th key={p.periodNumber} className="p-4 font-black text-palette-pine text-xs tracking-wider uppercase text-center min-w-[170px] border-l border-palette-sage/20">
+                    <div className="text-palette-leaf text-[11px] font-black tracking-normal lowercase first-letter:uppercase">{p.periodNumber}. period</div>
+                    <div className="text-[10px] text-palette-moss font-bold mt-0.5">{p.startTime} - {p.endTime}</div>
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {DAYS_OF_WEEK.map((day) => (
+                <tr key={day} className="border-b border-palette-sage/20 last:border-0 hover:bg-palette-mist/20 transition duration-150">
+                  <td className="p-4 font-black text-palette-pine align-middle bg-palette-mist/40 text-center border-r border-palette-sage/30">
+                    <span className="text-base font-extrabold">{DAY_LABELS[day] || day}</span>
+                  </td>
+
+                  {periodsToShow.map((p) => {
+                    const cellLessons = lessonsToShow.filter(
+                      (l) => l.day === day && l.periodNumber === p.periodNumber
+                    );
+
+                    return (
+                      <td key={p.periodNumber} className="p-3 border-r border-palette-sage/20 last:border-r-0 align-middle">
+                        <div className="space-y-2">
+                          {cellLessons.map((lesson) => (
+                            <button
+                              key={lesson.id}
+                              type="button"
+                              onClick={() => handleSelectLessonToLog(lesson)}
+                              className="w-full text-left rounded-xl border-l-4 border-palette-leaf bg-palette-mist/80 p-3 shadow-xs hover:shadow-md hover:scale-[1.02] active:scale-[0.98] transition-all duration-150 flex flex-col justify-between min-h-[90px]"
+                            >
+                              <div>
+                                  <h3 className="font-extrabold text-palette-pine text-sm leading-tight">
+                                    {lesson.subject}
+                                  </h3>
+                              </div>
+
+                              <div className="mt-2 text-[10px] space-y-0.5 bg-white/40 p-1.5 rounded border border-white/50 text-gray-700 font-semibold w-full">
+                                <p className="flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[12px] text-palette-moss">groups</span>
+                                  <span>Class: {lesson.class}</span>
+                                </p>
+                                <p className="flex items-center gap-1">
+                                  <span className="material-symbols-outlined text-[12px] text-palette-moss">meeting_room</span>
+                                  <span>Room: {lesson.room}</span>
+                                </p>
+                              </div>
+                            </button>
+                          ))}
+
+                          {cellLessons.length === 0 && (
+                            <div className="text-center py-6 text-palette-lichen/50 select-none font-semibold text-xs italic">
+                              Free Time
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    );
+  }
+
+  // Views: class_absence (general sheet) OR log_lesson (focused log view)
+  const isFocusedLog = viewState === 'log_lesson';
+
   return (
     <div className="space-y-6">
       <div>
-        <h1 className="text-3xl font-bold text-palette-pine">Attendance - {selectedDateLabel}</h1>
+        <button
+          onClick={() => {
+            if (isFocusedLog) {
+              setViewState('teacher_schedule');
+            } else {
+              setViewState('menu');
+            }
+          }}
+          className="inline-flex items-center gap-1.5 text-palette-moss hover:text-palette-pine font-black text-sm mb-2 transition"
+        >
+          <span className="material-symbols-outlined text-base">arrow_back</span>
+          {isFocusedLog ? 'Back to timetable' : 'Back to menu'}
+        </button>
+
+        <h1 className="text-3xl font-bold text-palette-pine">
+          {isFocusedLog ? `Log Lesson: ${selectedLesson?.subject}` : 'Attendance & Class Log'}
+        </h1>
         <p className="mt-2 text-sm text-palette-moss">
-          Filter by date, class and subject to check who attended each lesson.
+          {isFocusedLog 
+            ? `Logging attendance and topic for lesson ${selectedLesson?.subject} in Class ${selectedLesson?.class} (${selectedLesson?.startTime} - ${selectedLesson?.endTime}) held on ${selectedDateLabel}.`
+            : `Managing absences and logs for class {classFilter} on ${selectedDateLabel}.`
+          }
         </p>
       </div>
 
       <section className="rounded-lg border border-palette-lichen/45 bg-palette-mist shadow-soft">
         <div className="border-b border-palette-lichen/45 p-5">
-          <h2 className="mb-4 text-xl font-semibold text-palette-pine">Class {classFilter}</h2>
+          <h2 className="mb-4 text-xl font-semibold text-palette-pine">
+            {isFocusedLog ? `Lesson: ${selectedLesson?.subject}` : `Class: ${classFilter}`}
+          </h2>
+          
           <div className="grid gap-4 md:grid-cols-3">
             <label htmlFor="attendance-date-filter" className="flex flex-col gap-2 text-sm font-medium text-palette-pine">
               <span>Date</span>
@@ -511,31 +869,85 @@ const AttendancePage = () => {
                 type="date"
                 value={dateFilter}
                 onChange={(event) => setDateFilter(event.target.value)}
-                className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-palette-pine focus:outline-hidden focus:ring-1 focus:ring-emerald-500"
+                className="h-10 rounded-md border border-slate-200 bg-slate-50 px-3 text-sm text-palette-pine focus:outline-hidden focus:ring-1 focus:ring-emerald-500 cursor-pointer"
                 required
               />
             </label>
-            <Filter label="Class" value={classFilter} onChange={setClassFilter} options={CLASS_OPTIONS} />
-            <Filter label="Subject" value={activeSubjectFilter} onChange={setSubjectFilter} options={subjectOptions} />
-          </div>
 
+            {isFocusedLog ? (
+              <>
+                <div className="flex flex-col gap-2 text-sm font-medium text-palette-pine">
+                  <span>Class</span>
+                  <div className="h-10 flex items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-sm text-palette-pine/70 font-semibold cursor-not-allowed">
+                    {selectedLesson?.class}
+                  </div>
+                </div>
+                
+                <div className="flex flex-col gap-2 text-sm font-medium text-palette-pine">
+                  <span>Subject Taught</span>
+                  <div className="h-10 flex items-center rounded-md border border-slate-200 bg-slate-100 px-3 text-sm text-palette-pine/70 font-semibold cursor-not-allowed">
+                    {selectedLesson?.subject}
+                  </div>
+                </div>
+              </>
+            ) : (
+              <>
+                {/* For general class absence view, if admin they can change class, if teacher it is locked */}
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-palette-pine">Class</span>
+                  <Filter 
+                    label="" 
+                    value={classFilter} 
+                    onChange={setClassFilter} 
+                    options={CLASS_OPTIONS} 
+                    disabled={isTeacher} // Locked for class teachers to their class
+                  />
+                </div>
+                
+                <div className="flex flex-col gap-2">
+                  <span className="text-sm font-medium text-palette-pine">Subject</span>
+                  <Filter 
+                    label="" 
+                    value={activeSubjectFilter} 
+                    onChange={setSubjectFilter} 
+                    options={subjectOptions} 
+                  />
+                </div>
+              </>
+            )}
+          </div>
         </div>
 
         <div className="overflow-x-auto p-5">
-          <table className="w-full min-w-[1280px] border-collapse text-left text-sm">
+          <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-palette-lichen/60 text-palette-pine">
                 <th className="w-56 px-4 py-3 font-semibold">Student</th>
                 <th className="w-24 px-4 py-3 font-semibold">Class</th>
+                
                 {subjectsToShow.map((subject) => {
                   const topicKey = getLessonTopicKey(subject);
                   const savedTopic = lessonTopics[topicKey];
                   const isEditingTopic = editingLessonTopics[topicKey] ?? true;
+                  const isCollapsed = isFocusedLog && subject !== selectedLesson?.subject;
+
+                  if (isCollapsed) {
+                    return (
+                      <th key={subject} className="w-16 min-w-[70px] max-w-[70px] px-2 py-3 text-center align-top font-semibold border-l border-palette-sage/20 bg-palette-mist/40">
+                        <span className="block text-[11px] text-palette-moss leading-tight truncate" title={subject}>
+                          {getLessonLabel(classFilter, subject)}
+                        </span>
+                        <span className="block text-[9px] text-palette-lichen font-bold mt-1 uppercase select-none">
+                          Locked
+                        </span>
+                      </th>
+                    );
+                  }
 
                   return (
-                    <th key={subject} className="min-w-64 px-4 py-3 align-top font-semibold">
+                    <th key={subject} className="min-w-64 px-4 py-3 align-top font-semibold border-l border-palette-sage/20">
                       <span className="block">{getLessonLabel(classFilter, subject)}</span>
-                      {canEditAttendance ? (
+                      {canEditAttendance && canEditTopic ? (
                         <div className="mt-2">
                           {isEditingTopic ? (
                             <div className="flex gap-2">
@@ -543,7 +955,7 @@ const AttendancePage = () => {
                                 type="text"
                                 value={getLessonTopicDraftValue(subject)}
                                 onChange={(event) => updateLessonTopicDraft(subject, event.target.value)}
-                                placeholder="Topic..."
+                                placeholder="Lesson topic..."
                                 className="h-9 min-w-0 flex-1 rounded-md border border-palette-lichen/60 bg-white px-2 text-xs font-semibold text-palette-pine outline-none transition placeholder:text-palette-moss/60 focus:border-palette-leaf focus:ring-2 focus:ring-palette-leaf/20"
                               />
                               <button
@@ -571,16 +983,16 @@ const AttendancePage = () => {
                                 aria-label={`Edit topic for ${subject}`}
                                 title="Edit topic"
                               >
-                                <i className="fa-solid fa-pencil text-xs" aria-hidden="true" />
+                                <span className="material-symbols-outlined text-sm">edit</span>
                               </button>
                             </div>
                           )}
                         </div>
-                      ) : savedTopic ? (
-                        <span className="mt-1 block max-w-56 truncate text-xs font-medium text-palette-moss">
-                          {savedTopic}
+                      ) : (
+                        <span className="mt-1 block max-w-56 truncate text-xs font-semibold text-palette-moss italic bg-white/50 px-2 py-1.5 rounded border border-palette-sage/10 mt-2">
+                          {savedTopic || 'No topic registered'}
                         </span>
-                      ) : null}
+                      )}
                     </th>
                   );
                 })}
@@ -591,8 +1003,9 @@ const AttendancePage = () => {
                 <tr key={student.id} className="hover:bg-palette-sage/10">
                   <td className="px-4 py-3 font-medium text-palette-pine">{student.name}</td>
                   <td className="px-4 py-3">{student.className}</td>
+                  
                   {subjectsToShow.map((subject, subjectIndex) => {
-                    const status = student.attendance[subject] ?? 'absent';
+                    const status = student.attendance[subject] ?? 'present'; 
                     const absenceReason = absenceReasons[getAbsenceKey(student.id, subject)];
                     const statusMeta = getStatusMeta(status, absenceReason);
                     const controlIndex = studentIndex * subjectsToShow.length + subjectIndex;
@@ -600,11 +1013,43 @@ const AttendancePage = () => {
                       status === 'absent'
                         ? absenceReason
                           ? absenceReason
-                          : 'No reason selected'
+                          : 'No reason provided'
                         : undefined;
+                    
+                    const isCollapsed = isFocusedLog && subject !== selectedLesson?.subject;
+
+                    // Collapsed cell for locked subjects in concentrated log mode
+                    if (isCollapsed) {
+                      const absenceStatus = getAbsenceStatus(absenceReason);
+                      return (
+                        <td key={subject} className="w-16 min-w-[70px] max-w-[70px] px-2 py-3 text-center border-l border-palette-sage/10 bg-palette-mist/20">
+                          <span
+                            title={status === 'absent' ? (absenceReason || 'Absent') : 'Present'}
+                            className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-extrabold select-none ${
+                              status === 'present'
+                                ? 'bg-palette-sage/20 text-palette-leaf'
+                                : absenceStatus === 'Late'
+                                ? 'bg-orange-100 text-orange-700'
+                                : absenceStatus === 'Excused absence'
+                                ? 'bg-blue-100 text-blue-700'
+                                : 'bg-red-100 text-red-700'
+                            }`}
+                          >
+                            {status === 'present'
+                              ? '✓'
+                              : absenceStatus === 'Late'
+                              ? 'L'
+                              : absenceStatus === 'Excused absence'
+                              ? 'E'
+                              : 'A'
+                            }
+                          </span>
+                        </td>
+                      );
+                    }
 
                     return (
-                      <td key={subject} className="px-4 py-3">
+                      <td key={subject} className="px-4 py-3 border-l border-palette-sage/10">
                         {canEditAttendance ? (
                           <div
                             ref={(element) => {

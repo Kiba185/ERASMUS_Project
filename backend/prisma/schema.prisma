@@ -45,8 +45,10 @@ model User {
   // Other relations
   events   Event[]
   subjects Subject[]
+  groups   Group[]       @relation("GroupStudents")
 
-  attendances Attendance[] @relation("StudentAttendance")
+  attendances  Attendance[]  @relation("StudentAttendance")
+  absenceNotes AbsenceNote[] @relation("StudentAbsenceNotes")
 }
 
 model Subject {
@@ -56,8 +58,8 @@ model Subject {
   color        String
   timeTables   TimeTable[]
   teachers     User[]
-  attendances  Attendance[]
-  lessonTopics LessonTopic[]
+  attendances  Attendance[]  @relation("AttendanceSubject")
+  lessonTopics LessonTopic[] @relation("LessonTopicSubject")
 }
 
 model Lesson {
@@ -86,17 +88,18 @@ model Grade {
 }
 
 model Attendance {
-  id            Int      @id @default(autoincrement())
+  id            Int           @id @default(autoincrement())
   date          DateTime
   studentId     Int
-  student       User     @relation("StudentAttendance", fields: [studentId], references: [id])
+  student       User          @relation("StudentAttendance", fields: [studentId], references: [id])
   subjectId     Int
-  subject       Subject  @relation(fields: [subjectId], references: [id])
+  subject       Subject       @relation("AttendanceSubject", fields: [subjectId], references: [id])
   classId       Int
-  class         Class    @relation(fields: [classId], references: [id])
-  status        String // "present" | "absent"
-  absenceReason String? // "Late: ..." | "Excused absence: ..." | "Unexcused absence: ..."
-  createdAt     DateTime @default(now())
+  class         Class         @relation("AttendanceClass", fields: [classId], references: [id])
+  status        String
+  absenceReason String?
+  createdAt     DateTime      @default(now())
+  absenceNotes  AbsenceNote[]
 
   @@unique([date, studentId, subjectId])
 }
@@ -105,13 +108,24 @@ model LessonTopic {
   id        Int      @id @default(autoincrement())
   date      DateTime
   classId   Int
-  class     Class    @relation(fields: [classId], references: [id])
+  class     Class    @relation("LessonTopicClass", fields: [classId], references: [id])
   subjectId Int
-  subject   Subject  @relation(fields: [subjectId], references: [id])
+  subject   Subject  @relation("LessonTopicSubject", fields: [subjectId], references: [id])
   topic     String
   createdAt DateTime @default(now())
 
   @@unique([date, classId, subjectId])
+}
+
+model AbsenceNote {
+  id           Int        @id @default(autoincrement())
+  studentId    Int
+  student      User       @relation("StudentAbsenceNotes", fields: [studentId], references: [id])
+  attendanceId Int        @unique
+  attendance   Attendance @relation(fields: [attendanceId], references: [id])
+  reason       String
+  status       String     @default("sent")
+  createdAt    DateTime   @default(now())
 }
 
 model Room {
@@ -126,20 +140,25 @@ model Class {
   students     User[]
   timeTables   TimeTable[]
   events       Event[]
-  attendances  Attendance[]
-  lessonTopics LessonTopic[]
+  attendances  Attendance[]  @relation("AttendanceClass")
+  lessonTopics LessonTopic[] @relation("LessonTopicClass")
+  groups       Group[]
 }
 
 model TimeTable {
-  id           Int    @id @default(autoincrement())
+  id           Int     @id @default(autoincrement())
   day          String
   week         String
   startTime    String
   endTime      String
   periodNumber Int
   roomId       Int
-  room         Room   @relation(fields: [roomId], references: [id])
-  group        String @default("Whole Class")
+  room         Room    @relation(fields: [roomId], references: [id])
+  group        String  @default("Whole Class")
+  isPermanent  Boolean @default(true)
+  exceptionDate String?
+  status       String  @default("active")
+  templateId   Int?
 
   subjectId Int
   subject   Subject @relation(fields: [subjectId], references: [id])
@@ -175,4 +194,20 @@ model Message {
 
   sender    User @relation("SentMessages", fields: [senderId], references: [id])
   recipient User @relation("ReceivedMessages", fields: [recipientId], references: [id])
+}
+
+model Group {
+  id        Int     @id @default(autoincrement())
+  name      String
+  classId   Int
+  class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
+  students  User[]  @relation("GroupStudents")
+}
+
+model Period {
+  id           Int      @id @default(autoincrement())
+  periodNumber Int      @unique
+  startTime    String
+  endTime      String
+  createdAt    DateTime @default(now())
 }
