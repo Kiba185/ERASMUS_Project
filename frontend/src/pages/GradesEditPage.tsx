@@ -14,6 +14,7 @@ const GradesEditPage: React.FC = () => {
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
   const [classes, setClasses] = useState<string[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
     const loadStudents = async () => {
@@ -139,11 +140,18 @@ const GradesEditPage: React.FC = () => {
       }
     };
 
-    loadSubjects();
-    loadStudents();
-    loadAssignments();
-    loadGrades();
-    loadClasses();
+    const fetchAll = async () => {
+      setIsLoading(true);
+      await Promise.all([
+        loadSubjects(),
+        loadStudents(),
+        loadAssignments(),
+        loadGrades(),
+        loadClasses()
+      ]);
+      setIsLoading(false);
+    };
+    fetchAll();
   }, []);
 
   // 2. FILTER STATES
@@ -422,6 +430,13 @@ const GradesEditPage: React.FC = () => {
 
 
 
+
+  if (isLoading) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="w-12 h-12 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
+      <p className="text-palette-moss font-bold animate-pulse">Loading grades data...</p>
+    </div>
+  );
 
   return (
     <div className="p-6 max-w-7xl mx-auto space-y-6">

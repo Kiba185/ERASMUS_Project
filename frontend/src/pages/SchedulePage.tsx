@@ -29,7 +29,7 @@ const getSubjectColorClasses = (subjectName: string): string => {
 };
 
 const SchedulePage: React.FC = () => {
-  const { user } = useAuth();
+  const { user, activeChildId } = useAuth();
   const [lessons, setLessons] = useState<any[]>([]);
   const [periods, setPeriods] = useState<Period[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(false);
@@ -45,7 +45,8 @@ const SchedulePage: React.FC = () => {
         const loadedPeriods: Period[] = periodData.data || [];
         setPeriods(loadedPeriods);
 
-        const response = await fetch(`${API_URL}/api/timetables/${user.userName}`);
+        const targetId = user.role === 'parent' && activeChildId ? activeChildId : user.id;
+        const response = await fetch(`${API_URL}/api/timetables/${targetId}`);
         if (!response.ok) {
           throw new Error('Failed to load timetable');
         }
@@ -72,7 +73,7 @@ const SchedulePage: React.FC = () => {
     };
 
     fetchTimetable();
-  }, [user]);
+  }, [user, activeChildId]);
 
   return (
     <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-6">

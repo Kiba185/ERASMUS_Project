@@ -239,8 +239,11 @@ router.post('/api/admin/loginas/:id', async (req, res, next) => {
     if (await requireAuth(req, res, next, 10) !== true) { return; }
 
     const userId = parseInt(req.params.id);
-    const user = await prisma.user.findUnique({ where: { id: userId } });
-    
+    const user = await prisma.user.findUnique({ 
+        where: { id: userId },
+        include: { children: true }
+    });
+
     if (!user) {
         return res.status(404).json({ success: false, message: 'User not found' });
     }
