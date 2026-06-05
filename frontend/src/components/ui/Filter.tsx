@@ -12,6 +12,7 @@ interface FilterProps<TValue extends string = string> {
   options: FilterOption<TValue>[];
   className?: string;
   selectClassName?: string;
+  disabled?: boolean;
 }
 
 export const createFilterOptions = <TItem,>(
@@ -51,6 +52,7 @@ export const Filter = <TValue extends string = string,>({
   options,
   className = '',
   selectClassName = '',
+  disabled = false,
 }: FilterProps<TValue>) => {
   return (
     <label className={`flex flex-col gap-2 text-sm font-medium text-palette-pine ${className}`}>
@@ -58,7 +60,8 @@ export const Filter = <TValue extends string = string,>({
       <select
         value={value}
         onChange={(event) => onChange(event.target.value as TValue)}
-        className={`h-10 rounded-md border border-palette-lichen/80 bg-palette-mist px-3 text-sm text-palette-pine focus:outline-none focus:ring-2 focus:ring-palette-leaf ${selectClassName}`}
+        disabled={disabled}
+        className={`h-10 rounded-md border border-palette-lichen/80 bg-palette-mist px-3 text-sm text-palette-pine focus:outline-none focus:ring-2 focus:ring-palette-leaf disabled:opacity-60 disabled:cursor-not-allowed ${selectClassName}`}
       >
         {options.map((option) => (
           <option key={option.value} value={option.value}>

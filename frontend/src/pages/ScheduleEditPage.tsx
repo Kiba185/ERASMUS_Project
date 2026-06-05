@@ -1,41 +1,62 @@
 import API_URL from '../config/config.tsx';
-import React, { useState, useEffect } from 'react';
-import { createPortal } from 'react-dom';
+import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 
-// Můžeš smazat import loadSetupMockData, už to nepotřebujeme
-// import { loadSetupMockData, mergeUniqueOptions } from '../data/setupMockData';
+// ─── Interfaces ─────────────────────────────────────────────────────────────
 
 interface Lesson {
   id: string | number;
-  templateId?: string | number;
+  templateId?: string | number | null;
   day: string;
   time: string;
+  periodNumber?: number;
   subject: string;
   teacher: string;
   className: string;
   room: string;
-  color: string;
+  color?: string;
   isPermanent: boolean;
   weekType: 'all' | 'even' | 'odd';
   group: string;
-  exceptionDate?: string;
+  exceptionDate?: string | null;
   status?: 'active' | 'cancelled' | 'substituted' | 'regular';
 }
 
-const subjectTeachersMap: Record<string, string[]> = {
-  'Mathematics': ['Mr. Novak', 'Mrs. Smith'],
-  'Information Tech': ['Mr. Green', 'Ms. Davis'],
-  'Gymnastics': ['Mr. Wilson', 'Mr. Lopez'],
-  'Laboratory Physics': ['Mr. Johnson', 'Mr. White'],
-  'History': ['Mrs. Thompson'],
-  'Biology': ['Mr. Garcia']
-};
+interface Period {
+  id: number;
+  periodNumber: number;
+  startTime: string;
+  endTime: string;
+}
+
+interface DbClass   { id: number; name: string; }
+interface DbSubject { id: number; name: string; }
+interface DbTeacher { id: number; firstName: string; lastName: string; }
+interface DbRoom    { id: number; name: string; }
+
+// ─── Static Options ──────────────────────────────────────────────────────────
 
 const availableGroups = ['Whole Class', 'Group 1', 'Group 2', 'Boys', 'Girls'];
 const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
-const timeSlots = ['08:00 - 08:45', '08:55 - 09:40', '10:00 - 10:45', '10:55 - 11:40', '11:50 - 12:35', '12:45 - 13:30'];
 
+// Helper to determine subject-specific styling (Curated harmonious color palette)
+const getSubjectColorClasses = (subjectName: string): string => {
+  const s = subjectName.toLowerCase();
+  if (s.includes('math')) return 'border-blue-500 bg-blue-50/70 text-blue-950 hover:bg-blue-100/70';
+  if (s.includes('phys')) return 'border-cyan-500 bg-cyan-50/70 text-cyan-950 hover:bg-cyan-100/70';
+  if (s.includes('chem')) return 'border-purple-500 bg-purple-50/70 text-purple-950 hover:bg-purple-100/70';
+  if (s.includes('biol')) return 'border-emerald-500 bg-emerald-50/70 text-emerald-950 hover:bg-emerald-100/70';
+  if (s.includes('hist')) return 'border-amber-500 bg-amber-50/70 text-amber-950 hover:bg-amber-100/70';
+  if (s.includes('engl') || s.includes('cj') || s.includes('czech')) return 'border-indigo-500 bg-indigo-50/70 text-indigo-950 hover:bg-indigo-100/70';
+  if (s.includes('geogr')) return 'border-orange-500 bg-orange-50/70 text-orange-950 hover:bg-orange-100/70';
+  if (s.includes('pe') || s.includes('gym') || s.includes('sport')) return 'border-rose-500 bg-rose-50/70 text-rose-950 hover:bg-rose-100/70';
+  if (s.includes('art') || s.includes('paint')) return 'border-pink-500 bg-pink-50/70 text-pink-950 hover:bg-pink-100/70';
+  if (s.includes('comp') || s.includes('info')) return 'border-teal-500 bg-teal-50/70 text-teal-950 hover:bg-teal-100/70';
+  if (s.includes('music') || s.includes('sing')) return 'border-violet-500 bg-violet-50/70 text-violet-950 hover:bg-violet-100/70';
+  return 'border-palette-sage bg-palette-mist/80 text-palette-pine hover:bg-palette-mist';
+};
+
+// Date math helpers
 const getISOWeekDetails = (date: Date) => {
   const target = new Date(date.valueOf());
   const dayNr = (date.getDay() + 6) % 7;
@@ -66,37 +87,58 @@ const getWeekDatesStrings = (weekOffset: number): string[] => {
   });
 };
 
+const formatDateCzech = (isoString: string): string => {
+  const [year, month, day] = isoString.split('-');
+  return `${parseInt(day)}.${parseInt(month)}.`;
+};
+
+// ─── Component ───────────────────────────────────────────────────────────────
+
 const ScheduleEditPage: React.FC = () => {
   const { user } = useAuth();
 
-  // --- STAVY PRO DATA Z DATABÁZE ---
-  const [dbClasses, setDbClasses] = useState<{id: number, name: string}[]>([]);
-  const [dbSubjects, setDbSubjects] = useState<{id: number, name: string}[]>([]);
-  const [dbTeachers, setDbTeachers] = useState<{id: number, firstName: string, lastName: string}[]>([]);
-  const [dbRooms, setDbRooms] = useState<{id: number, name: string}[]>([]);
+  // ── State ──────────────────────────────────────────────────────────────────
+  const [dbClasses,  setDbClasses]  = useState<DbClass[]>([]);
+  const [dbSubjects, setDbSubjects] = useState<DbSubject[]>([]);
+  const [dbTeachers, setDbTeachers] = useState<DbTeacher[]>([]);
+  const [dbRooms,    setDbRooms]    = useState<DbRoom[]>([]);
+  const [periods,    setPeriods]    = useState<Period[]>([]);
 
-  const [selectedClass, setSelectedClass] = useState<string>('');
-  const [weekOffset, setWeekOffset] = useState<number>(0);
-
-  // 🌟 OPRAVA: Počáteční stav rozvrhu je prázdný, žádná mock data
-  const [lessons, setLessons] = useState<Lesson[]>([]);
-  const [isPermanentEditMode, setIsPermanentEditMode] = useState(false);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [selectedClass,        setSelectedClass]        = useState<string>('');
+  const [weekOffset,           setWeekOffset]           = useState<number>(0);
+  const [lessons,              setLessons]              = useState<Lesson[]>([]);
+  const [isPermanentEditMode,  setIsPermanentEditMode]  = useState<boolean>(false);
+  
+  // Modal states
+  const [isModalOpen,   setIsModalOpen]   = useState<boolean>(false);
   const [editingLesson, setEditingLesson] = useState<Partial<Lesson> | null>(null);
   const [saving, setSaving] = useState(false);
   const [savingLabel, setSavingLabel] = useState('Saving...');
 
-  const currentWeekDates = getWeekDatesStrings(weekOffset);
-  const viewedMondayDate = getMondayOfOffsetWeek(weekOffset);
-  const { weekNumber: currentWeekNo, isEven: isCurrentWeekEven } = getISOWeekDetails(viewedMondayDate);
+  // Copy/paste schedule states
+  const [copiedLessons, setCopiedLessons] = useState<Lesson[] | null>(null);
+  const [copiedFromDay, setCopiedFromDay] = useState<string | null>(null);
+
+  // Computed week values
+  const currentWeekDates = useMemo(() => getWeekDatesStrings(weekOffset), [weekOffset]);
+  const viewedMondayDate = useMemo(() => getMondayOfOffsetWeek(weekOffset), [weekOffset]);
+  const { weekNumber: currentWeekNo, isEven: isCurrentWeekEven } = useMemo(
+    () => getISOWeekDetails(viewedMondayDate),
+    [viewedMondayDate]
+  );
   const activeWeekParity: 'even' | 'odd' = isCurrentWeekEven ? 'even' : 'odd';
 
-  // --- NAČTENÍ ROLETEK Z DATABÁZE PŘI STARTU ---
+  // ── Data Fetching ──────────────────────────────────────────────────────────
+
   useEffect(() => {
     const fetchSetupOptions = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/setup-data`);
-        const result = await response.json();
+        const [setupRes, periodRes] = await Promise.all([
+          fetch(`${API_URL}/api/setup-data`),
+          fetch(`${API_URL}/api/periods`)
+        ]);
+        const result = await setupRes.json();
+        const pData = await periodRes.json();
         
         if (result.success) {
           setDbClasses(result.data.classes);
@@ -108,74 +150,88 @@ const ScheduleEditPage: React.FC = () => {
             setSelectedClass(result.data.classes[0].name);
           }
         }
+        if (pData.success) {
+          setPeriods(pData.data);
+        }
       } catch (error) {
-        console.error("Nepodařilo se načíst nastavení z databáze", error);
+        console.error("Failed to load options from DB", error);
       }
     };
 
     fetchSetupOptions();
   }, []);
 
-  // 🌟 NOVÉ: STAHOVÁNÍ ROZVRHU PODLE VYBRANÉ TŘÍDY
-  useEffect(() => {
+  const fetchClassTimetable = async () => {
     if (!selectedClass) return;
+    try {
+      const response = await fetch(`${API_URL}/api/timetables/class/${selectedClass}`);
+      if (!response.ok) throw new Error('Error loading timetable');
+      const data = await response.json();
+      
+      const mappedLessons: Lesson[] = data.map((item: any) => ({
+        id: item.id,
+        templateId: item.templateId || null,
+        day: item.day,
+        periodNumber: item.periodNumber,
+        time: `${item.startTime} - ${item.endTime}`,
+        subject: item.subject?.name || 'Unknown',
+        teacher: `${item.teacher?.firstName || ''} ${item.teacher?.lastName || ''}`,
+        className: item.class?.name || '',
+        room: item.room?.name || 'N/A',
+        weekType: item.week || 'all',
+        isPermanent: item.isPermanent !== undefined ? item.isPermanent : true,
+        group: item.group || 'Whole Class',
+        exceptionDate: item.exceptionDate || null,
+        status: item.status || 'active'
+      }));
 
-    const fetchClassTimetable = async () => {
-      try {
-        // Zde voláme API backendu pro stažení hodin podle názvu třídy
-        const response = await fetch(`${API_URL}/api/timetables/class/${selectedClass}`);
-        if (!response.ok) throw new Error('Chyba při načítání rozvrhu');
-        
-        const data = await response.json();
-        
-        const mappedLessons: Lesson[] = data.map((item: any) => ({
-          id: item.id,
-          day: item.day,
-          time: `${item.startTime} - ${item.endTime}`,
-          subject: item.subject?.name || 'Neznámý předmět',
-          teacher: `Mr. ${item.teacher?.lastName || ''}`,
-          className: item.class?.name || '',
-          room: item.room?.name || 'Neznámá místnost',
-          weekType: item.week || 'all',
-          color: item.subject?.color || 'border-blue-500 bg-blue-50', // Výchozí barva
-          isPermanent: true, // Prozatím předpokládáme, že vše z DB je permanentní
-          group: item.group || 'Whole Class',
-          status: 'active'
-        }));
+      setLessons(mappedLessons);
+    } catch (error) {
+      console.error("Error fetching timetable:", error);
+    }
+  };
 
-        setLessons(mappedLessons);
-      } catch (error) {
-        console.error("Chyba při stahování rozvrhu pro třídu:", error);
-      }
-    };
-
+  useEffect(() => {
     fetchClassTimetable();
-  }, [selectedClass]); // Tento useEffect se spustí vždy, když se změní vybraná třída
+  }, [selectedClass]);
+
+  // ── Permissions Guard ──────────────────────────────────────────────────────
 
   if (user?.role !== 'admin') {
     return (
       <div className="p-8 flex items-center justify-center min-h-[50vh]">
-        <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-xl shadow-sm text-center">
-          <h2 className="text-2xl font-bold text-red-700 mb-2">Access Denied</h2>
-          <p className="text-red-600">This page is only accessible to administrators.</p>
+        <div className="bg-red-50 border-l-4 border-red-500 p-6 rounded-2xl shadow-soft max-w-md text-center space-y-3">
+          <span className="material-symbols-outlined text-[48px] text-red-500 mx-auto">warning</span>
+          <h2 className="text-2xl font-bold text-red-800">Access Denied</h2>
+          <p className="text-red-700 font-medium">This administration dashboard is restricted to system administrators only.</p>
         </div>
       </div>
     );
   }
 
+  // ── Timetable Filter Logic ─────────────────────────────────────────────────
+
   const getVisibleLessons = () => {
     const classLessons = lessons.filter(l => l.className === selectedClass);
-    if (isPermanentEditMode) return classLessons.filter(l => l.isPermanent);
+    
+    // Master template mode shows all permanent lessons (without parity filters for templates)
+    if (isPermanentEditMode) {
+      return classLessons.filter(l => l.isPermanent);
+    }
 
+    // Weekly view mode:
+    // 1. Get all permanent lessons matching the week parity
     const permanentLessons = classLessons.filter(l =>
       l.isPermanent && (l.weekType === 'all' || l.weekType === activeWeekParity)
     );
 
+    // 2. Get exceptions defined for the currently viewed calendar week
     const allExceptions = classLessons.filter(l => !l.isPermanent);
     const currentWeekExceptions = allExceptions.filter(e =>
       e.exceptionDate && currentWeekDates.includes(e.exceptionDate)
     );
 
+    // 3. Remove permanent template items that are explicitly overridden or cancelled this week
     const filteredPermanents = permanentLessons.filter(p => {
       const dayIndex = days.indexOf(p.day);
       const associatedCalendarDate = currentWeekDates[dayIndex];
@@ -188,47 +244,69 @@ const ScheduleEditPage: React.FC = () => {
     return [...filteredPermanents, ...currentWeekExceptions];
   };
 
+  // ── Handlers ───────────────────────────────────────────────────────────────
+
   const handleLessonClick = (lesson: Lesson) => {
     if (isPermanentEditMode) {
-      setEditingLesson(lesson);
+      setEditingLesson({ ...lesson });
     } else {
       if (!lesson.isPermanent) {
-        setEditingLesson(lesson);
+        setEditingLesson({ ...lesson });
       } else {
         const dayIndex = days.indexOf(lesson.day);
         const targetedCalendarDate = currentWeekDates[dayIndex];
         setEditingLesson({
           ...lesson,
-          id: Date.now(),
+          id: `temp-${Date.now()}`,
           templateId: lesson.id,
           isPermanent: false,
           exceptionDate: targetedCalendarDate,
-          status: 'cancelled',
+          status: 'substituted',
         });
       }
     }
     setIsModalOpen(true);
   };
 
-  const handleAddNewPermanentLesson = () => {
+  const handleAddNewSlotLesson = (day: string, periodNumber: number, time: string) => {
     const defaultSubject = dbSubjects.length > 0 ? dbSubjects[0].name : '';
-    const defaultTeacher = dbTeachers.length > 0 ? `Mr. ${dbTeachers[0].lastName}` : '';
+    const defaultTeacher = dbTeachers.length > 0 ? `${dbTeachers[0].firstName} ${dbTeachers[0].lastName}` : '';
     const defaultRoom = dbRooms.length > 0 ? dbRooms[0].name : '';
 
-    setEditingLesson({
-      id: Date.now(), // Dočasné ID pro novou lekci
-      day: 'Monday',
-      time: timeSlots[0],
-      subject: defaultSubject,
-      teacher: defaultTeacher,
-      className: selectedClass,
-      room: defaultRoom,
-      weekType: 'all',
-      group: 'Whole Class',
-      color: 'border-gray-500 bg-gray-900/5',
-      isPermanent: true,
-      status: 'active'
-    });
+    if (isPermanentEditMode) {
+      setEditingLesson({
+        id: `new-${Date.now()}`,
+        day,
+        time,
+        periodNumber,
+        subject: defaultSubject,
+        teacher: defaultTeacher,
+        className: selectedClass,
+        room: defaultRoom,
+        weekType: 'all',
+        group: 'Whole Class',
+        isPermanent: true,
+        status: 'active'
+      });
+    } else {
+      const dayIndex = days.indexOf(day);
+      const exceptionDate = currentWeekDates[dayIndex];
+      setEditingLesson({
+        id: `new-${Date.now()}`,
+        day,
+        time,
+        periodNumber,
+        subject: defaultSubject,
+        teacher: defaultTeacher,
+        className: selectedClass,
+        room: defaultRoom,
+        weekType: 'all',
+        group: 'Whole Class',
+        isPermanent: false,
+        exceptionDate,
+        status: 'active'
+      });
+    }
     setIsModalOpen(true);
   };
 
@@ -240,10 +318,8 @@ const ScheduleEditPage: React.FC = () => {
   const handleSaveLesson = async () => {
     if (!editingLesson) return;
 
-    const isNewLesson = !editingLesson.id || editingLesson.id.toString().length > 10;
-    
-    // Testovací admin nastavený natvrdo, dokud nefunguje správně AuthContext
-    const testAdminName = "admin";
+    const isNewLesson = String(editingLesson.id).startsWith('new-') || String(editingLesson.id).startsWith('temp-');
+    const testAdminName = user?.userName || "admin";
     
     const url = isNewLesson 
       ? `${API_URL}/api/timetables/edit/${testAdminName}` 
@@ -264,392 +340,531 @@ const ScheduleEditPage: React.FC = () => {
       const result = await response.json();
 
       if (!result.success) {
-        throw new Error(result.message || 'Chyba při ukládání');
+        throw new Error(result.message || 'Error saving timetable data');
       }
 
-      const dbData = result.data;
-      const mappedLesson: Lesson = {
-        id: dbData.id,
-        day: dbData.day,
-        time: `${dbData.startTime} - ${dbData.endTime}`,
-        subject: dbData.subject.name,
-        teacher: `Mr. ${dbData.teacher.lastName}`, 
-        className: dbData.class.name,
-        room: dbData.room?.name || 'Neznámá třída',
-        weekType: dbData.week as any,
-        color: editingLesson.color || 'border-blue-500 bg-blue-50', 
-        isPermanent: editingLesson.isPermanent || true,
-        group: dbData.group || editingLesson.group || 'Whole Class',
-        status: editingLesson.status || 'active'
-      };
-
-      setLessons((prev) => {
-        if (isNewLesson) {
-          const filtered = prev.filter(l => l.id !== editingLesson.id);
-          return [...filtered, mappedLesson];
-        } else {
-          return prev.map((l) => (l.id === editingLesson.id ? mappedLesson : l));
-        }
-      });
-
+      await fetchClassTimetable();
       setIsModalOpen(false);
       setEditingLesson(null);
-    } catch (error) {
-      console.error("Chyba:", error);
-      alert("Nepodařilo se uložit data na server.");
-    } finally {
-      setSaving(false);
+    } catch (error: any) {
+      console.error("Save error:", error);
+      alert(error.message || "Failed to save lesson data.");
     }
   };
 
   const handleDeleteLesson = async (id: string | number) => {
-    if (id.toString().length > 10) { 
-      setLessons((prev) => prev.filter((l) => l.id !== id));
+    if (String(id).startsWith('new-') || String(id).startsWith('temp-')) { 
       setIsModalOpen(false);
+      setEditingLesson(null);
       return;
     }
 
+    if (!confirm('Are you sure you want to delete/discard this entry?')) return;
+
     try {
-      const testAdminName = "admin";
+      const testAdminName = user?.userName || "admin";
       const url = `${API_URL}/api/timetables/edit/${testAdminName}/${id}`;
       const response = await fetch(url, { method: 'DELETE' });
       const result = await response.json();
 
       if (result.success) {
-        setLessons((prev) => prev.filter((l) => l.id !== id));
+        await fetchClassTimetable();
         setIsModalOpen(false);
         setEditingLesson(null);
       } else {
-        alert("Nepodařilo se smazat z databáze.");
+        alert("Failed to delete entry from database.");
       }
     } catch (error) {
-      console.error("Chyba při mazání:", error);
+      console.error("Delete error:", error);
     }
   };
 
-const handleSubjectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextSubject = e.target.value;
-    // Už nefiltrujeme podle mapy, prostě jen uložíme vybraný předmět
-    setEditingLesson((prev) => prev ? { ...prev, subject: nextSubject } : null);
+  const handleCopyDay = (day: string) => {
+    const dayLessons = lessons.filter(l => l.day === day && l.isPermanent);
+    if (dayLessons.length === 0) {
+      alert(`No template lessons to copy on ${day}.`);
+      return;
+    }
+    setCopiedLessons(dayLessons);
+    setCopiedFromDay(day);
   };
 
-  const handleStatusChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
-    const nextStatus = e.target.value as any;
-    // Úplně stejné zjednodušení, jen uložíme nový status
-    setEditingLesson((prev) => prev ? { ...prev, status: nextStatus } : null);
-  };
+  const handlePasteDay = async (targetDay: string) => {
+    if (!copiedLessons || !copiedFromDay) return;
+    if (!confirm(`Are you sure you want to paste the schedule from ${copiedFromDay} to ${targetDay}? This will append the copied lessons.`)) return;
 
-  const getFilteredTeachers = () => {
-    if (!editingLesson) return [];
-    // Ať už je to suplování nebo normální hodina, vždycky vypíšeme 
-    // VŠECHNY skutečné učitele z tvé databáze
-    return dbTeachers.map(t => `${t.firstName} ${t.lastName}`);
+    const testAdminName = user?.userName || "admin";
+
+    try {
+      for (const lesson of copiedLessons) {
+        const newLessonPayload = {
+          day: targetDay,
+          time: lesson.time,
+          periodNumber: lesson.periodNumber,
+          subject: lesson.subject,
+          teacher: lesson.teacher,
+          className: selectedClass,
+          room: lesson.room,
+          weekType: lesson.weekType,
+          group: lesson.group,
+          isPermanent: true,
+          status: 'active'
+        };
+
+        const response = await fetch(`${API_URL}/api/timetables/edit/${testAdminName}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(newLessonPayload)
+        });
+        
+        if (!response.ok) {
+          throw new Error('Failed to paste some lessons');
+        }
+      }
+
+      await fetchClassTimetable();
+      alert(`Successfully pasted schedule to ${targetDay}!`);
+    } catch (error: any) {
+      console.error("Paste day error:", error);
+      alert(error.message || "Failed to paste some lessons.");
+    }
   };
 
   return (
-    <div className="p-8">
-      {saving && createPortal(
-        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-[99999]">
-          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
-            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
-            <p className="text-palette-pine font-bold text-lg">{savingLabel}</p>
-          </div>
-        </div>,
-        document.body
-      )}
-      {/* Top Controller Management Panel */}
-      <div className="bg-white p-6 rounded-2xl border border-gray-100 shadow-sm mb-8 flex flex-col lg:flex-row lg:items-center lg:justify-between gap-6">
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-300">
+      
+      {/* ─── Control Header ──────────────────────────────────────────────────── */}
+      <div className="bg-white p-6 rounded-2xl border border-palette-mist/60 shadow-soft flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
         <div className="flex flex-wrap items-center gap-6">
+          {/* Class Selector */}
           <div>
-            <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Selected Target Class</label>
+            <label className="block text-xs font-bold text-palette-moss uppercase tracking-wider mb-2">Target Class</label>
             <select
               value={selectedClass}
               onChange={(e) => setSelectedClass(e.target.value)}
-              disabled={isPermanentEditMode}
-              className="border border-gray-200 rounded-xl px-4 py-2.5 font-bold text-palette-pine bg-gray-50 outline-none focus:bg-white transition disabled:opacity-50"
+              className="border border-gray-200 rounded-xl px-4 py-2.5 font-bold text-palette-pine bg-gray-50 outline-none focus:ring-2 focus:ring-palette-meadow focus:bg-white transition"
             >
-              {dbClasses.length === 0 && <option value="">Načítám třídy...</option>}
+              {dbClasses.length === 0 && <option value="">Loading classes...</option>}
               {dbClasses.map(c => <option key={c.id} value={c.name}>Class {c.name}</option>)}
             </select>
           </div>
 
+          {/* Mode Switcher */}
+          <div>
+            <label className="block text-xs font-bold text-palette-moss uppercase tracking-wider mb-2">Scope Modifier</label>
+            <div className="flex bg-gray-100 p-1.5 rounded-xl border border-gray-200/60">
+              <button
+                onClick={() => setIsPermanentEditMode(false)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition ${!isPermanentEditMode ? 'bg-white text-palette-pine shadow-sm' : 'text-gray-500 hover:text-palette-pine'}`}
+              >
+                <span className="material-symbols-outlined text-[18px]">event_busy</span> Weekly Exceptions
+              </button>
+              <button
+                onClick={() => setIsPermanentEditMode(true)}
+                className={`flex items-center gap-2 px-4 py-2 rounded-lg font-bold text-sm transition ${isPermanentEditMode ? 'bg-palette-pine text-white shadow-sm' : 'text-gray-500 hover:text-palette-pine'}`}
+              >
+                <span className="material-symbols-outlined text-[18px]">calendar_month</span> Master Template
+              </button>
+            </div>
+          </div>
+
+          {/* Calendar navigation */}
           {!isPermanentEditMode && (
             <div>
-              <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Calendar Range Tracker</label>
+              <label className="block text-xs font-bold text-palette-moss uppercase tracking-wider mb-2">Calendar Navigation</label>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setWeekOffset(-1)}
-                  className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === -1 ? 'bg-palette-pine text-white border-transparent' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
+                  onClick={() => setWeekOffset(w => w - 1)}
+                  className="p-2 bg-gray-50 text-palette-pine border border-gray-200 rounded-xl hover:bg-gray-100 transition flex items-center"
+                  title="Previous week"
                 >
-                  Previous Week
+                  <span className="material-symbols-outlined">chevron_left</span>
                 </button>
                 <button
                   onClick={() => setWeekOffset(0)}
-                  className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === 0 ? 'bg-palette-pine text-white border-transparent shadow-inner' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
+                  className={`px-4 py-2 border rounded-xl font-bold text-sm transition flex items-center gap-1.5 ${weekOffset === 0 ? 'bg-palette-fern text-white border-transparent shadow-inner' : 'bg-gray-50 text-palette-pine hover:bg-gray-100'}`}
                 >
-                  Current Week
+                  <span className="material-symbols-outlined text-[18px]">today</span> Current Week
                 </button>
                 <button
-                  onClick={() => setWeekOffset(1)}
-                  className={`px-4 py-2.5 border rounded-xl font-bold text-sm transition ${weekOffset === 1 ? 'bg-palette-pine text-white border-transparent' : 'bg-gray-50 text-gray-700 hover:bg-gray-100'}`}
+                  onClick={() => setWeekOffset(w => w + 1)}
+                  className="p-2 bg-gray-50 text-palette-pine border border-gray-200 rounded-xl hover:bg-gray-100 transition flex items-center"
+                  title="Next week"
                 >
-                  Next Week
+                  <span className="material-symbols-outlined">chevron_right</span>
                 </button>
               </div>
             </div>
           )}
         </div>
 
-        <div className="flex items-center gap-4 self-end lg:self-auto">
-          {isPermanentEditMode && (
-            <button
-              onClick={handleAddNewPermanentLesson}
-              className="bg-gray-800 text-white px-5 py-3 rounded-xl hover:bg-gray-700 transition font-bold shadow-sm"
-            >
-              Add New Permanent Lesson
-            </button>
+        {/* Dynamic Context Header Status */}
+        <div className="flex items-center gap-4 xl:self-center">
+          {!isPermanentEditMode ? (
+            <div className="flex items-center gap-3 bg-palette-mist/70 p-2 rounded-2xl border border-palette-sage/30">
+              <span className="text-xs font-bold text-palette-moss uppercase tracking-wider pl-2">Active Frame:</span>
+              <div className="bg-white px-4 py-2 rounded-xl border border-gray-100 shadow-sm flex items-center gap-3">
+                <span className="text-sm font-bold text-palette-pine">Week {currentWeekNo}</span>
+                <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded tracking-wider ${isCurrentWeekEven ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
+                  {isCurrentWeekEven ? 'Even' : 'Odd'}
+                </span>
+              </div>
+            </div>
+          ) : (
+            <div className="flex items-center gap-2 bg-orange-50 text-orange-800 p-3 rounded-2xl border border-orange-200 text-sm font-semibold max-w-sm">
+              <span className="material-symbols-outlined text-orange-600">warning</span>
+              <span>Template alterations update the repeating yearly loop. Use Weekly Exceptions for temporary substitutions.</span>
+            </div>
           )}
-          <button
-            onClick={() => setIsPermanentEditMode(!isPermanentEditMode)}
-            className={`px-6 py-3 rounded-xl transition font-bold shadow-sm border-2 ${isPermanentEditMode
-                ? 'bg-red-50 text-red-600 border-red-600 hover:bg-red-100'
-                : 'bg-palette-pine text-white border-transparent hover:bg-palette-leaf'
-              }`}
-          >
-            {isPermanentEditMode ? 'Disable Permanent Modifications' : 'Enable Permanent Schedule Editing'}
-          </button>
         </div>
       </div>
 
-      {/* Week Parity State Highlighting Header */}
-      <div className="mb-8 flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-4xl font-bold text-palette-pine">Schedule Matrix: Class {selectedClass}</h1>
-          <p className="text-gray-500 mt-2">  
-            {isPermanentEditMode
-              ? 'Configuring master template cyclic rotations.'
-              : `Displaying timeline window from ${currentWeekDates[0]} to ${currentWeekDates[4]}`
-            }
-          </p>
-        </div>
-
-        {!isPermanentEditMode && (
-          <div className="flex items-center gap-3 bg-gray-100/80 p-1.5 rounded-2xl border border-gray-200 self-start md:self-auto">
-            <span className="text-xs font-bold text-gray-500 uppercase tracking-wider pl-3">Active Frame:</span>
-            <div className="bg-white px-4 py-2 rounded-xl border shadow-sm flex items-center gap-4">
-              <span className="text-sm font-bold text-palette-pine">Week {currentWeekNo}</span>
-              <span className={`text-xs font-black uppercase px-2.5 py-1 rounded-md tracking-wider ${isCurrentWeekEven ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}`}>
-                {isCurrentWeekEven ? 'Even Week' : 'Odd Week'}
-              </span>
-            </div>
-          </div>
-        )}
+      {/* ─── Page Title ──────────────────────────────────────────────────────── */}
+      <div>
+        <h1 className="text-4xl font-extrabold text-palette-pine tracking-tight">
+          Schedule Matrix: Class {selectedClass}
+        </h1>
+        <p className="text-palette-moss font-semibold mt-1">
+          {isPermanentEditMode
+            ? 'Configuring master rotation cyclic template.'
+            : `Calendar window view: ${formatDateCzech(currentWeekDates[0])} to ${formatDateCzech(currentWeekDates[4])} ${viewedMondayDate.getFullYear()}`
+          }
+        </p>
       </div>
 
-      {isPermanentEditMode && (
-        <div className="mb-6 p-4 bg-orange-50 border-l-4 border-orange-500 text-orange-800 rounded-r-lg font-medium">
-          Notice: You are editing the permanent weekly schedule template. Changes will affect all weeks.
-        </div>
-      )}
+      {/* ─── Grid Timeline Table (Days as Rows, Slots as Columns) ─────────────── */}
+      <div className="overflow-x-auto rounded-2xl border border-palette-sage/30 shadow-soft bg-white">
+        <table className="w-full border-collapse text-left">
+          <thead>
+            <tr className="bg-palette-mist/80 border-b border-palette-sage/30">
+              <th className="p-4 font-black text-palette-pine text-xs tracking-wider uppercase min-w-[125px]">
+                Day
+              </th>
+              {periods.map((p) => (
+                <th key={p.periodNumber} className="p-4 font-black text-palette-pine text-xs tracking-wider uppercase text-center min-w-[195px] border-l border-palette-sage/20">
+                  <div className="text-palette-leaf text-[11px] font-black tracking-normal lowercase first-letter:uppercase">{p.periodNumber}. Hour</div>
+                  <div className="text-[10px] text-palette-moss font-bold mt-0.5">{p.startTime} - {p.endTime}</div>
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {days.map((day, dayIndex) => {
+              const dayDateStr = currentWeekDates[dayIndex];
+              const displayedLessons = getVisibleLessons().filter(l => l.day === day);
 
-      {/* Grid Display Calendar Columns */}
-      <div className="grid grid-cols-1 lg:grid-cols-5 gap-6">
-        {days.map((day, index) => (
-          <div key={day} className="bg-white rounded-2xl shadow-sm p-5 border border-gray-100">
-            <div className="border-b pb-2 mb-5">
-              <h2 className="text-xl font-bold text-palette-pine">{day}</h2>
-              {!isPermanentEditMode && (
-                <span className="text-xs text-gray-400 font-medium block mt-0.5">{currentWeekDates[index]}</span>
-              )}
-            </div>
-
-            <div className="space-y-4">
-              {getVisibleLessons()
-                .filter((lesson) => lesson.day === day)
-                .sort((a, b) => a.time.localeCompare(b.time))
-                .map((lesson) => (
-                  <div
-                    key={lesson.id}
-                    onClick={() => handleLessonClick(lesson)}
-                    className={`rounded-xl border-l-4 p-4 shadow-sm cursor-pointer transition duration-200 
-                      hover:shadow-md hover:-translate-y-1 ${lesson.color} 
-                      ${lesson.status === 'cancelled' ? 'opacity-60 bg-red-50/50 border-red-400' : ''}
-                      h-44 flex flex-col justify-between
-                    `}
-                  >
-                    <div>
-                      <div className="flex justify-between items-start mb-1 gap-2">
-                        <p className="text-xs font-semibold text-gray-500 bg-white/50 px-2 py-1 rounded whitespace-nowrap">
-                          {lesson.time}
-                        </p>
-
-                        {lesson.isPermanent && isPermanentEditMode && (
-                          <span className={`text-[9px] px-1.5 py-0.5 font-bold uppercase rounded border ${lesson.weekType === 'even' ? 'bg-blue-50 border-blue-200 text-blue-700' : lesson.weekType === 'odd' ? 'bg-purple-50 border-purple-200 text-purple-700' : 'bg-gray-50 border-gray-200 text-gray-600'}`}>
-                            {lesson.weekType === 'all' ? 'All' : lesson.weekType}
-                          </span>
-                        )}
-
-                        {!lesson.isPermanent && (
-                          <span className={`text-[9px] px-2 py-0.5 rounded-full font-bold uppercase tracking-wider ${lesson.status === 'cancelled' ? 'bg-red-100 text-red-800' : 'bg-amber-100 text-amber-800'}`}>
-                            {lesson.status === 'cancelled' ? 'Cancelled' : 'Substituted'}
-                          </span>
-                        )}
-                      </div>
-
-                      <h3 className={`font-bold text-palette-pine text-lg mt-1 line-clamp-1 ${lesson.status === 'cancelled' ? 'line-through text-gray-400' : ''}`}>
-                        {lesson.subject}
-                      </h3>
-                    </div>
-
-                    <div className="mt-2">
-                      {lesson.status !== 'cancelled' ? (
-                        <div className="text-xs text-gray-600 space-y-0.5 bg-white/40 p-1.5 rounded-lg border border-gray-50">
-                          <p><span className="font-medium text-gray-400">Teacher:</span> {lesson.teacher}</p>
-                          <p><span className="font-medium text-gray-400">Room:</span> {lesson.room}</p>
-                          <p><span className="font-medium text-gray-400">Division:</span> <span className="font-semibold text-palette-pine">{lesson.group}</span></p>
-                        </div>
-                      ) : (
-                        <div className="bg-red-50/50 p-2 rounded-lg border border-red-100/70 text-center">
-                          <p className="text-xs font-bold text-red-500">Class has been called off.</p>
+              return (
+                <tr key={day} className="border-b border-palette-sage/20 last:border-0 hover:bg-palette-mist/20 transition duration-150 group">
+                  {/* Row Header Cell (Day) */}
+                  <td className="p-4 align-middle bg-palette-mist/40 border-r border-palette-sage/30 text-center select-none">
+                    <div className="flex flex-col items-center justify-center gap-1">
+                      <span className="text-base font-black text-palette-pine">{day}</span>
+                      {!isPermanentEditMode && (
+                        <span className="text-[11px] text-palette-moss font-bold">
+                          {formatDateCzech(dayDateStr)}
+                        </span>
+                      )}
+                      
+                      {/* Copy/Paste Day Actions */}
+                      {isPermanentEditMode && (
+                        <div className="flex items-center gap-1.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
+                          <button
+                            type="button"
+                            onClick={() => handleCopyDay(day)}
+                            className="p-1 text-palette-moss hover:text-palette-pine rounded hover:bg-palette-mist transition flex items-center"
+                            title={`Copy ${day}'s template schedule`}
+                          >
+                            <span className="material-symbols-outlined text-[16px]">content_copy</span>
+                          </button>
+                          {copiedLessons && copiedFromDay !== day && (
+                            <button
+                              type="button"
+                              onClick={() => handlePasteDay(day)}
+                              className="p-1 text-palette-leaf hover:text-palette-grass rounded hover:bg-palette-mist transition flex items-center"
+                              title={`Paste copied template to ${day}`}
+                            >
+                              <span className="material-symbols-outlined text-[16px]">content_paste</span>
+                            </button>
+                          )}
                         </div>
                       )}
                     </div>
-                  </div>
-                ))}
-            </div>
-          </div>
-        ))}
+                  </td>
+
+                  {/* Time Slots Cells */}
+                  {periods.map((p) => {
+                    const slotLessons = displayedLessons.filter(l => l.periodNumber === p.periodNumber);
+                    const slotTime = `${p.startTime} - ${p.endTime}`;
+
+                    return (
+                      <td key={p.periodNumber} className="p-3 border-r border-palette-sage/20 last:border-r-0 align-middle">
+                        <div className="space-y-2">
+                          {slotLessons.map((lesson) => {
+                            const isCancelled = lesson.status === 'cancelled';
+                            const isSubstituted = lesson.status === 'substituted';
+                            const colorClasses = getSubjectColorClasses(lesson.subject);
+
+                            return (
+                              <div
+                                key={lesson.id}
+                                onClick={(e) => { e.stopPropagation(); handleLessonClick(lesson); }}
+                                className={`rounded-xl border-l-4 p-3.5 shadow-sm cursor-pointer transition-all duration-200 
+                                  hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between ${colorClasses}
+                                  ${isCancelled ? 'bg-red-50/60 border-red-500 text-red-950/60 opacity-60' : ''}
+                                  ${isSubstituted ? 'bg-orange-50/80 border-orange-500 text-orange-950' : ''}
+                                  min-h-[115px]
+                                `}
+                              >
+                                <div>
+                                  <div className="flex justify-between items-center gap-1.5">
+                                    <h3 className={`font-extrabold text-sm line-clamp-1 leading-snug ${isCancelled ? 'line-through text-gray-400' : ''}`}>
+                                      {lesson.subject}
+                                    </h3>
+                                    
+                                    {/* Template Parity Tag */}
+                                    {lesson.isPermanent && isPermanentEditMode && lesson.weekType !== 'all' && (
+                                      <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase tracking-wide border ${lesson.weekType === 'even' ? 'bg-blue-100 border-blue-200 text-blue-800' : 'bg-purple-100 border-purple-200 text-purple-800'}`}>
+                                        {lesson.weekType}
+                                      </span>
+                                    )}
+
+                                    {/* Exception Status Tag */}
+                                    {!lesson.isPermanent && (
+                                      <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase tracking-wider ${isCancelled ? 'bg-red-100 text-red-800' : 'bg-orange-100 text-orange-800'}`}>
+                                        {isCancelled ? 'Cancel' : 'Subst'}
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="mt-2 text-[10px] space-y-0.5 bg-white/40 p-1.5 rounded border border-white/50 text-gray-700">
+                                  {!isCancelled ? (
+                                    <>
+                                      <p className="truncate flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[12px] text-palette-moss">person</span>
+                                        <span>{lesson.teacher}</span>
+                                      </p>
+                                      <p className="flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[12px] text-palette-moss">meeting_room</span>
+                                        <span>{lesson.room}</span>
+                                      </p>
+                                      <p className="flex items-center gap-1">
+                                        <span className="material-symbols-outlined text-[12px] text-palette-moss">groups</span>
+                                        <span className="font-bold text-palette-pine">{lesson.group}</span>
+                                      </p>
+                                    </>
+                                  ) : (
+                                    <p className="text-[10px] font-bold text-red-600 text-center py-1">Called off</p>
+                                  )}
+                                </div>
+                              </div>
+                            );
+                          })}
+
+                          {/* Split Group Option Button */}
+                          {isPermanentEditMode && slotLessons.length > 0 && slotLessons.length < 3 && (
+                            <button
+                              type="button"
+                              onClick={(e) => { e.stopPropagation(); handleAddNewSlotLesson(day, p.periodNumber, slotTime); }}
+                              className="w-full py-1 text-[10px] text-gray-500 bg-palette-mist hover:text-palette-pine rounded-lg hover:bg-palette-lichen/20 transition flex items-center justify-center gap-1 font-bold border border-palette-sage/20"
+                            >
+                              <span className="material-symbols-outlined text-[12px]">add</span> Add Split Group
+                            </button>
+                          )}
+
+                          {/* Empty Slot Placeholder */}
+                          {slotLessons.length === 0 && (
+                            <div
+                              onClick={() => handleAddNewSlotLesson(day, p.periodNumber, slotTime)}
+                              className="flex flex-col items-center justify-center min-h-[115px] w-full cursor-pointer hover:bg-palette-mist/50 rounded-xl transition duration-150 group text-palette-lichen hover:text-palette-leaf"
+                            >
+                              <span className="material-symbols-outlined text-[20px] scale-90 group-hover:scale-110 transition-transform duration-200">add_circle</span>
+                              <span className="text-[10px] font-black mt-1 uppercase tracking-wider opacity-0 group-hover:opacity-100 transition-opacity duration-200">Add Lesson</span>
+                            </div>
+                          )}
+                        </div>
+                      </td>
+                    );
+                  })}
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
       </div>
 
-      {/* Modal Configuration View */}
+      {/* ─── Modal Dialog View ──────────────────────────────────────────────── */}
       {isModalOpen && editingLesson && (
-        <div className="fixed inset-0 bg-black/50 flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
-          <div className="bg-white rounded-2xl p-8 w-full max-w-lg shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <h2 className="text-2xl font-bold text-palette-pine mb-2">
-              {isPermanentEditMode ? 'Edit Permanent Lesson' : 'Single-Day Lesson Exception'}
-            </h2>
-            <p className="text-sm text-gray-500 mb-6 border-b pb-4">
-              Modifying configuration properties specifically for <span className="font-bold text-gray-800">Class {selectedClass}</span>.
-            </p>
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
+          <div className="bg-white rounded-2xl p-6 md:p-8 w-full max-w-lg shadow-2xl border border-palette-mist animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
+            
+            <div className="flex justify-between items-start border-b pb-4 mb-5">
+              <div>
+                <h2 className="text-2xl font-bold text-palette-pine">
+                  {isPermanentEditMode ? 'Modify Weekly Template' : 'Configure Weekly Exception'}
+                </h2>
+                <p className="text-xs font-semibold text-palette-moss mt-1">
+                  Adjusting schedule details for <span className="font-bold text-palette-pine">Class {selectedClass}</span>.
+                </p>
+              </div>
+              <button onClick={() => setIsModalOpen(false)} className="text-gray-400 hover:text-palette-pine flex items-center">
+                <span className="material-symbols-outlined text-[24px]">close</span>
+              </button>
+            </div>
 
             <div className="space-y-4">
+              
+              {/* Exceptions controls info block */}
               {!isPermanentEditMode && (
-                <div className="grid grid-cols-2 gap-4 bg-red-50 p-4 rounded-xl border border-red-100 mb-4">
-                  <div>
-                    <label className="block text-sm font-bold text-red-700 mb-1">Exception Date</label>
-                    <input type="date" name="exceptionDate" value={editingLesson.exceptionDate || ''} disabled className="w-full border rounded-lg p-2 outline-none bg-gray-100 text-gray-500 cursor-not-allowed" />
-                  </div>
-                  <div>
-                    <label className="block text-sm font-bold text-red-700 mb-1">Action Status</label>
-                    <select name="status" value={editingLesson.status} onChange={handleStatusChange} className="w-full border rounded-lg p-2 outline-none bg-white">
-                      <option value="cancelled">Cancelled (No Class)</option>
-                      <option value="substituted">Substitution</option>
-                      <option value="regular">Regular Class (Reset)</option>
-                    </select>
+                <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl space-y-3">
+                  <div className="grid grid-cols-2 gap-4">
+                    <div>
+                      <label className="block text-xs font-bold text-orange-800 uppercase mb-1">Target Date</label>
+                      <input type="text" value={editingLesson.exceptionDate ? formatDateCzech(editingLesson.exceptionDate) + " " + editingLesson.exceptionDate.split('-')[0] : ''} disabled className="w-full border border-orange-200/50 rounded-lg p-2 outline-none bg-orange-100/50 text-orange-900 font-semibold cursor-not-allowed text-sm" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-orange-800 uppercase mb-1">Weekly Action</label>
+                      <select name="status" value={editingLesson.status || 'active'} onChange={(e) => setEditingLesson(prev => prev ? { ...prev, status: e.target.value as any } : null)} className="w-full border border-orange-300 rounded-lg p-2 outline-none bg-white text-orange-950 font-semibold text-sm">
+                        <option value="substituted">Substitution (Suplování)</option>
+                        <option value="cancelled">Called Off (Odpadá)</option>
+                        <option value="active">Regular Class (Vyučuje se)</option>
+                      </select>
+                    </div>
                   </div>
                 </div>
               )}
 
+              {/* Day & Time Slot */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Day</label>
-                  <select name="day" value={editingLesson.day} onChange={handleChange} disabled={!isPermanentEditMode} className="w-full border rounded-lg p-2 bg-gray-50 outline-none disabled:opacity-60">
+                  <label className="block text-xs font-bold text-palette-pine uppercase mb-1.5">Day</label>
+                  <select name="day" value={editingLesson.day} onChange={handleChange} disabled={!isPermanentEditMode} className="w-full border border-gray-200 rounded-lg p-2.5 bg-gray-50 outline-none disabled:opacity-60 text-sm font-semibold">
                     {days.map(d => <option key={d} value={d}>{d}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Time Slot</label>
-                  <select name="time" value={editingLesson.time} onChange={handleChange} disabled={!isPermanentEditMode} className="w-full border rounded-lg p-2 bg-gray-50 outline-none disabled:opacity-60">
-                    {timeSlots.map(t => <option key={t} value={t}>{t}</option>)}
+                  <label className="block text-xs font-bold text-palette-pine uppercase mb-1.5">Period</label>
+                  <select
+                    name="periodNumber"
+                    value={editingLesson.periodNumber || 1}
+                    onChange={(e) => {
+                      const pNum = Number(e.target.value);
+                      const p = periods.find(x => x.periodNumber === pNum);
+                      setEditingLesson(prev => prev ? {
+                        ...prev,
+                        periodNumber: pNum,
+                        time: p ? `${p.startTime} - ${p.endTime}` : ''
+                      } : null);
+                    }}
+                    disabled={!isPermanentEditMode}
+                    className="w-full border border-gray-200 rounded-lg p-2.5 bg-white outline-none disabled:opacity-60 text-sm font-semibold"
+                  >
+                    {periods.map(p => (
+                      <option key={p.periodNumber} value={p.periodNumber}>
+                        {p.periodNumber}. Hour ({p.startTime} - {p.endTime})
+                      </option>
+                    ))}
                   </select>
                 </div>
               </div>
 
+              {/* Parity (Template mode only) */}
               {isPermanentEditMode && (
-                <div className="bg-gray-50 p-3.5 rounded-xl border border-gray-200/60">
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Cyclic Week Parity Rotation</label>
-                  <select name="weekType" value={editingLesson.weekType} onChange={handleChange} className="w-full border rounded-lg p-2 bg-white outline-none focus:border-palette-pine">
-                    <option value="all">Every Week (No Rotation)</option>
-                    <option value="even">Even Calendar Weeks Only</option>
-                    <option value="odd">Odd Calendar Weeks Only</option>
+                <div>
+                  <label className="block text-xs font-bold text-palette-pine uppercase mb-1.5">Rotation Recurrence</label>
+                  <select name="weekType" value={editingLesson.weekType} onChange={handleChange} className="w-full border border-gray-200 rounded-lg p-2.5 bg-white outline-none focus:border-palette-meadow text-sm font-semibold">
+                    <option value="all">Every Week (All cycles)</option>
+                    <option value="even">Even Weeks Only (Sudé týdny)</option>
+                    <option value="odd">Odd Weeks Only (Liché týdny)</option>
                   </select>
                 </div>
               )}
 
+              {/* Subject, Group */}
               <div className="grid grid-cols-2 gap-4">
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Subject Name</label>
+                  <label className="block text-xs font-bold text-palette-pine uppercase mb-1.5">Subject</label>
                   <select
                     name="subject"
                     value={editingLesson.subject || ''}
-                    onChange={handleSubjectChange}
-                    disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'}
-                    className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60 font-medium"
+                    onChange={(e) => setEditingLesson(prev => prev ? { ...prev, subject: e.target.value } : null)}
+                    disabled={editingLesson.status === 'cancelled'}
+                    className="w-full border border-gray-200 rounded-lg p-2.5 bg-white outline-none focus:border-palette-meadow disabled:bg-gray-100 disabled:opacity-50 text-sm font-semibold"
                   >
-                    {dbSubjects.length === 0 && <option value="" disabled>Načítám předměty...</option>}
-                    {dbSubjects.length > 0 && <option value="" disabled>Select subject...</option>}
+                    {dbSubjects.length === 0 && <option value="" disabled>Loading subjects...</option>}
+                    {dbSubjects.length > 0 && <option value="" disabled>Select subject</option>}
                     {dbSubjects.map(s => <option key={s.id} value={s.name}>{s.name}</option>)}
                   </select>
                 </div>
                 <div>
-                  <label className="block text-sm font-bold text-gray-700 mb-1">Class Division Group</label>
-                  <select name="group" value={editingLesson.group} onChange={handleChange} disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'} className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60">
+                  <label className="block text-xs font-bold text-palette-pine uppercase mb-1.5">Student Division</label>
+                  <select name="group" value={editingLesson.group} onChange={handleChange} disabled={editingLesson.status === 'cancelled'} className="w-full border border-gray-200 rounded-lg p-2.5 bg-white outline-none focus:border-palette-meadow disabled:bg-gray-100 disabled:opacity-50 text-sm font-semibold">
                     {availableGroups.map(g => <option key={g} value={g}>{g}</option>)}
                   </select>
                 </div>
               </div>
 
+              {/* Teacher */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">
-                  Assigned Teacher {editingLesson.status === 'substituted' && <span className="text-xs text-amber-600 font-normal">(Substitution Mode: All options opened)</span>}
+                <label className="block text-xs font-bold text-palette-pine uppercase mb-1.5">
+                  Assigned Teacher
                 </label>
                 <select
                   name="teacher"
                   value={editingLesson.teacher || ''}
                   onChange={handleChange}
-                  disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular' || !editingLesson.subject}
-                  className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60"
+                  disabled={editingLesson.status === 'cancelled' || !editingLesson.subject}
+                  className="w-full border border-gray-200 rounded-lg p-2.5 bg-white outline-none focus:border-palette-meadow disabled:bg-gray-100 disabled:opacity-50 text-sm font-semibold"
                 >
-                  {dbTeachers.length === 0 && <option value="" disabled>Načítám učitele...</option>}
-                  {dbTeachers.length > 0 && <option value="" disabled>Select teacher...</option>}
-                  {getFilteredTeachers().map((teacherName) => (
-                    <option key={teacherName} value={teacherName}>{teacherName}</option>
-                  ))}
+                  {dbTeachers.length === 0 && <option value="" disabled>Loading teachers...</option>}
+                  {dbTeachers.length > 0 && <option value="" disabled>Select teacher</option>}
+                  {dbTeachers.map(t => {
+                    const fullName = `${t.firstName} ${t.lastName}`;
+                    return <option key={t.id} value={fullName}>{fullName}</option>;
+                  })}
                 </select>
               </div>
 
+              {/* Room */}
               <div>
-                <label className="block text-sm font-bold text-gray-700 mb-1">Assigned Room</label>
-                <select name="room" value={editingLesson.room} onChange={handleChange} disabled={editingLesson.status === 'cancelled' || editingLesson.status === 'regular'} className="w-full border rounded-lg p-2 bg-gray-50 outline-none focus:border-palette-pine disabled:opacity-60">
-                  {dbRooms.length === 0 && <option value="" disabled>Načítám místnosti...</option>}
+                <label className="block text-xs font-bold text-palette-pine uppercase mb-1.5">Room Location</label>
+                <select name="room" value={editingLesson.room} onChange={handleChange} disabled={editingLesson.status === 'cancelled'} className="w-full border border-gray-200 rounded-lg p-2.5 bg-white outline-none focus:border-palette-meadow disabled:bg-gray-100 disabled:opacity-50 text-sm font-semibold">
+                  {dbRooms.length === 0 && <option value="" disabled>Loading rooms...</option>}
                   {dbRooms.map(r => <option key={r.id} value={r.name}>{r.name}</option>)}
                 </select>
               </div>
+
             </div>
 
-            <div className="flex justify-between items-center mt-8 pt-4 border-t">
+            {/* Actions bottom footer */}
+            <div className="flex justify-between items-center mt-8 pt-4 border-t border-gray-100">
               <button
+                type="button"
                 onClick={() => handleDeleteLesson(editingLesson.id!)}
-                className="text-red-500 hover:bg-red-50 px-4 py-2 rounded-lg font-bold transition"
+                className="text-red-500 hover:bg-red-50 px-4 py-2.5 rounded-xl font-bold text-sm transition flex items-center gap-1.5"
               >
-                {isPermanentEditMode ? 'Remove from Template' : 'Discard Exception'}
+                <span className="material-symbols-outlined text-[18px]">delete</span>
+                {isPermanentEditMode ? 'Delete Template' : 'Discard Exception'}
               </button>
-              <div className="space-x-3">
+              <div className="flex items-center gap-3">
                 <button
+                  type="button"
                   onClick={() => setIsModalOpen(false)}
-                  className="px-4 py-2 text-gray-500 hover:bg-gray-100 rounded-lg transition"
+                  className="px-4 py-2.5 border border-gray-200 text-gray-500 hover:bg-gray-50 rounded-xl text-sm font-bold transition"
                 >
                   Close
                 </button>
                 <button
+                  type="button"
                   onClick={handleSaveLesson}
-                  disabled={saving}
-                  className="px-6 py-2 bg-palette-pine text-white font-bold rounded-lg hover:bg-palette-leaf transition shadow-sm disabled:opacity-50 disabled:cursor-not-allowed"
+                  className="px-6 py-2.5 bg-palette-pine text-white font-bold rounded-xl hover:bg-palette-leaf transition shadow-sm text-sm flex items-center gap-1.5"
                 >
+                  <span className="material-symbols-outlined text-[18px]">save</span>
                   Save Changes
                 </button>
               </div>
             </div>
+
           </div>
         </div>
       )}
