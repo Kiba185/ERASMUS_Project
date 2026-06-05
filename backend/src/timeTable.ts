@@ -228,9 +228,10 @@ router.delete("/api/timetables/edit/:userId/:timetableId", async (req, res, next
 // ---------------------------------------------------------
 router.get("/api/timetables/:userId", async (req, res, next) => {
     const userIdentifier = req.params.userId;
+    const isId = !isNaN(Number(userIdentifier));
     
     const user = await prisma.user.findFirst({
-        where: { username: userIdentifier },
+        where: isId ? { id: Number(userIdentifier) } : { username: userIdentifier },
         include: { classes: true }
     });
 
@@ -269,6 +270,21 @@ router.get("/api/timetables/:userId", async (req, res, next) => {
         return res.json(timetable);
     }
 });
+// ---------------------------------------------------------
+// EXTRA: GET TIMETABLE BY CLASS ID
+// ---------------------------------------------------------
+router.get("/api/timetables/class-id/:classId", async (req, res) => {
+    try {
+        const timetable = await prisma.timeTable.findMany({
+            where: { classId: Number(req.params.classId) },
+            include: { subject: true, teacher: true, class: true, room: true }
+        });
+        res.json(timetable);
+    } catch (error: any) {
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
 // ---------------------------------------------------------
 // EXTRA: GET TIMETABLE BY CLASS NAME (Pro editační stránku)
 // ---------------------------------------------------------

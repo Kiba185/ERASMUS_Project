@@ -201,14 +201,20 @@ router.post('/api/absence-notes', async (req, res, next) => {
 router.get('/api/absence-notes/inbox', async (req, res, next) => {
   if (await requireAuth(req, res, next, 5) !== true) return;
   try {
-    // Teachers (Head Teachers) see absence notes for their class
+    // Teachers (Head Teachers) see absence notes for the students in their class
     const notes = await prisma.absenceNote.findMany({
       where: {
-        attendance: { class: { classTeacherId: req.session.userId! } },
+        student: {
+          classes: {
+            some: {
+              classTeacherId: req.session.userId!
+            }
+          }
+        }
       },
       include: {
         student: { select: { firstName: true, lastName: true } },
-        attendance: { include: { subject: true } }
+        attendance: { include: { subject: true, class: { select: { id: true } } } }
       },
       orderBy: { createdAt: 'desc' }
     });
@@ -225,10 +231,45 @@ router.put('/api/absence-notes/:id/approve', async (req, res, next) => {
       where: { id: Number(req.params.id) },
       data: { status: 'excused' },
     });
-    // Also update the attendance record
+    // Mark the attendance record as excused (status: 'absent', absenceType: 'Excused absence')
     await prisma.attendance.update({
       where: { id: note.attendanceId },
-      data: { status: 'Excused absence' }
+      data: { status: 'absent', absenceType: 'Excused absence' }
+    });
+    res.json({ success: true, data: note });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.put('/api/absence-notes/:id/bulk-approve', async (req, res, next) => {
+  if (await requireAuth(req, res, next, 5) !== true) return;
+  try {
+    const { attendanceIds } = req.body;
+    if (!Array.isArray(attendanceIds)) throw new Error('attendanceIds must be an array');
+
+    const note = await prisma.absenceNote.update({
+      where: { id: Number(req.params.id) },
+      data: { status: 'excused' },
+    });
+
+    await prisma.attendance.updateMany({
+      where: { id: { in: attendanceIds.map(Number) } },
+      data: { status: 'absent', absenceType: 'Excused absence' }
+    });
+
+    res.json({ success: true, data: note });
+  } catch (e: any) {
+    res.status(500).json({ success: false, message: e.message });
+  }
+});
+
+router.put('/api/absence-notes/:id/reject', async (req, res, next) => {
+  if (await requireAuth(req, res, next, 5) !== true) return;
+  try {
+    // Delete the note, or set its status to something else. Let's delete it so parent can try again.
+    const note = await prisma.absenceNote.delete({
+      where: { id: Number(req.params.id) }
     });
     res.json({ success: true, data: note });
   } catch (e: any) {

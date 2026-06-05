@@ -145,387 +145,174 @@ app.post('/api/admin/createuser', async (req, res, next) => {
 });
 
 
-// INITIALIZE DB
 app.get('/api/initialize', async (req, res, next) => {
     try {
-        const users = await prisma.user.findMany();
-        if (users.length > 0) {
+        const usersCount = await prisma.user.count();
+        if (usersCount > 0) {
             return res.status(400).json({ success: false, message: 'Database is not empty' });
         }
 
-        // ─── USERS ───────────────────────────────────────────────────────────
-        const hash = (pw: string) => bcrypt.hash(pw, 10);
+        console.log('Starting database initialization. Please wait...');
 
+        // 1. Security & default password (Hash only once for performance!)
+        const defaultPassword = await bcrypt.hash('password123', 10);
+
+        // 2. Create Periods, Rooms, and Subjects
+        console.log('- Creating basic dictionaries (periods, rooms, subjects)...');
+        await prisma.period.createMany({
+            data: Array.from({ length: 8 }).map((_, i) => ({
+                periodNumber: i + 1,
+                startTime: `${7 + i}:00`,
+                endTime: `${7 + i}:45`
+            }))
+        });
+
+        const rooms = await Promise.all(['101', '102', '103', 'Gymnasium', 'Computer Lab'].map(name => 
+            prisma.room.create({ data: { name } })
+        ));
+
+        const subjectsData = [
+            { name: 'Mathematics', code: 'MAT', color: '#e63946' },
+            { name: 'English', code: 'ENG', color: '#457b9d' },
+            { name: 'Science', code: 'SCI', color: '#1d3557' },
+            { name: 'Computer Science', code: 'CS', color: '#2a9d8f' },
+            { name: 'Physical Education', code: 'PE', color: '#f4a261' }
+        ];
+        const subjects = await Promise.all(subjectsData.map(s => prisma.subject.create({ data: s })));
+
+        // 3. Admin and Teachers
+        console.log('- Creating users and teachers...');
         const admin = await prisma.user.create({
-            data: {
-                role: 'admin',
-                password: await hash('admin'),
-                firstName: 'Admin',
-                lastName: 'User',
-                birthday: new Date('1980-01-01'),
-                username: 'admin',
-                email: 'admin@example.com',
-                phone: '100000000',
-                adress: '1 Admin Lane',
-            },
+            data: { role: 'admin', firstName: 'Super', lastName: 'Admin', birthday: new Date('1980-01-01'), username: 'admin', password: defaultPassword, email: 'admin@school.example.com', phone: '111222333', adress: '1 Admin Way' }
         });
 
-        const teachers = await Promise.all([
-            prisma.user.create({
+        const teachers = [];
+        for (let i = 1; i <= 10; i++) {
+            const subject = subjects[i % subjects.length];
+            const teacher = await prisma.user.create({
                 data: {
-                    role: 'teacher',
-                    password: await hash('teacher'),
-                    firstName: 'Alice',
-                    lastName: 'Martin',
-                    birthday: new Date('1985-03-15'),
-                    username: 'teacher',
-                    email: 'teacher@example.com',
-                    phone: '200000001',
-                    adress: '10 Oak Street',
-                },
-            }),
-            prisma.user.create({
-                data: {
-                    role: 'teacher',
-                    password: await hash('teacher2'),
-                    firstName: 'Bob',
-                    lastName: 'Chen',
-                    birthday: new Date('1979-07-22'),
-                    username: 'teacher2',
-                    email: 'teacher2@example.com',
-                    phone: '200000002',
-                    adress: '12 Oak Street',
-                },
-            }),
-        ]);
+                    role: 'teacher', firstName: 'Teacher', lastName: `${i}`, birthday: new Date('1975-05-05'), username: `teacher${i}`, password: defaultPassword, email: `teacher${i}@school.example.com`, phone: `22233344${i}`, adress: `School St ${i}`,
+                    subjects: { connect: [{ id: subject.id }] }
+                }
+            });
+            teachers.push(teacher);
+        }
 
-        const parents = await Promise.all([
-            prisma.user.create({
-                data: {
-                    role: 'parent',
-                    password: await hash('parent'),
-                    firstName: 'Carol',
-                    lastName: 'Smith',
-                    birthday: new Date('1975-06-10'),
-                    username: 'parent',
-                    email: 'parent@example.com',
-                    phone: '300000001',
-                    adress: '5 Maple Ave',
-                },
-            }),
-            prisma.user.create({
-                data: {
-                    role: 'parent',
-                    password: await hash('parent2'),
-                    firstName: 'David',
-                    lastName: 'Jones',
-                    birthday: new Date('1973-11-30'),
-                    username: 'parent2',
-                    email: 'parent2@example.com',
-                    phone: '300000002',
-                    adress: '7 Maple Ave',
-                },
-            }),
-        ]);
-
-        const students = await Promise.all([
-            prisma.user.create({
-                data: {
-                    role: 'student',
-                    password: await hash('student'),
-                    firstName: 'Emma',
-                    lastName: 'Smith',
-                    birthday: new Date('2010-04-12'),
-                    username: 'student',
-                    email: 'student@example.com',
-                    phone: '400000001',
-                    adress: '5 Maple Ave',
-                    parentId: parents[0].id,
-                },
-            }),
-            prisma.user.create({
-                data: {
-                    role: 'student',
-                    password: await hash('student2'),
-                    firstName: 'Liam',
-                    lastName: 'Jones',
-                    birthday: new Date('2010-09-05'),
-                    username: 'student2',
-                    email: 'student2@example.com',
-                    phone: '400000002',
-                    adress: '7 Maple Ave',
-                    parentId: parents[1].id,
-                },
-            }),
-            prisma.user.create({
-                data: {
-                    role: 'student',
-                    password: await hash('student3'),
-                    firstName: 'Sophia',
-                    lastName: 'Brown',
-                    birthday: new Date('2011-01-20'),
-                    username: 'student3',
-                    email: 'student3@example.com',
-                    phone: '400000003',
-                    adress: '9 Birch Rd',
-                },
-            }),
-            prisma.user.create({
-                data: {
-                    role: 'student',
-                    password: await hash('student4'),
-                    firstName: 'Noah',
-                    lastName: 'Davis',
-                    birthday: new Date('2011-03-14'),
-                    username: 'student4',
-                    email: 'student4@example.com',
-                    phone: '400000004',
-                    adress: '11 Birch Rd',
-                },
-            }),
-        ]);
-
-        // ─── SUBJECTS ────────────────────────────────────────────────────────
-        const subjects = await Promise.all([
-            prisma.subject.create({
-                data: {
-                    name: 'Mathematics',
-                    code: 'MATH',
-                    color: '#4f46e5',
-                    teachers: { connect: [{ id: teachers[0].id }] },
-                },
-            }),
-            prisma.subject.create({
-                data: {
-                    name: 'English',
-                    code: 'ENG',
-                    color: '#0891b2',
-                    teachers: { connect: [{ id: teachers[1].id }] },
-                },
-            }),
-            prisma.subject.create({
-                data: {
-                    name: 'Science',
-                    code: 'SCI',
-                    color: '#16a34a',
-                    teachers: { connect: [{ id: teachers[0].id }] },
-                },
-            }),
-            prisma.subject.create({
-                data: {
-                    name: 'History',
-                    code: 'HIST',
-                    color: '#b45309',
-                    teachers: { connect: [{ id: teachers[1].id }] },
-                },
-            }),
-        ]);
-
-        // ─── ROOMS ───────────────────────────────────────────────────────────
-        const rooms = await Promise.all([
-            prisma.room.create({ data: { name: 'Room 101' } }),
-            prisma.room.create({ data: { name: 'Room 102' } }),
-            prisma.room.create({ data: { name: 'Science Lab' } }),
-        ]);
-
-        // ─── PERIODS ─────────────────────────────────────────────────────────
-        const periodDefs = [
-            { periodNumber: 1, startTime: '08:00', endTime: '08:45' },
-            { periodNumber: 2, startTime: '08:50', endTime: '09:35' },
-            { periodNumber: 3, startTime: '09:50', endTime: '10:35' },
-            { periodNumber: 4, startTime: '10:40', endTime: '11:25' },
-            { periodNumber: 5, startTime: '12:00', endTime: '12:45' },
-        ];
-        await prisma.period.createMany({ data: periodDefs });
-
-        // ─── CLASS ───────────────────────────────────────────────────────────
-        const mainClass = await prisma.class.create({
-            data: {
-                name: '6A',
-                students: { connect: students.map((s) => ({ id: s.id })) },
-                classTeacherId: teachers[0].id,
-            },
-        });
-
-        // ─── GROUPS ──────────────────────────────────────────────────────────
-        await Promise.all([
-            prisma.group.create({
-                data: {
-                    name: 'Group A',
-                    classId: mainClass.id,
-                    students: { connect: [{ id: students[0].id }, { id: students[1].id }] },
-                },
-            }),
-            prisma.group.create({
-                data: {
-                    name: 'Group B',
-                    classId: mainClass.id,
-                    students: { connect: [{ id: students[2].id }, { id: students[3].id }] },
-                },
-            }),
-        ]);
-
-        // ─── TIMETABLE ───────────────────────────────────────────────────────
-        // Monday & Wednesday: Math (period 1) and English (period 2)
-        // Tuesday & Thursday: Science (period 1) and History (period 2)
-        const timetableEntries = [
-            { day: 'Monday',    subjectIdx: 0, teacherIdx: 0, roomIdx: 0, period: 1, time: ['08:00', '08:45'] },
-            { day: 'Monday',    subjectIdx: 1, teacherIdx: 1, roomIdx: 1, period: 2, time: ['08:50', '09:35'] },
-            { day: 'Tuesday',   subjectIdx: 2, teacherIdx: 0, roomIdx: 2, period: 1, time: ['08:00', '08:45'] },
-            { day: 'Tuesday',   subjectIdx: 3, teacherIdx: 1, roomIdx: 1, period: 2, time: ['08:50', '09:35'] },
-            { day: 'Wednesday', subjectIdx: 0, teacherIdx: 0, roomIdx: 0, period: 1, time: ['08:00', '08:45'] },
-            { day: 'Wednesday', subjectIdx: 1, teacherIdx: 1, roomIdx: 1, period: 2, time: ['08:50', '09:35'] },
-            { day: 'Thursday',  subjectIdx: 2, teacherIdx: 0, roomIdx: 2, period: 1, time: ['08:00', '08:45'] },
-            { day: 'Thursday',  subjectIdx: 3, teacherIdx: 1, roomIdx: 1, period: 2, time: ['08:50', '09:35'] },
-            { day: 'Friday',    subjectIdx: 0, teacherIdx: 0, roomIdx: 0, period: 3, time: ['09:50', '10:35'] },
-            { day: 'Friday',    subjectIdx: 2, teacherIdx: 0, roomIdx: 2, period: 4, time: ['10:40', '11:25'] },
-        ];
-
-        await prisma.timeTable.createMany({
-            data: timetableEntries.map((e) => ({
-                day: e.day,
-                week: 'A',
-                startTime: e.time[0],
-                endTime: e.time[1],
-                periodNumber: e.period,
-                roomId: rooms[e.roomIdx].id,
-                subjectId: subjects[e.subjectIdx].id,
-                teacherId: teachers[e.teacherIdx].id,
-                classId: mainClass.id,
-                isPermanent: true,
-                status: 'active',
-            })),
-        });
-
-        // ─── ATTENDANCE ──────────────────────────────────────────────────────
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
-
-        await prisma.attendance.createMany({
-            data: students.flatMap((student, si) =>
-                subjects.slice(0, 2).map((subject, sj) => ({
-                    date: today,
-                    studentId: student.id,
-                    subjectId: subject.id,
-                    classId: mainClass.id,
-                    periodNumber: sj + 1,
-                    status: si === 1 && sj === 0 ? 'absent' : 'present',
-                    absenceType: si === 1 && sj === 0 ? 'unjustified' : null,
-                }))
-            ),
-        });
-
-        // Give Liam's absence an absence note
-        const liamAbsence = await prisma.attendance.findFirst({
-            where: { studentId: students[1].id, status: 'absent' },
-        });
-        if (liamAbsence) {
-            await prisma.absenceNote.create({
-                data: {
-                    studentId: students[1].id,
-                    attendanceId: liamAbsence.id,
-                    reason: 'Doctor appointment',
-                    status: 'sent',
-                },
+        // 4. Classes and Groups
+        console.log('- Creating classes and students...');
+        const classes = [];
+        for (const className of ['1A', '2A', '3A']) {
+            const newClass = await prisma.class.create({ data: { name: className } });
+            classes.push(newClass);
+            await prisma.group.createMany({
+                data: [
+                    { name: 'Group 1', classId: newClass.id },
+                    { name: 'Group 2', classId: newClass.id }
+                ]
             });
         }
 
-        // ─── LESSON TOPICS ───────────────────────────────────────────────────
-        await prisma.lessonTopic.createMany({
-            data: [
-                {
-                    date: today,
-                    classId: mainClass.id,
-                    subjectId: subjects[0].id,
-                    periodNumber: 1,
-                    topic: 'Introduction to Fractions',
-                },
-                {
-                    date: today,
-                    classId: mainClass.id,
-                    subjectId: subjects[1].id,
-                    periodNumber: 2,
-                    topic: 'Reading Comprehension: Short Stories',
-                },
-            ],
-        });
+        // 5. Students and Parents (3 classes x 30 students)
+        const students = [];
+        let studentCounter = 1;
+        for (const c of classes) {
+            for (let i = 1; i <= 30; i++) {
+                // Create parent
+                const parent = await prisma.user.create({
+                    data: { role: 'parent', firstName: 'Parent', lastName: `${studentCounter}`, birthday: new Date('1980-01-01'), username: `parent${studentCounter}`, password: defaultPassword, email: `parent${studentCounter}@school.example.com`, phone: `777000${studentCounter.toString().padStart(3, '0')}`, adress: `Residence ${studentCounter}` }
+                });
 
-        // ─── EVENTS ──────────────────────────────────────────────────────────
-        const nextWeek = new Date(today);
-        nextWeek.setDate(today.getDate() + 7);
+                // Create student and link to parent and class
+                const student = await prisma.user.create({
+                    data: {
+                        role: 'student', firstName: 'Student', lastName: `${studentCounter}`, birthday: new Date('2008-01-01'), username: `student${studentCounter}`, password: defaultPassword, email: `student${studentCounter}@school.example.com`, phone: `666000${studentCounter.toString().padStart(3, '0')}`, adress: `Residence ${studentCounter}`,
+                        parentId: parent.id,
+                        classes: { connect: [{ id: c.id }] }
+                    }
+                });
+                
+                // Store student locally with class ID for grade generation later
+                students.push({ id: student.id, classId: c.id });
+                studentCounter++;
+            }
+        }
 
+        // 6. TimeTables
+        console.log('- Generating timetables...');
+        const days = ['Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday'];
+        for (const c of classes) {
+            for (const day of days) {
+                for (let p = 1; p <= 5; p++) { // 5 periods a day
+                    const subject = subjects[Math.floor(Math.random() * subjects.length)];
+                    const teacher = teachers[Math.floor(Math.random() * teachers.length)];
+                    const room = rooms[Math.floor(Math.random() * rooms.length)];
+
+                    await prisma.timeTable.create({
+                        data: {
+                            day: day, week: 'A', startTime: `${7 + p}:00`, endTime: `${7 + p}:45`, periodNumber: p, group: 'Whole Class', isPermanent: true, status: 'active',
+                            roomId: room.id, subjectId: subject.id, teacherId: teacher.id, classId: c.id
+                        }
+                    });
+                }
+            }
+        }
+
+        // 7. Grades (GradeColumns & Grades)
+        console.log('- Writing test grades...');
+        for (const c of classes) {
+            const classStudents = students.filter(s => s.classId === c.id);
+            for (const subject of subjects) {
+                const teacher = teachers[Math.floor(Math.random() * teachers.length)];
+                
+                // Note: Using TeacherId with capital T as defined in your schema
+                const gCol = await prisma.gradeColumn.create({
+                    data: { subjectId: subject.id, TeacherId: teacher.id, name: 'Midterm Exam', weight: 10, date: new Date() }
+                });
+
+                // Generate random grades (1-5) for all students in this class
+                const gradesData = classStudents.map(s => ({
+                    gColumnId: gCol.id,
+                    userId: s.id,
+                    grade: Math.floor(Math.random() * 5) + 1 
+                }));
+                await prisma.grade.createMany({ data: gradesData });
+            }
+        }
+
+        // 8. Other sample data (Todo, Event, Attendance, Message, Lesson)
+        console.log('- Creating sample messages, todos, and attendance...');
+        
+        await prisma.todo.create({ data: { title: 'Check Vercel deployment', urgency: 3 } });
+        
         await prisma.event.create({
-            data: {
-                title: 'Parent-Teacher Meeting',
-                description: 'Semester progress review with parents.',
-                type: 'meeting',
-                startDate: nextWeek,
-                endDate: nextWeek,
-                startTime: new Date(nextWeek.setHours(17, 0, 0, 0)),
-                allDay: false,
-                participantsClasses: { connect: [{ id: mainClass.id }] },
-                participantsIndividuals: {
-                    connect: [...teachers.map((t) => ({ id: t.id })), ...parents.map((p) => ({ id: p.id }))],
-                },
-            },
+            data: { title: 'School Year Opening', description: 'Welcoming students in the main hall.', startDate: new Date(), endDate: new Date(), type: 'Ceremony', startTime: new Date(), allDay: true }
         });
 
-        // ─── MESSAGES ────────────────────────────────────────────────────────
-        await prisma.message.createMany({
-            data: [
-                {
-                    senderId: parents[0].id,
-                    recipientId: teachers[0].id,
-                    subject: "Emma's progress",
-                    body: "Hi, I was wondering how Emma has been doing in Math lately. She mentioned she finds fractions tricky.",
-                    read: true,
-                },
-                {
-                    senderId: teachers[0].id,
-                    recipientId: parents[0].id,
-                    subject: "Re: Emma's progress",
-                    body: "Hello Carol, Emma is doing well overall. We just started fractions this week — I'll keep you posted on her progress.",
-                    read: false,
-                },
-                {
-                    senderId: admin.id,
-                    recipientId: teachers[0].id,
-                    subject: 'Welcome',
-                    body: 'Welcome to the platform! Please review the timetable for class 6A.',
-                    read: false,
-                },
-            ],
+        await prisma.attendance.create({
+            data: { date: new Date(), studentId: students[0].id, subjectId: subjects[0].id, classId: classes[0].id, status: 'present' }
         });
 
-        // ─── TODOS ───────────────────────────────────────────────────────────
-        await prisma.todo.createMany({
-            data: [
-                { title: 'Review attendance reports', urgency: 2, isCompleted: false },
-                { title: 'Prepare parent-teacher meeting agenda', urgency: 1, isCompleted: false },
-                { title: 'Update timetable for next semester', urgency: 3, isCompleted: false },
-            ],
+        await prisma.message.create({
+            data: { senderId: teachers[0].id, recipientId: students[0].id, subject: 'Project Reminder', body: 'Please do not forget to submit your project by Friday.' }
         });
 
-        res.json({
-            success: true,
-            message: 'Database initialized successfully',
-            summary: {
-                users: { admin: 1, teachers: teachers.length, parents: parents.length, students: students.length },
-                subjects: subjects.length,
-                rooms: rooms.length,
-                periods: periodDefs.length,
-                classes: 1,
-                groups: 2,
-                timetableEntries: timetableEntries.length,
-                attendanceRecords: students.length * 2,
-                lessonTopics: 2,
-                events: 1,
-                messages: 3,
-                todos: 3,
-            },
+        await prisma.lesson.create({
+            data: { teacherId: teachers[0].id, classId: classes[0].id, subjectId: subjects[0].id, name: 'Introduction to Algorithms', classroom: rooms[0].name }
         });
+
+        await prisma.lessonTopic.create({
+            data: { date: new Date(), classId: classes[0].id, subjectId: subjects[0].id, topic: 'Basic loops and conditions' }
+        });
+
+        console.log('✅ Database successfully initialized!');
+        return res.json({ 
+            success: true, 
+            message: 'Database initialized successfully with 1 Admin, 10 Teachers, 3 Classes, 90 Students, and 90 Parents.' 
+        });
+
     } catch (error) {
-        next(error);
+        console.error('Database initialization failed:', error);
+        return res.status(500).json({ success: false, message: 'Initialization failed', error: error.message });
     }
 });
 
@@ -626,6 +413,16 @@ app.get('/api/gradeColumns', async (req, res, next) => {
 app.post('/api/gradeColumns', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) { return; }
     const { name, subjectId, weight, date } = req.body;
+    
+    // Check if the user teaches this subject or is an admin
+    const isAdmin = await requireAuth(req, res, next, 10);
+    if (!isAdmin) {
+        const isTeachingSubject = await prisma.timeTable.findFirst({
+            where: { teacherId: req.session.userId, subjectId: Number(subjectId) }
+        });
+        if (!isTeachingSubject) return res.status(403).json({ success: false, message: 'You can only create grade columns for subjects you teach' });
+    }
+
     const newGradeColumn = await prisma.gradeColumn.create({
         data: { name, subjectId: Number(subjectId), weight: Number(weight), date: new Date(date), TeacherId: req.session.userId! }
     });
@@ -637,7 +434,7 @@ app.delete('/api/gradeColumns/:id', async (req, res, next) => {
     const gradeColumnId = parseInt(req.params.id);
     const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: gradeColumnId } });
     if (!gradeColumn) return res.status(404).json({ success: false, message: 'Grade column not found' });
-    if (gradeColumn.TeacherId !== req.session.userId) return res.status(403).json({ success: false, message: 'You can only delete your own grade columns' });
+    if (gradeColumn.TeacherId !== req.session.userId && await requireAuth(req, res, next, 10) !== true) return res.status(403).json({ success: false, message: 'You can only delete your own grade columns' });
     await prisma.gradeColumn.delete({ where: { id: gradeColumnId } });
     res.json({ success: true, message: 'Grade column deleted' });
 });
@@ -651,6 +448,15 @@ app.put('/api/gradeColumns/:id', async (req, res, next) => {
         return res.status(403).json({ success: false, message: 'You can only update your own grade columns' });
     }
     const { name, subjectId, weight, date } = req.body;
+
+    const isAdmin = await requireAuth(req, res, next, 10);
+    if (!isAdmin) {
+        const isTeachingSubject = await prisma.timeTable.findFirst({
+            where: { teacherId: req.session.userId, subjectId: Number(subjectId) }
+        });
+        if (!isTeachingSubject) return res.status(403).json({ success: false, message: 'You can only update grade columns to subjects you teach' });
+    }
+
     const updatedGradeColumn = await prisma.gradeColumn.update({ where: { id: gradeColumnId }, data: { name, subjectId, weight, date } });
     res.json(updatedGradeColumn);
 });
@@ -678,7 +484,12 @@ app.delete('/api/grades/:id', async (req, res, next) => {
 
 async function getUserGrades(req: express.Request, res: express.Response, next: express.NextFunction, userId?: number) {
     try {
-        if (req.session.userId !== userId) { if (await requireAuth(req, res, next, 5) !== true) { return; } }
+        if (req.session.userId !== userId) { 
+            const targetUser = await prisma.user.findUnique({ where: { id: userId } });
+            if (targetUser?.parentId !== req.session.userId) {
+                if (await requireAuth(req, res, next, 5) !== true) { return; } 
+            }
+        }
         const allGrades = await prisma.grade.findMany();
         const userGrades = allGrades.filter(grade => grade.userId === userId);
         const formattedGrades = [];
@@ -711,7 +522,12 @@ app.get('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
         const { studentId, gradeColumnId } = req.params;
         const grade = await prisma.grade.findFirst({ where: { userId: Number(studentId), gColumnId: Number(gradeColumnId) } });
         if (!grade) return res.status(404).json({ success: false, message: 'Grade not found' });
-        if (req.session.userId !== Number(studentId)) { if (await requireAuth(req, res, next, 5) !== true) { return; } }
+        if (req.session.userId !== Number(studentId)) { 
+            const targetUser = await prisma.user.findUnique({ where: { id: Number(studentId) } });
+            if (targetUser?.parentId !== req.session.userId) {
+                if (await requireAuth(req, res, next, 5) !== true) { return; } 
+            }
+        }
         res.json(await formatGradeResponse(grade));
     } catch (error) {
         res.status(500).json({ success: false, message: 'Failed to fetch grade' });
@@ -723,7 +539,7 @@ app.post('/api/grades', async (req, res, next) => {
     const { value, userId, gradeColumnId } = req.body;
     const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: Number(gradeColumnId) } });
     if (!gradeColumn) return res.status(404).json({ success: false, message: 'Grade column not found' });
-    if (gradeColumn.TeacherId !== req.session.userId && await requireAuth(req, res, next, 5) !== true) {
+    if (gradeColumn.TeacherId !== req.session.userId && await requireAuth(req, res, next, 10) !== true) {
         return res.status(403).json({ success: false, message: 'You can only add grades to your own grade columns' });
     }
     const user = await prisma.user.findUnique({ where: { id: Number(userId) } });
@@ -740,7 +556,7 @@ app.delete('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
     const grade = await prisma.grade.findFirst({ where: { userId: Number(studentId), gColumnId: Number(gradeColumnId) } });
     if (!grade) return res.status(404).json({ success: false, message: 'Grade not found' });
     const gradeColumn = await prisma.gradeColumn.findUnique({ where: { id: grade.gColumnId } });
-    if (gradeColumn?.TeacherId !== req.session.userId && await requireAuth(req, res, next, 5) !== true) {
+    if (gradeColumn?.TeacherId !== req.session.userId && await requireAuth(req, res, next, 10) !== true) {
         return res.status(403).json({ success: false, message: 'You can only delete grades from your own grade columns' });
     }
     await prisma.grade.delete({ where: { id: grade.id } });
@@ -759,18 +575,23 @@ app.get('/api/classes', async (req, res, next) => {
     const classToUser = classToUserRelagtions.map(c => ({
         id: c.id,
         name: c.name,
-        students: c.students.filter(s => s.role === 'student').map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))
+        classTeacherId: c.classTeacherId,
+        students: c.students.filter(s => s.role === 'student').map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}`, role: s.role }))
     }));
     res.json(classToUser);
 });
 
 app.post('/api/classes', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) { return; }
-    const { name, studentIds } = req.body;
+    const { name, studentIds, classTeacherId } = req.body;
     if (!name) return res.status(400).json({ error: 'name is required' });
     try {
         const newClass = await prisma.class.create({
-            data: { name, students: studentIds?.length ? { connect: studentIds.map((id: any) => ({ id: Number(id) })) } : undefined },
+            data: { 
+                name, 
+                classTeacherId: classTeacherId || null,
+                students: studentIds?.length ? { connect: studentIds.map((id: any) => ({ id: Number(id) })) } : undefined 
+            },
             include: { students: true },
         });
         res.status(201).json(newClass);
@@ -787,13 +608,21 @@ app.delete('/api/classes/:id', async (req, res, next) => {
 
 app.put('/api/classes/:id', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) { return; }
-    const { name, studentIds } = req.body;
-    const updatedClass = await prisma.class.update({
-        where: { id: parseInt(req.params.id) },
-        data: { name, students: { set: studentIds.map((id: number) => ({ id })) } },
-        include: { students: true },
-    });
-    res.json(updatedClass);
+    const { name, studentIds, classTeacherId } = req.body;
+    try {
+        const updatedClass = await prisma.class.update({
+            where: { id: parseInt(req.params.id) },
+            data: { 
+                name, 
+                classTeacherId: classTeacherId || null,
+                students: { set: studentIds.map((id: number) => ({ id })) } 
+            },
+            include: { students: true },
+        });
+        res.json(updatedClass);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.get('/api/class/studentId/:studentId', async (req, res, next) => {
@@ -990,6 +819,85 @@ app.get('/api/setup/messages', async (req, res) => {
         res.json({ success: true, message: 'Message table created' });
     } catch (err: any) {
         res.status(500).json({ success: false, error: err.message });
+    }
+});
+
+// ─── SCHOOL INFO ─────────────────────────────────────────────────────────────
+
+app.get('/api/school-info', async (req, res, next) => {
+    try {
+        let info = await prisma.schoolInfo.findUnique({ where: { id: 1 } });
+        if (!info) {
+            info = await prisma.schoolInfo.create({ data: {} });
+        }
+        res.json(info);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/school-info', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) return;
+    try {
+        const { schoolName, registrationId, principal, street, city, zipCode, email, phone, website } = req.body;
+        const info = await prisma.schoolInfo.upsert({
+            where: { id: 1 },
+            update: { schoolName, registrationId, principal, street, city, zipCode, email, phone, website },
+            create: { schoolName, registrationId, principal, street, city, zipCode, email, phone, website }
+        });
+        res.json(info);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+// ─── SEMESTERS ─────────────────────────────────────────────────────────────
+
+app.get('/api/semesters', async (req, res, next) => {
+    try {
+        const semesters = await prisma.semester.findMany({ orderBy: { startDate: 'desc' } });
+        res.json(semesters);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.post('/api/semesters', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) return;
+    try {
+        const { name, startDate, endDate, isActive } = req.body;
+        const newSemester = await prisma.semester.create({
+            data: { name, startDate: new Date(startDate), endDate: new Date(endDate), isActive: Boolean(isActive) }
+        });
+        res.status(201).json(newSemester);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.put('/api/semesters/:id', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) return;
+    try {
+        const { name, startDate, endDate, isActive } = req.body;
+        const updated = await prisma.semester.update({
+            where: { id: parseInt(req.params.id) },
+            data: { name, startDate: new Date(startDate), endDate: new Date(endDate), isActive: Boolean(isActive) }
+        });
+        res.json(updated);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
+});
+
+app.delete('/api/semesters/:id', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 10) !== true) return;
+    try {
+        const deleted = await prisma.semester.delete({
+            where: { id: parseInt(req.params.id) }
+        });
+        res.json(deleted);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
     }
 });
 

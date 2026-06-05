@@ -15,7 +15,7 @@ type Lesson = {
 
 const ScheduleWidget: React.FC = () => {
     const navigate = useNavigate();
-    const { user } = useAuth();
+    const { user, activeChildId } = useAuth();
     const [lessons, setLessons] = useState<Lesson[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -23,9 +23,8 @@ const ScheduleWidget: React.FC = () => {
         const loadSchedule = async () => {
             if (!user) return;
             try {
-                // Currently only fetches for logged-in user's username (stored in user.id)
-                // Note: Parents might return 404 unless backend supports parent timetables
-                const res = await fetch(`${API_URL}/api/timetables/${user.id}`);
+                const targetId = user.role === 'parent' && activeChildId ? activeChildId : user.id;
+                const res = await fetch(`${API_URL}/api/timetables/${targetId}`);
                 if (res.ok) {
                     const data = await res.json();
                     
@@ -54,7 +53,7 @@ const ScheduleWidget: React.FC = () => {
             }
         };
         loadSchedule();
-    }, [user]);
+    }, [user, activeChildId]);
 
     const getDayShortName = () => {
         const days = ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];

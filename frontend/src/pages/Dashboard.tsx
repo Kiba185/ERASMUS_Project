@@ -51,9 +51,8 @@ const Dashboard: React.FC = () => {
           <ClassesWidget />
 
         )}
-        {user.role === 'student' && (
+        {(user.role === 'student' || user.role === 'parent') && (
           <AbsenceWidget />
-
         )}
 
 

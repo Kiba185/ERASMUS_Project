@@ -209,7 +209,7 @@ const AttendancePage = () => {
   const [periodsToShow, setPeriodsToShow] = useState<Period[]>([]);
   const [lessonsToShow, setLessonsToShow] = useState<TeacherLesson[]>([]);
   const [classesList, setClassesList] = useState<ClassData[]>([]);
-  const [classSubjects, setClassSubjects] = useState<Subject[]>([]);
+  const [classTimetable, setClassTimetable] = useState<TeacherLesson[]>([]);
 
   // Loading & Saving state
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -226,9 +226,25 @@ const AttendancePage = () => {
   
   // Lesson Topics & Attendance State (for current class & date)
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
-  const [lessonTopics, setLessonTopics] = useState<Record<string, string>>({}); // key: subjectId -> topic
+  const [lessonTopics, setLessonTopics] = useState<Record<string, string>>({}); // key: periodNumber -> topic
   const [lessonTopicDrafts, setLessonTopicDrafts] = useState<Record<string, string>>({});
   const [editingLessonTopics, setEditingLessonTopics] = useState<Record<string, boolean>>({});
+
+  const dayTimetable = useMemo(() => {
+    if (!dateFilter) return [];
+    const d = new Date(dateFilter);
+    const dayNames = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const dayName = dayNames[d.getDay()];
+    return classTimetable.filter(t => t.day === dayName).sort((a, b) => a.periodNumber - b.periodNumber);
+  }, [dateFilter, classTimetable]);
+
+  const classSubjects = useMemo(() => {
+    const map = new Map<number, Subject>();
+    dayTimetable.forEach(l => {
+      if (l.subject) map.set(l.subject.id, l.subject);
+    });
+    return Array.from(map.values());
+  }, [dayTimetable]);
 
   // Resolve assigned class for the class teacher
   const assignedClass = useMemo(() => { const u = user as any; return u?.taughtClass || u?.user?.taughtClass; }, [user]);
@@ -283,21 +299,21 @@ const AttendancePage = () => {
     fetchInitialData();
   }, [isStudentOrParent, isTeacher, assignedClass, classFilterId]);
 
-  // --- FETCH CLASS SUBJECTS ---
+  // --- FETCH CLASS TIMETABLE ---
   useEffect(() => {
     if (classFilterId === 0) return;
-    const fetchSubjects = async () => {
+    const fetchTimetable = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/class-subjects/${classFilterId}`, { credentials: 'include' });
+        const res = await fetch(`${API_URL}/api/timetables/class-id/${classFilterId}`, { credentials: 'include' });
         if (res.ok) {
           const data = await res.json();
-          setClassSubjects(data.data || []);
+          setClassTimetable(data || []);
         }
       } catch (e) {
         console.error(e);
       }
     };
-    fetchSubjects();
+    fetchTimetable();
   }, [classFilterId]);
 
   // --- FETCH ATTENDANCE & TOPICS ---
@@ -321,7 +337,7 @@ const AttendancePage = () => {
           const topicsMap: Record<string, string> = {};
           if (Array.isArray(topData.data)) {
             topData.data.forEach((t) => {
-              topicsMap[t.subjectId.toString()] = t.topic;
+              topicsMap[t.periodNumber.toString()] = t.topic;
             });
           }
           setLessonTopics(topicsMap);
@@ -386,11 +402,9 @@ const AttendancePage = () => {
     setViewState('log_lesson');
   };
 
-  const saveLessonTopic = async (subjectId: number) => {
-    const savedTopic = (lessonTopicDrafts[subjectId.toString()] ?? lessonTopics[subjectId.toString()] ?? '').trim();
-    const periodNumber = viewState === 'log_lesson' && selectedLesson?.subject.id === subjectId 
-        ? selectedLesson.periodNumber 
-        : 0;
+  const saveLessonTopic = async (subjectId: number, periodNumber: number) => {
+    const savedTopic = (lessonTopicDrafts[periodNumber.toString()] ?? lessonTopics[periodNumber.toString()] ?? '').trim();
+
 
     setIsSaving(true);
     try {
@@ -407,8 +421,8 @@ const AttendancePage = () => {
         })
       });
       if (res.ok) {
-        setLessonTopics(prev => ({ ...prev, [subjectId.toString()]: savedTopic }));
-        setEditingLessonTopics(prev => ({ ...prev, [subjectId.toString()]: false }));
+        setLessonTopics(prev => ({ ...prev, [periodNumber.toString()]: savedTopic }));
+        setEditingLessonTopics(prev => ({ ...prev, [periodNumber.toString()]: false }));
       }
     } catch (e) {
       console.error(e);
@@ -510,18 +524,18 @@ const AttendancePage = () => {
       : classSubjects.filter(s => s.id.toString() === activeSubjectFilterId);
   }, [viewState, selectedLesson, activeSubjectFilterId, classSubjects]);
 
-  const getRecord = (studentId: number, subjectId: number) => {
-    return attendanceRecords.find(r => r.studentId === studentId && r.subjectId === subjectId);
+  const getRecord = (studentId: number, periodNumber: number) => {
+    return attendanceRecords.find(r => r.studentId === studentId && r.periodNumber === periodNumber);
   };
 
   const focusAttendanceControlAt = (controlIndex: number) => {
-    if (subjectsToShow.length === 0) return;
-    const studentIndex = Math.floor(controlIndex / subjectsToShow.length);
-    const subjectIndex = controlIndex % subjectsToShow.length;
+    if (dayTimetable.length === 0) return;
+    const studentIndex = Math.floor(controlIndex / dayTimetable.length);
+    const lessonIndex = controlIndex % dayTimetable.length;
     const student = studentsToShow[studentIndex];
-    const subject = subjectsToShow[subjectIndex];
-    if (!student || !subject) return;
-    attendanceControlRefs.current[`${student.id}-${subject.id}`]?.focus();
+    const lesson = dayTimetable[lessonIndex];
+    if (!student || !lesson) return;
+    attendanceControlRefs.current[`${student.id}-${lesson.periodNumber}`]?.focus();
   };
 
   const handleAttendanceControlKeyDown = (
@@ -535,10 +549,10 @@ const AttendancePage = () => {
       event.preventDefault();
       const direction = event.key === 'ArrowRight' ? 1 
                       : event.key === 'ArrowLeft' ? -1 
-                      : event.key === 'ArrowDown' ? subjectsToShow.length 
-                      : -subjectsToShow.length;
+                      : event.key === 'ArrowDown' ? dayTimetable.length 
+                      : -dayTimetable.length;
       const nextControlIndex = controlIndex + direction;
-      const controlCount = studentsToShow.length * subjectsToShow.length;
+      const controlCount = studentsToShow.length * dayTimetable.length;
       if (nextControlIndex >= 0 && nextControlIndex < controlCount) {
         focusAttendanceControlAt(nextControlIndex);
       }
@@ -752,34 +766,36 @@ const AttendancePage = () => {
           <table className="w-full min-w-[1000px] border-collapse text-left text-sm">
             <thead>
               <tr className="border-b border-palette-lichen/60 text-palette-pine">
-                <th className="w-56 px-4 py-3 font-semibold">Student</th>
+                <th className="w-56 px-4 py-3 font-semibold sticky left-0 z-20 bg-palette-mist border-r border-palette-lichen/60">Student</th>
                 
-                {subjectsToShow.map((subject) => {
-                  const savedTopic = lessonTopics[subject.id.toString()];
-                  const isEditingTopic = editingLessonTopics[subject.id.toString()] ?? true;
-                  const isCollapsed = isFocusedLog && subject.id !== selectedLesson?.subject.id;
+                {dayTimetable.map((lesson) => {
+                  const savedTopic = lessonTopics[lesson.periodNumber.toString()];
+                  const isEditingTopic = editingLessonTopics[lesson.periodNumber.toString()] ?? true;
+                  const isFilteredOut = activeSubjectFilterId !== ALL_FILTER_VALUE && lesson.subject.id.toString() !== activeSubjectFilterId;
+                  const isCollapsed = (isFocusedLog && lesson.periodNumber !== selectedLesson?.periodNumber) || isFilteredOut;
 
-                  if (isCollapsed) return <th key={subject.id} className="w-16 px-2 py-3 bg-palette-mist/40 text-center border-l"><span className="text-[11px] truncate">{subject.name}</span></th>;
+                  if (isCollapsed) return <th key={lesson.periodNumber} className="w-16 px-2 py-3 bg-palette-mist/40 text-center border-l"><span className="text-[11px] truncate opacity-50">{lesson.subject.name}</span></th>;
 
                   return (
-                    <th key={subject.id} className="min-w-64 px-4 py-3 border-l border-palette-sage/20">
-                      <span className="block">{getLessonLabel(subject)}</span>
+                    <th key={lesson.periodNumber} className="min-w-64 px-4 py-3 border-l border-palette-sage/20">
+                      <span className="block text-palette-leaf font-black text-xs">{lesson.periodNumber}. period ({lesson.startTime} - {lesson.endTime})</span>
+                      <span className="block text-base">{lesson.subject.name}</span>
                       {canEditTopic ? (
                         <div className="mt-2">
                           {isEditingTopic ? (
                             <div className="flex gap-2">
-                              <input type="text" value={lessonTopicDrafts[subject.id.toString()] ?? savedTopic ?? ''} onChange={(e) => setLessonTopicDrafts(prev => ({...prev, [subject.id.toString()]: e.target.value}))} placeholder="Lesson topic..." className="h-9 flex-1 rounded border px-2 text-xs" />
-                              <button onClick={() => void saveLessonTopic(subject.id)} className="h-9 rounded bg-palette-fern px-3 text-xs text-white">Save</button>
+                              <input type="text" value={lessonTopicDrafts[lesson.periodNumber.toString()] ?? savedTopic ?? ''} onChange={(e) => setLessonTopicDrafts(prev => ({...prev, [lesson.periodNumber.toString()]: e.target.value}))} placeholder="Lesson topic..." className="h-9 flex-1 rounded border px-2 text-xs font-normal" />
+                              <button onClick={() => void saveLessonTopic(lesson.subject.id, lesson.periodNumber)} className="h-9 rounded bg-palette-fern px-3 text-xs text-white">Save</button>
                             </div>
                           ) : (
                             <div className="flex items-center gap-2">
-                              <span className="flex-1 truncate text-xs">{savedTopic || 'No topic'}</span>
-                              <button onClick={() => setEditingLessonTopics(prev => ({...prev, [subject.id.toString()]: true}))} className="text-palette-moss"><span className="material-symbols-outlined text-sm">edit</span></button>
+                              <span className="flex-1 truncate text-xs font-normal">{savedTopic || 'No topic'}</span>
+                              <button onClick={() => setEditingLessonTopics(prev => ({...prev, [lesson.periodNumber.toString()]: true}))} className="text-palette-moss"><span className="material-symbols-outlined text-sm">edit</span></button>
                             </div>
                           )}
                         </div>
                       ) : (
-                        <span className="mt-1 block text-xs italic">{savedTopic || 'No topic registered'}</span>
+                        <span className="mt-1 block text-xs italic font-normal">{savedTopic || 'No topic registered'}</span>
                       )}
                     </th>
                   );
@@ -789,35 +805,58 @@ const AttendancePage = () => {
             <tbody className="divide-y divide-palette-lichen/35 text-palette-moss">
               {studentsToShow.map((student, studentIndex) => (
                 <tr key={student.id} className="hover:bg-palette-sage/10">
-                  <td className="px-4 py-3 font-medium text-palette-pine">{student.name || `${student.firstName} ${student.lastName}`}</td>
+                  <td className="px-4 py-3 font-medium text-palette-pine sticky left-0 z-10 bg-white border-r border-palette-lichen/60">{student.name || `${student.firstName} ${student.lastName}`}</td>
                   
-                  {subjectsToShow.map((subject, subjectIndex) => {
-                    const record = getRecord(student.id, subject.id);
+                  {dayTimetable.map((lesson, lessonIndex) => {
+                    const record = getRecord(student.id, lesson.periodNumber);
                     const status = (record?.status as AttendanceStatus) || 'present';
                     const absenceType = record?.absenceType;
                     const statusMeta = getStatusMeta(status, absenceType);
-                    const controlIndex = studentIndex * subjectsToShow.length + subjectIndex;
-                    const isCollapsed = isFocusedLog && subject.id !== selectedLesson?.subject.id;
+                    const controlIndex = studentIndex * dayTimetable.length + lessonIndex;
+                    const isFilteredOut = activeSubjectFilterId !== ALL_FILTER_VALUE && lesson.subject.id.toString() !== activeSubjectFilterId;
+                    const isCollapsed = (isFocusedLog && lesson.periodNumber !== selectedLesson?.periodNumber) || isFilteredOut;
 
-                    if (isCollapsed) return <td key={subject.id} className="w-16 px-2 py-3 text-center border-l bg-palette-mist/20"><span className={`inline-flex h-7 w-7 items-center justify-center rounded-full text-xs font-extrabold ${statusMeta.className}`}>{status === 'present' ? '✓' : 'A'}</span></td>;
+                    if (isCollapsed) {
+                      return (
+                        <td key={lesson.periodNumber} className="px-2 py-3 bg-palette-mist/40 border-l text-center opacity-50">
+                          <div className={`w-3 h-3 rounded-full mx-auto ${status === 'absent' ? 'bg-red-400' : 'bg-palette-fern/40'}`}></div>
+                        </td>
+                      );
+                    }
 
                     return (
-                      <td key={subject.id} className="px-4 py-3 border-l border-palette-sage/10">
-                        {canEditAttendance ? (
-                          <div ref={(el) => { attendanceControlRefs.current[`${student.id}-${subject.id}`] = el; }} tabIndex={0} onKeyDown={(e) => handleAttendanceControlKeyDown(e, student, subject, status, controlIndex)} className="inline-flex rounded-md border bg-palette-mist p-1">
-                            {(['present', 'absent'] as const).map((opt) => {
-                              const optMeta = getStatusMeta(opt, opt === 'absent' ? absenceType : null);
-                              return (
-                                <button key={opt} type="button" tabIndex={-1} onClick={() => handleAttendanceStatusClick(student, subject, opt)} className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded px-3 py-1 text-xs font-semibold ${getStatusButtonClassName(opt, status, opt === 'absent' ? absenceType : null)}`}>
-                                  {opt === status && optMeta.showWarningIcon && <WarningIcon className={optMeta.warningIconClassName} />}
-                                  <span>{opt === status ? optMeta.label : STATUS_LABELS[opt]}</span>
-                                </button>
-                              )
-                            })}
-                          </div>
-                        ) : (
-                          <span className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${statusMeta.className}`}>{statusMeta.label}</span>
-                        )}
+                      <td key={lesson.periodNumber} className="px-4 py-3 border-l border-palette-sage/20">
+                        <div 
+                          ref={(el) => { attendanceControlRefs.current[`${student.id}-${lesson.periodNumber}`] = el; }}
+                          tabIndex={canEditAttendance ? 0 : -1}
+                          onKeyDown={(e) => canEditAttendance && handleAttendanceControlKeyDown(e, student, lesson.subject, status, controlIndex)}
+                          className={`flex items-center gap-2 rounded-xl p-1.5 focus:outline-none focus:ring-2 focus:ring-palette-fern focus:ring-offset-1 ${canEditAttendance ? 'hover:bg-palette-mist/50' : ''}`}
+                        >
+                          {canEditAttendance ? (
+                            <div className="inline-flex rounded-md border bg-palette-mist p-1">
+                              {(['present', 'absent'] as const).map((opt) => {
+                                const optMeta = getStatusMeta(opt, opt === 'absent' ? absenceType : null);
+                                return (
+                                  <button key={opt} type="button" tabIndex={-1} onClick={() => handleAttendanceStatusClick(student, lesson.subject, opt)} className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded px-3 py-1 text-xs font-semibold ${getStatusButtonClassName(opt, status, opt === 'absent' ? absenceType : null)}`}>
+                                    {opt === status && optMeta.showWarningIcon && <WarningIcon className={optMeta.warningIconClassName} />}
+                                    <span>{opt === status ? optMeta.label : STATUS_LABELS[opt]}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${statusMeta.className}`}>{statusMeta.label}</span>
+                          )}
+                          {canEditAttendance && (
+                            <button
+                              onClick={() => setPendingAbsence({ studentId: student.id, studentName: student.name || `${student.firstName} ${student.lastName}`, subject: lesson.subject, periodNumber: lesson.periodNumber })}
+                              className="ml-auto text-palette-lichen hover:text-palette-pine transition"
+                              title="Edit absence details"
+                            >
+                              <span className="material-symbols-outlined text-[18px]">more_vert</span>
+                            </button>
+                          )}
+                        </div>
                       </td>
                     );
                   })}
