@@ -93,7 +93,10 @@ app.post('/api/admin/setuser', async (req, res, next) => { await adminsetuser(re
 //LOGIN
 async function login(req: express.Request, res: express.Response, next: express.NextFunction) {
     const { username, password } = req.body;
-    const user = await prisma.user.findFirst({ where: { username } });
+    const user = await prisma.user.findFirst({ 
+        where: { username },
+        include: { children: true }
+    });
     if (user && await bcrypt.compare(password, user.password)) {
         req.session.userId = user.id;
         req.session.save((err) => {
@@ -696,7 +699,10 @@ app.get('/api/grades/:username', async (req, res, next) => {
 });
 
 app.get('/api/mygrades', async (req, res, next) => {
-    try { res.json(await getUserGrades(req, res, next, req.session.userId)); }
+    try { 
+        const targetUserId = req.query.studentId ? Number(req.query.studentId) : req.session.userId;
+        res.json(await getUserGrades(req, res, next, targetUserId)); 
+    }
     catch (error) { res.status(500).json({ success: false, message: 'Failed to fetch user grades' }); }
 });
 
@@ -753,7 +759,7 @@ app.get('/api/classes', async (req, res, next) => {
     const classToUser = classToUserRelagtions.map(c => ({
         id: c.id,
         name: c.name,
-        students: c.students.map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))
+        students: c.students.filter(s => s.role === 'student').map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}` }))
     }));
     res.json(classToUser);
 });
@@ -817,6 +823,35 @@ app.get('/api/subjects', async (req, res, next) => {
 });
 
 
+///////////////////////////////////////
+//      --=== ROOMS STUFF ===--
+
+app.get('/api/rooms', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    const rooms = await prisma.room.findMany();
+    res.json(rooms);
+});
+
+app.post('/api/rooms', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    const { name } = req.body;
+    try {
+        const room = await prisma.room.create({ data: { name } });
+        res.status(201).json(room);
+    } catch (e: any) {
+        res.status(400).json({ error: e.message });
+    }
+});
+
+app.delete('/api/rooms/:id', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 5) !== true) { return; }
+    try {
+        const room = await prisma.room.delete({ where: { id: parseInt(req.params.id) } });
+        res.json(room);
+    } catch (e: any) {
+        res.status(400).json({ error: e.message });
+    }
+});
 
 
 ///////////////////////////////////////
@@ -842,11 +877,12 @@ app.get('/api/events', async (req, res, next) => {
             participantsClasses: { include: { students: true } }
         }
     });
+    const targetUserId = req.query.studentId ? Number(req.query.studentId) : req.session.userId!;
     const currentUser = req.session.userId ? await prisma.user.findUnique({ where: { id: req.session.userId } }) : null;
     const currentPrivilege = privileges[(currentUser?.role ?? '') as keyof typeof privileges] ?? 0;
     const filteredEvents = events.filter(event => {
-        const isParticipant = event.participantsIndividuals.some(u => u.id === req.session.userId) ||
-            event.participantsClasses.some(c => c.students?.some(s => s.id === req.session.userId));
+        const isParticipant = event.participantsIndividuals.some(u => u.id === targetUserId) ||
+            event.participantsClasses.some(c => c.students?.some(s => s.id === targetUserId));
         return isParticipant || currentPrivilege >= 5;
     });
     res.json(filteredEvents);

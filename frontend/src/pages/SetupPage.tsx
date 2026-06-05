@@ -1,5 +1,6 @@
 import API_URL from '../config/config.tsx';
 import React, { useEffect, useState } from 'react';
+import { createPortal } from 'react-dom';
 
 interface Room {
   id: number;
@@ -297,14 +298,12 @@ const SetupPage: React.FC = () => {
   };
 
   // --- RENDER ---
+  const isSavingAny = roomSaving || periodsSaving || subjectSaving;
 
   if (loading) return (
-    <div className="flex items-center justify-center gap-3 p-12 text-palette-pine font-bold text-lg">
-      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-      </svg>
-      Loading setup data...
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="w-12 h-12 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
+      <p className="text-palette-moss font-bold animate-pulse">Loading setup data...</p>
     </div>
   );
 
@@ -319,6 +318,15 @@ const SetupPage: React.FC = () => {
 
   return (
     <section className="mx-auto max-w-7xl space-y-5 px-2 py-2 text-palette-pine">
+      {isSavingAny && createPortal(
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-[99999]">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
+            <p className="text-palette-pine font-bold text-lg">Processing...</p>
+          </div>
+        </div>,
+        document.body
+      )}
       <header className="rounded-lg border border-palette-lichen/45 bg-palette-mist p-5 shadow-soft">
         <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_auto] lg:items-center">
           <div>

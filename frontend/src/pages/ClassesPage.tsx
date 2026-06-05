@@ -51,6 +51,11 @@ const ClassesPage: React.FC = () => {
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [isNewClass, setIsNewClass] = useState(false);
   const [editingClass, setEditingClass] = useState<UIClass | null>(null);
+
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
+
+  // Form states
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [selectedHeadTeacherId, setSelectedHeadTeacherId] = useState<number | null>(null);
   const [className, setClassName] = useState('');
@@ -62,6 +67,7 @@ const ClassesPage: React.FC = () => {
   // --- FETCH ALL CLASSES + ALL USERS ---
   const fetchData = async () => {
     setLoading(true);
+    setIsLoading(true);
     setError(null);
     try {
       // Fetch classes
@@ -123,6 +129,7 @@ const ClassesPage: React.FC = () => {
       setError(e.message ?? 'Unknown error');
     } finally {
       setLoading(false);
+      setIsLoading(false);
     }
   };
 
@@ -179,6 +186,7 @@ const ClassesPage: React.FC = () => {
 
   const handleSave = async (e: React.FormEvent) => {
     e.preventDefault();
+    setIsSaving(true);
     if (editingClass) {
       setClasses(
         classes.map((c) =>
@@ -190,95 +198,56 @@ const ClassesPage: React.FC = () => {
             : c
         )
       );
-    }
-    if (!className.trim()) return;
-    setSaving(true);
-    const payload = buildPayload();
-
-    try {
-      if (isNewClass) {
-        // POST
-        const res = await fetch(`${API_URL}/api/classes`, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error('Failed to create class');
-        const savedClass = await res.json();
-        const classId = savedClass.id;
-        for (const ng of groups) {
-          await fetch(`${API_URL}/api/classes/${classId}/groups`, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ name: ng.name, studentIds: ng.studentIds })
-          });
-        }
-      } else if (editingClass) {
-        // PUT
-        const res = await fetch(`${API_URL}/api/classes/${editingClass.id}`, {
+      try {
+        await fetch(`${API_URL}/api/classes/${editingClass.id}`, {
           method: 'PUT',
-          credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(payload),
+          body: JSON.stringify(buildPayload()),
+          credentials: 'include'
         });
-        if (!res.ok) throw new Error('Failed to update class');
-
-        const classId = editingClass.id;
-        const oldGroups = editingClass.groups || [];
-        const newGroups = groups;
-
-        // Deletes
-        const deletedGroups = oldGroups.filter(og => !newGroups.find(ng => ng.id === og.id));
-        for (const dg of deletedGroups) {
-          await fetch(`${API_URL}/api/groups/${dg.id}`, { method: 'DELETE', credentials: 'include' });
-        }
-
-        // Adds & Updates
-        for (const ng of newGroups) {
-          if (ng.id > 1000000000000) { // Date.now() check
-            await fetch(`${API_URL}/api/classes/${classId}/groups`, {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: ng.name, studentIds: ng.studentIds })
-            });
-          } else {
-            await fetch(`${API_URL}/api/groups/${ng.id}`, {
-              method: 'PUT',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ name: ng.name, studentIds: ng.studentIds })
-            });
-          }
-        }
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsSaving(false);
       }
-      setIsModalOpen(false);
-      await fetchData(); // Re-fetch to stay in sync
-    } catch (e: any) {
-      alert(e.message ?? 'Save failed');
-    } finally {
-      setSaving(false);
+    } else {
+      try {
+        const response = await fetch(`${API_URL}/api/classes`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify(buildPayload()),
+          credentials: 'include'
+        });
+        const data = await response.json();
+        setClasses([...classes, {
+          id: data.id,
+          name: data.name,
+          studentIds: selectedStudentIds,
+          headTeacherId: selectedHeadTeacherId,
+          groups,
+        }]);
+      } catch (err) {
+        console.error(err);
+      } finally {
+        setIsSaving(false);
+      }
     }
+    setIsModalOpen(false);
+    await fetchData();
   };
 
-  const handleDelete = async () => {
-    if (!editingClass) return;
-    if (!window.confirm(`Delete class "${editingClass.name}"?`)) return;
-    setSaving(true);
+  const handleDelete = async (id: number) => {
+    setIsSaving(true);
     try {
-      const res = await fetch(`${API_URL}/api/classes/${editingClass.id}`, {
+      await fetch(`${API_URL}/api/classes/${id}`, {
         method: 'DELETE',
-        credentials: 'include',
+        credentials: 'include'
       });
-      if (!res.ok) throw new Error('Failed to delete class');
-      setIsModalOpen(false);
-      await fetchData();
-    } catch (e: any) {
-      alert(e.message ?? 'Delete failed');
+      setClasses(classes.filter((c) => c.id !== id));
+    } catch (err) {
+      console.error(err);
     } finally {
-      setSaving(false);
+      setIsSaving(false);
     }
   };
 
@@ -301,13 +270,10 @@ const ClassesPage: React.FC = () => {
     return t ? t.name : 'Unknown';
   };
 
-  if (loading) return (
-    <div className="flex items-center justify-center gap-3 p-12 text-palette-pine font-bold text-lg">
-      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
-        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
-      </svg>
-      Loading classes...
+  if (isLoading) return (
+    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
+      <div className="w-12 h-12 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
+      <p className="text-palette-moss font-bold animate-pulse">Loading classes...</p>
     </div>
   );
 

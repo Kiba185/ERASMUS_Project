@@ -159,10 +159,15 @@ const EventsPage: React.FC = () => {
       );
     };
 
-    loadTeachers();
-    loadClasses();
-    loadStudents();
-    loadEvents();
+    const fetchAll = async () => {
+      setIsLoading(true);
+      try {
+        await Promise.all([loadTeachers(), loadClasses(), loadStudents(), loadEvents()]);
+      } finally {
+        setIsLoading(false);
+      }
+    };
+    fetchAll();
   }, [currentUser, activeChildId]);
 
   // --- AUTOMATICKÉ URČENÍ PRÁV PODLE PROFILU ---
@@ -170,6 +175,10 @@ const EventsPage: React.FC = () => {
   const isTeacher = userRole === 'teacher';
   const isAdmin = userRole === 'admin';
   const canManageEvents = isTeacher || isAdmin;
+
+  // --- STAV PRO UDÁLOSTI A LOADING ---
+  const [isLoading, setIsLoading] = useState(true);
+  const [isSaving, setIsSaving] = useState(false);
 
   // --- STAV PRO UDÁLOSTI ---
   const [events, setEvents] = useState<SchoolEvent[]>([]);
@@ -363,6 +372,7 @@ const EventsPage: React.FC = () => {
     };
 
     if (modalView === 'create') {
+      setIsSaving(true);
       try {
         const response = await fetch(`${API_URL}/api/events`, {
           method: 'POST',
@@ -390,9 +400,12 @@ const EventsPage: React.FC = () => {
         setIsModalOpen(false);
       } catch (err) {
         console.error('Failed to create event:', err);
+      } finally {
+        setIsSaving(false);
       }
 
     } else if (modalView === 'edit' && selectedEventId) {
+      setIsSaving(true);
       try {
         const response = await fetch(`${API_URL}/api/events/${selectedEventId}`, {
           method: 'PUT',
@@ -419,12 +432,15 @@ const EventsPage: React.FC = () => {
         setModalView('details');
       } catch (err) {
         console.error('Failed to update event:', err);
+      } finally {
+        setIsSaving(false);
       }
     }
   };
 
   const handleDeleteEvent = async (id: string) => {
     if (!canManageEvents) return;
+    setIsSaving(true);
     try {
       const response = await fetch(`${API_URL}/api/events/${id}`, {
         method: 'DELETE',
@@ -441,6 +457,8 @@ const EventsPage: React.FC = () => {
       });
     } catch (err) {
       console.error('Failed to delete event:', err);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -490,8 +508,29 @@ const EventsPage: React.FC = () => {
     };
   };
 
+  if (isLoading) return (
+    <div className="p-8 flex items-center justify-center gap-3 text-palette-pine font-bold text-lg">
+      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      </svg>
+      Loading events...
+    </div>
+  );
+
   return (
     <div className="p-4 sm:p-6 max-w-7xl mx-auto space-y-6 antialiased text-slate-800">
+      
+      {/* FULLSCREEN SAVING OVERLAY */}
+      {isSaving && createPortal(
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-[99999]">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
+            <p className="text-palette-pine font-bold text-lg">Processing...</p>
+          </div>
+        </div>,
+        document.body
+      )}
 
       {/* HEADER */}
       <div className="bg-white p-6 rounded-2xl border border-slate-200 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 shadow-2xs">

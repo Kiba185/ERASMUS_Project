@@ -2,18 +2,24 @@ import API_URL from '../../config/config.tsx';
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useState, useEffect } from 'react';
+import { useAuth } from '../../context/AuthContext';
 
 type Grade = { id: string; gColumnId: string; userId: string; grade: string, subjectName: string; subjectId: number; date: string; gColumnName?: string; weight?: number };
 
 const GradesWidget: React.FC = () => {
     const navigate = useNavigate();
+    const { activeChildId, user } = useAuth();
     const [grades, setGrades] = useState<Grade[]>([]);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
         const loadGrades = async () => {
             try {
-                const response = await fetch(`${API_URL}/api/mygrades`, {
+                const url = user?.role === 'parent' && activeChildId
+                    ? `${API_URL}/api/mygrades?studentId=${activeChildId}`
+                    : `${API_URL}/api/mygrades`;
+
+                const response = await fetch(url, {
                     credentials: 'include',
                     headers: { 'Content-Type': 'application/json' }
                 });
@@ -48,8 +54,10 @@ const GradesWidget: React.FC = () => {
             }
         };
 
-        loadGrades();
-    }, []);
+        if (user) {
+            loadGrades();
+        }
+    }, [user, activeChildId]);
 
     const getGradeBadgeColor = (gradeValue: string) => {
         const mainGrade = gradeValue[0];

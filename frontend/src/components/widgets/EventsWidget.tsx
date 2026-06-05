@@ -1,6 +1,7 @@
 import API_URL from '../../config/config.tsx';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { useAuth } from '../../context/AuthContext';
 
 type Event = {
   id: number;
@@ -18,13 +19,18 @@ const MONTH_LABELS = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct
 
 const EventsWidget: React.FC = () => {
   const navigate = useNavigate();
+  const { activeChildId, user } = useAuth();
   const [events, setEvents] = useState<Event[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     const loadEvents = async () => {
       try {
-        const res = await fetch(`${API_URL}/api/events`, {
+        const url = user?.role === 'parent' && activeChildId
+          ? `${API_URL}/api/events?studentId=${activeChildId}`
+          : `${API_URL}/api/events`;
+
+        const res = await fetch(url, {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
         });
@@ -45,8 +51,10 @@ const EventsWidget: React.FC = () => {
         setLoading(false);
       }
     };
-    loadEvents();
-  }, []);
+    if (user) {
+      loadEvents();
+    }
+  }, [user, activeChildId]);
 
   // Build the subtitle line: class names if any, otherwise "All participants"
   const getParticipantLabel = (event: Event): string => {
