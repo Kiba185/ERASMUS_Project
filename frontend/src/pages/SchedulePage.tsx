@@ -45,7 +45,7 @@ const SchedulePage: React.FC = () => {
         const loadedPeriods: Period[] = periodData.data || [];
         setPeriods(loadedPeriods);
 
-        const response = await fetch(`${API_URL}/api/timetables/${user.id}`);
+        const response = await fetch(`${API_URL}/api/timetables/${user.userName}`);
         if (!response.ok) {
           throw new Error('Failed to load timetable');
         }
