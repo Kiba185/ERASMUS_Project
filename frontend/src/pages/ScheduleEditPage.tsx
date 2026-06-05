@@ -1,6 +1,7 @@
 import API_URL from '../config/config.tsx';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
+import { createPortal } from 'react-dom';
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 
@@ -29,10 +30,10 @@ interface Period {
   endTime: string;
 }
 
-interface DbClass   { id: number; name: string; }
+interface DbClass { id: number; name: string; }
 interface DbSubject { id: number; name: string; }
 interface DbTeacher { id: number; firstName: string; lastName: string; }
-interface DbRoom    { id: number; name: string; }
+interface DbRoom { id: number; name: string; }
 
 // ─── Static Options ──────────────────────────────────────────────────────────
 
@@ -98,19 +99,19 @@ const ScheduleEditPage: React.FC = () => {
   const { user } = useAuth();
 
   // ── State ──────────────────────────────────────────────────────────────────
-  const [dbClasses,  setDbClasses]  = useState<DbClass[]>([]);
+  const [dbClasses, setDbClasses] = useState<DbClass[]>([]);
   const [dbSubjects, setDbSubjects] = useState<DbSubject[]>([]);
   const [dbTeachers, setDbTeachers] = useState<DbTeacher[]>([]);
-  const [dbRooms,    setDbRooms]    = useState<DbRoom[]>([]);
-  const [periods,    setPeriods]    = useState<Period[]>([]);
+  const [dbRooms, setDbRooms] = useState<DbRoom[]>([]);
+  const [periods, setPeriods] = useState<Period[]>([]);
 
-  const [selectedClass,        setSelectedClass]        = useState<string>('');
-  const [weekOffset,           setWeekOffset]           = useState<number>(0);
-  const [lessons,              setLessons]              = useState<Lesson[]>([]);
-  const [isPermanentEditMode,  setIsPermanentEditMode]  = useState<boolean>(false);
-  
+  const [selectedClass, setSelectedClass] = useState<string>('');
+  const [weekOffset, setWeekOffset] = useState<number>(0);
+  const [lessons, setLessons] = useState<Lesson[]>([]);
+  const [isPermanentEditMode, setIsPermanentEditMode] = useState<boolean>(false);
+
   // Modal states
-  const [isModalOpen,   setIsModalOpen]   = useState<boolean>(false);
+  const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
   const [editingLesson, setEditingLesson] = useState<Partial<Lesson> | null>(null);
   const [saving, setSaving] = useState(false);
   const [savingLabel, setSavingLabel] = useState('Saving...');
@@ -128,46 +129,18 @@ const ScheduleEditPage: React.FC = () => {
   );
   const activeWeekParity: 'even' | 'odd' = isCurrentWeekEven ? 'even' : 'odd';
 
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
   // ── Data Fetching ──────────────────────────────────────────────────────────
-
-  useEffect(() => {
-    const fetchSetupOptions = async () => {
-      try {
-        const [setupRes, periodRes] = await Promise.all([
-          fetch(`${API_URL}/api/setup-data`),
-          fetch(`${API_URL}/api/periods`)
-        ]);
-        const result = await setupRes.json();
-        const pData = await periodRes.json();
-        
-        if (result.success) {
-          setDbClasses(result.data.classes);
-          setDbSubjects(result.data.subjects);
-          setDbTeachers(result.data.teachers);
-          setDbRooms(result.data.rooms || []);
-          
-          if (result.data.classes.length > 0) {
-            setSelectedClass(result.data.classes[0].name);
-          }
-        }
-        if (pData.success) {
-          setPeriods(pData.data);
-        }
-      } catch (error) {
-        console.error("Failed to load options from DB", error);
-      }
-    };
-
-    fetchSetupOptions();
-  }, []);
-
   const fetchClassTimetable = async () => {
     if (!selectedClass) return;
+
     try {
       const response = await fetch(`${API_URL}/api/timetables/class/${selectedClass}`);
       if (!response.ok) throw new Error('Error loading timetable');
       const data = await response.json();
-      
+
       const mappedLessons: Lesson[] = data.map((item: any) => ({
         id: item.id,
         templateId: item.templateId || null,
@@ -187,12 +160,48 @@ const ScheduleEditPage: React.FC = () => {
 
       setLessons(mappedLessons);
     } catch (error) {
+      setError("Failed to load timetable data. Please try again later.");
       console.error("Error fetching timetable:", error);
     }
   };
 
+  const fetchSetupOptions = async () => {
+    try {
+      const [setupRes, periodRes] = await Promise.all([
+        fetch(`${API_URL}/api/setup-data`),
+        fetch(`${API_URL}/api/periods`)
+      ]);
+      const result = await setupRes.json();
+      const pData = await periodRes.json();
+
+      if (result.success) {
+        setDbClasses(result.data.classes);
+        setDbSubjects(result.data.subjects);
+        setDbTeachers(result.data.teachers);
+        setDbRooms(result.data.rooms || []);
+
+        if (result.data.classes.length > 0) {
+          setSelectedClass(result.data.classes[0].name);
+        }
+      }
+      if (pData.success) {
+        setPeriods(pData.data);
+      }
+    } catch (error) {
+      setError("Failed to load necessary options from the database. Please try again later.");
+      console.error("Failed to load options from DB", error);
+    }
+  };
+
   useEffect(() => {
-    fetchClassTimetable();
+    const loadAll = async () => {
+      setLoading(true);
+      await Promise.all([fetchClassTimetable(), fetchSetupOptions()]);
+
+      await new Promise(resolve => setTimeout(resolve, 100));
+      setLoading(false);
+    };
+    loadAll();
   }, [selectedClass]);
 
   // ── Permissions Guard ──────────────────────────────────────────────────────
@@ -213,7 +222,7 @@ const ScheduleEditPage: React.FC = () => {
 
   const getVisibleLessons = () => {
     const classLessons = lessons.filter(l => l.className === selectedClass);
-    
+
     // Master template mode shows all permanent lessons (without parity filters for templates)
     if (isPermanentEditMode) {
       return classLessons.filter(l => l.isPermanent);
@@ -320,11 +329,11 @@ const ScheduleEditPage: React.FC = () => {
 
     const isNewLesson = String(editingLesson.id).startsWith('new-') || String(editingLesson.id).startsWith('temp-');
     const testAdminName = user?.userName || "admin";
-    
-    const url = isNewLesson 
-      ? `${API_URL}/api/timetables/edit/${testAdminName}` 
+
+    const url = isNewLesson
+      ? `${API_URL}/api/timetables/edit/${testAdminName}`
       : `${API_URL}/api/timetables/edit/${testAdminName}/${editingLesson.id}`;
-    
+
     const method = isNewLesson ? 'POST' : 'PUT';
 
     setSaving(true);
@@ -353,7 +362,7 @@ const ScheduleEditPage: React.FC = () => {
   };
 
   const handleDeleteLesson = async (id: string | number) => {
-    if (String(id).startsWith('new-') || String(id).startsWith('temp-')) { 
+    if (String(id).startsWith('new-') || String(id).startsWith('temp-')) {
       setIsModalOpen(false);
       setEditingLesson(null);
       return;
@@ -416,8 +425,9 @@ const ScheduleEditPage: React.FC = () => {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(newLessonPayload)
         });
-        
+
         if (!response.ok) {
+          setError(`Failed to paste lesson: ${lesson.subject} at ${lesson.time} on ${targetDay}.`);
           throw new Error('Failed to paste some lessons');
         }
       }
@@ -425,14 +435,45 @@ const ScheduleEditPage: React.FC = () => {
       await fetchClassTimetable();
       alert(`Successfully pasted schedule to ${targetDay}!`);
     } catch (error: any) {
+      setError("Failed to paste schedule. Please try again.");
       console.error("Paste day error:", error);
       alert(error.message || "Failed to paste some lessons.");
     }
   };
 
+  //make page load when not all db options are loaded
+  if (error) return (
+    <div className="p-8 text-center space-y-4">
+      <p className="text-red-600 font-bold">{error}</p>
+      <button onClick={fetchClassTimetable} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl hover:bg-palette-leaf transition">
+        Retry
+      </button>
+    </div>
+  );
+
+  if (loading) return (
+    <div className="flex items-center justify-center gap-3 p-12 text-palette-pine font-bold text-lg">
+      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      </svg>
+      Loading schedule editor...
+    </div>
+  );
+
   return (
-    <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-8 animate-in fade-in duration-300">
-      
+    <div className="p-4 md:p-8 max-w-[1600px] mx-auto space-y-0 animate-in fade-in duration-300">
+
+      {saving && createPortal(
+        <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
+            <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin"></div>
+            <p className="text-palette-pine font-bold text-lg">Sending...</p>
+          </div>
+        </div>,
+        document.body
+      )}
+
       {/* ─── Control Header ──────────────────────────────────────────────────── */}
       <div className="bg-white p-6 rounded-2xl border border-palette-mist/60 shadow-soft flex flex-col xl:flex-row xl:items-center xl:justify-between gap-6">
         <div className="flex flex-wrap items-center gap-6">
@@ -564,7 +605,7 @@ const ScheduleEditPage: React.FC = () => {
                           {formatDateCzech(dayDateStr)}
                         </span>
                       )}
-                      
+
                       {/* Copy/Paste Day Actions */}
                       {isPermanentEditMode && (
                         <div className="flex items-center gap-1.5 mt-1.5 opacity-0 group-hover:opacity-100 transition-opacity duration-200">
@@ -620,7 +661,7 @@ const ScheduleEditPage: React.FC = () => {
                                     <h3 className={`font-extrabold text-sm line-clamp-1 leading-snug ${isCancelled ? 'line-through text-gray-400' : ''}`}>
                                       {lesson.subject}
                                     </h3>
-                                    
+
                                     {/* Template Parity Tag */}
                                     {lesson.isPermanent && isPermanentEditMode && lesson.weekType !== 'all' && (
                                       <span className={`text-[8px] px-1.5 py-0.5 rounded font-black uppercase tracking-wide border ${lesson.weekType === 'even' ? 'bg-blue-100 border-blue-200 text-blue-800' : 'bg-purple-100 border-purple-200 text-purple-800'}`}>
@@ -697,7 +738,7 @@ const ScheduleEditPage: React.FC = () => {
       {isModalOpen && editingLesson && (
         <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-50 p-4" onClick={() => setIsModalOpen(false)}>
           <div className="bg-white rounded-2xl p-6 md:p-8 w-full max-w-lg shadow-2xl border border-palette-mist animate-in zoom-in-95 duration-200" onClick={(e) => e.stopPropagation()}>
-            
+
             <div className="flex justify-between items-start border-b pb-4 mb-5">
               <div>
                 <h2 className="text-2xl font-bold text-palette-pine">
@@ -713,7 +754,7 @@ const ScheduleEditPage: React.FC = () => {
             </div>
 
             <div className="space-y-4">
-              
+
               {/* Exceptions controls info block */}
               {!isPermanentEditMode && (
                 <div className="bg-orange-50 border border-orange-200 p-4 rounded-xl space-y-3">
