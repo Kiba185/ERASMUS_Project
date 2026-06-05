@@ -146,15 +146,19 @@ model Class {
 }
 
 model TimeTable {
-  id           Int    @id @default(autoincrement())
+  id           Int     @id @default(autoincrement())
   day          String
   week         String
   startTime    String
   endTime      String
   periodNumber Int
   roomId       Int
-  room         Room   @relation(fields: [roomId], references: [id])
-  group        String @default("Whole Class")
+  room         Room    @relation(fields: [roomId], references: [id])
+  group        String  @default("Whole Class")
+  isPermanent  Boolean @default(true)
+  exceptionDate String?
+  status       String  @default("active")
+  templateId   Int?
 
   subjectId Int
   subject   Subject @relation(fields: [subjectId], references: [id])
@@ -198,4 +202,12 @@ model Group {
   classId   Int
   class     Class   @relation(fields: [classId], references: [id], onDelete: Cascade)
   students  User[]  @relation("GroupStudents")
+}
+
+model Period {
+  id           Int      @id @default(autoincrement())
+  periodNumber Int      @unique
+  startTime    String
+  endTime      String
+  createdAt    DateTime @default(now())
 }
