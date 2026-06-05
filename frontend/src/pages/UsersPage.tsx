@@ -320,21 +320,38 @@ const UsersPage: React.FC = () => {
   };
 
   // --- LOGIN AS ---
-
-  const handleLoginAs = async (user: MockUser) => {
+const handleLoginAs = async (user: MockUser) => {
     try {
-      const res = await fetch(`${API_URL}/api/admin/loginas/${user.id}`, {
-        method: 'POST', credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-      });
-      if (!res.ok) throw new Error(`Login as failed (${res.status})`);
-      login(String(user.id), { ...user, id: String(user.id), children: [] } as any);
-      navigate('/dashboard');
-    } catch (e: any) {
-      alert(e.message ?? 'Failed to login as this user.');
-    }
-  };
+        const res = await fetch(`${API_URL}/api/admin/loginas/${user.id}`, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+        });
 
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ message: res.statusText }));
+            alert(err.message ?? 'Login as failed');
+            return;
+        }
+
+        const data = await res.json();
+        if (!data.success) {
+            alert(data.message ?? 'Login as failed');
+            return;
+        }
+
+        login(String(data.user.id), {
+            ...data.user,
+            id: String(data.user.id),
+            children: []
+        } as any);
+
+        navigate('/dashboard');
+
+    } catch (e: any) {
+        alert(e.message ?? 'Something went wrong');
+    }
+};
   // --- HELPERS ---
 
   const getClassBadge = (user: MockUser) => {

@@ -17,19 +17,20 @@ export const AuthProvider: React.FC<{ children: ReactNode }> = ({ children }) =>
   const [user, setUser] = useState<User | null>(null);
   const [activeChildId, setActiveChildId] = useState<string | null>(null);
 
-  const login = (id: User['id'], user: User['user']) => {
+ const login = (id: User['id'], user: User['user']) => {
     setUser({ 
         id, 
         user, 
         role: user.role, 
         firstName: user.firstName, 
         lastName: user.lastName, 
+        userName: user.username,  // ← přidej toto
         adress: user.adress, 
         birthday: user.birthday, 
         email: user.email, 
         phone: user.phone,
         children: user.children 
-    }); 
+    });
 
     // Automatically set the first child as active if it's a parent with children
     if (user.role === 'parent' && user.children && user.children.length > 0) {

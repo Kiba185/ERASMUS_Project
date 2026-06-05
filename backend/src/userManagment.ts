@@ -248,6 +248,7 @@ router.post('/api/admin/loginas/:id', async (req, res, next) => {
         return res.status(404).json({ success: false, message: 'User not found' });
     }
 
+    // Přepíše session na tohoto uživatele
     req.session.userId = userId;
     req.session.save((err) => {
         if (err) return res.status(500).json({ success: false });
