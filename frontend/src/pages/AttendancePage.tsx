@@ -1,34 +1,16 @@
-import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import API_URL from '../config/config.tsx';
 import AttendancePopUp from '../components/ui/AttendancePopUp';
 import { ALL_FILTER_VALUE, Filter, type FilterOption } from '../components/ui/Filter';
 import { useAuth } from '../context/AuthContext';
 import API_URL from '../config/config.tsx';
 
-const CLASSES = ['4.B', '4.C', '4.D'] as const;
-
 type AttendanceStatus = 'present' | 'absent';
-type ClassName = (typeof CLASSES)[number];
-type Subject =
-  | 'Maths'
-  | 'Physics'
-  | 'Chemistry'
-  | 'Biology'
-  | 'History'
-  | 'Geography'
-  | 'English'
-  | 'PE'
-  | 'Art'
-  | 'Computer Science'
-  | 'Music';
 
-interface StudentProfile {
-  id: string;
+interface ApiClass {
+  id: number;
   name: string;
-  className: ClassName;
-}
-
-interface AttendanceStudent extends StudentProfile {
-  attendance: Partial<Record<Subject, AttendanceStatus>>;
+  students: { id: number; name: string }[];
 }
 
 interface PendingAbsent {
@@ -37,11 +19,12 @@ interface PendingAbsent {
   subject: Subject;
 }
 
-interface LessonTopicPayload {
-  date: string;
+interface AttendanceStudent {
+  id: number;
+  name: string;
+  classId: number;
   className: string;
-  subject: string;
-  topic: string;
+  attendance: Record<number, AttendanceStatus>; // subjectId -> status
 }
 
 const lessonTopicStorage = {
@@ -103,11 +86,6 @@ const ABSENCE_STATUS_CLASS_NAMES: Record<keyof typeof ABSENCE_STATUS_LABELS, str
   'Excused absence': 'bg-blue-100 text-blue-700',
 };
 
-const CLASS_OPTIONS: FilterOption<ClassName>[] = CLASSES.map((className) => ({
-  value: className,
-  label: className,
-}));
-
 const formatDateValue = (date: Date) => date.toISOString().slice(0, 10);
 const TODAY_DATE_VALUE = formatDateValue(new Date());
 
@@ -121,40 +99,35 @@ const getDateLabel = (dateValue: string) => {
   const formattedDate = date.toLocaleDateString('cs-CZ');
   return dateValue === TODAY_DATE_VALUE ? `Today (${formattedDate})` : formattedDate;
 };
-
-const getLessonLabel = (className: ClassName, subject: Subject) => {
-  const lessonIndex = CLASS_SCHEDULES[className].indexOf(subject);
-  return lessonIndex === -1 ? subject : `${lessonIndex + 1}. ${subject}`;
-};
+const DATE_OPTIONS: FilterOption[] = Array.from({ length: 14 }, (_, index) => {
+  const date = new Date();
+  date.setDate(date.getDate() - index);
+  return {
+    value: formatDateValue(date),
+    label: index === 0
+      ? `Today (${date.toLocaleDateString('cs-CZ')})`
+      : date.toLocaleDateString('cs-CZ'),
+  };
+});
 
 const getAbsentStatus = (absenceReason?: string) => {
   const possibleStatus = absenceReason?.split(': ')[0] ?? '';
-  return possibleStatus in ABSENCE_STATUS_LABELS ? (possibleStatus as keyof typeof ABSENCE_STATUS_LABELS) : null;
+  return possibleStatus in ABSENCE_STATUS_LABELS
+    ? (possibleStatus as keyof typeof ABSENCE_STATUS_LABELS)
+    : null;
 };
 
 const getStatusMeta = (status: AttendanceStatus, absenceReason?: string) => {
   if (status === 'present') {
-    return {
-      label: STATUS_LABELS.present,
-      className: 'bg-palette-sage/25 text-palette-leaf',
-      showWarningIcon: false,
-      warningIconClassName: '',
-    };
+    return { label: 'Present', className: 'bg-palette-sage/25 text-palette-leaf', showWarningIcon: false, warningIconClassName: '' };
   }
 
   const absenceStatus = getAbsentStatus(absenceReason);
 
   if (!absenceStatus) {
-    return {
-      label: STATUS_LABELS.absent,
-      className: 'bg-red-100 text-red-700',
-      showWarningIcon: false,
-      warningIconClassName: '',
-    };
+    return { label: 'Absent', className: 'bg-red-100 text-red-700', showWarningIcon: false, warningIconClassName: '' };
   }
-
   const showWarningIcon = absenceStatus === 'Unexcused absence' || absenceStatus === 'Late';
-
   return {
     label: ABSENCE_STATUS_LABELS[absenceStatus],
     className: ABSENCE_STATUS_CLASS_NAMES[absenceStatus],
@@ -163,22 +136,8 @@ const getStatusMeta = (status: AttendanceStatus, absenceReason?: string) => {
   };
 };
 
-const getStatusButtonClassName = (
-  buttonStatus: AttendanceStatus,
-  currentStatus: AttendanceStatus,
-  absenceReason?: string,
-) =>
-  buttonStatus === currentStatus
-    ? getStatusMeta(buttonStatus, absenceReason).className
-    : 'bg-palette-mist text-palette-moss hover:bg-palette-sage/15';
-
 const WarningIcon = ({ className = 'bg-red-600' }: { className?: string }) => (
-  <span
-    aria-hidden="true"
-    className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold leading-none text-white ${className}`}
-  >
-    !
-  </span>
+  <span className={`flex h-4 w-4 items-center justify-center rounded-full text-[10px] font-bold leading-none text-white ${className}`}>!</span>
 );
 
 const getStableMockNumber = (seed: string) => {
@@ -426,171 +385,138 @@ const AttendancePage = () => {
   );
   const selectedDateLabel = getDateLabel(dateFilter);
 
+  // --- INITIAL LOAD ---
   useEffect(() => {
-    let ignoreResponse = false;
-
-    const loadLessonTopics = async () => {
+    const fetchBase = async () => {
+      setLoading(true);
       try {
-        const loadedTopics = await lessonTopicStorage.load({
-          date: dateFilter,
-          className: classFilter,
-        });
-
-        if (ignoreResponse) {
-          return;
-        }
-
-        const loadedTopicEntries = Object.fromEntries(
-          loadedTopics.map((lessonTopic) => [
-            getLessonTopicKeyForValues(lessonTopic.date, lessonTopic.className, lessonTopic.subject),
-            lessonTopic.topic,
-          ]),
-        );
-        const loadedEditEntries = Object.fromEntries(
-          loadedTopics.map((lessonTopic) => [
-            getLessonTopicKeyForValues(lessonTopic.date, lessonTopic.className, lessonTopic.subject),
-            false,
-          ]),
-        );
-
-        setLessonTopics((currentTopics) => ({
-          ...currentTopics,
-          ...loadedTopicEntries,
-        }));
-        setLessonTopicDrafts((currentDrafts) => ({
-          ...currentDrafts,
-          ...loadedTopicEntries,
-        }));
-        setEditingLessonTopics((currentTopics) => ({
-          ...currentTopics,
-          ...loadedEditEntries,
-        }));
-      } catch (error) {
-        console.error('Failed to load lesson topics', error);
+        const [classRes, subjectRes] = await Promise.all([
+          fetch(`${API_URL}/api/classes`, { credentials: 'include' }),
+          fetch(`${API_URL}/api/subjects`, { credentials: 'include' }),
+        ]);
+        const classData: ApiClass[] = await classRes.json();
+        const subjectData: ApiSubject[] = await subjectRes.json();
+        setClasses(classData);
+        setSubjects(subjectData);
+        if (classData.length > 0) setSelectedClassId(classData[0].id);
+      } catch (e) {
+        console.error('Failed to load base data', e);
+      } finally {
+        setLoading(false);
       }
     };
+    fetchBase();
+  }, []);
 
-    void loadLessonTopics();
+  // --- LOAD ATTENDANCE + TOPICS when class or date changes ---
+  useEffect(() => {
+    if (!selectedClassId) return;
 
-    return () => {
-      ignoreResponse = true;
-    };
-  }, [classFilter, dateFilter]);
+    const fetchAttendanceAndTopics = async () => {
+      try {
+        const [attRes, topicRes] = await Promise.all([
+          fetch(`${API_URL}/api/attendance?classId=${selectedClassId}&date=${dateFilter}`, { credentials: 'include' }),
+          fetch(`${API_URL}/api/lesson-topics?classId=${selectedClassId}&date=${dateFilter}`, { credentials: 'include' }),
+        ]);
 
-  const subjectOptions = useMemo<FilterOption[]>(
-    () => [
-      { value: ALL_FILTER_VALUE, label: 'All Subjects' },
-      ...availableSubjects.map((subject) => ({
-        value: subject,
-        label: getLessonLabel(classFilter, subject),
-      })),
-    ],
-    [availableSubjects, classFilter],
-  );
+        // Attendance
+        if (attRes.ok) {
+          const attData: any[] = await attRes.json();
+          const newAttendance: Record<number, Record<number, AttendanceStatus>> = {};
+          const newReasons: Record<number, Record<number, string>> = {};
+
+          attData.forEach(record => {
+            if (!newAttendance[record.studentId]) newAttendance[record.studentId] = {};
+            newAttendance[record.studentId][record.subjectId] = record.status;
+            if (record.absenceReason) {
+              if (!newReasons[record.studentId]) newReasons[record.studentId] = {};
+              newReasons[record.studentId][record.subjectId] = record.absenceReason;
+            }
+          });
+
+          setAttendance(newAttendance);
+          setAbsenceReasons(newReasons);
+        }
 
   const studentsToShow = useMemo(
     () => students.filter((student) => student.className === classFilter),
     [classFilter, students],
   );
 
-  const focusAttendanceControlAt = (controlIndex: number) => {
-    if (subjectsToShow.length === 0) {
-      return;
-    }
+          setLessonTopics(newTopics);
+          setLessonTopicDrafts(newTopics);
+          setEditingTopics(newEditing);
+        }
+      } catch (e) {
+        console.error('Failed to load attendance/topics', e);
+      }
+    };
 
-    const studentIndex = Math.floor(controlIndex / subjectsToShow.length);
-    const subjectIndex = controlIndex % subjectsToShow.length;
-    const student = studentsToShow[studentIndex];
-    const subject = subjectsToShow[subjectIndex];
+    fetchAttendanceAndTopics();
+  }, [selectedClassId, dateFilter]);
 
-    if (!student || !subject) {
-      return;
-    }
+  // --- DERIVED DATA ---
+  const selectedClass = classes.find(c => c.id === selectedClassId) ?? null;
 
-    attendanceControlRefs.current[getAttendanceControlKey(student.id, subject)]?.focus();
-  };
+  const studentsInClass = useMemo(() => {
+    if (!selectedClass) return [];
+    return selectedClass.students.map(s => ({
+      id: s.id,
+      name: s.name,
+      // filter out teachers (role check not available here, so we just show everyone in the class)
+    }));
+  }, [selectedClass]);
 
   const getAbsentKey = (studentId: string, subject: Subject) => `${dateFilter}-${studentId}-${subject}`;
   const getLessonTopicKey = (subject: Subject) => getLessonTopicKeyForValues(dateFilter, classFilter, subject);
 
-  const getLessonTopicDraftValue = (subject: Subject) => {
-    const topicKey = getLessonTopicKey(subject);
-    return lessonTopicDrafts[topicKey] ?? lessonTopics[topicKey] ?? '';
-  };
+  const subjectsToShow = subjectFilter === ALL_FILTER_VALUE
+    ? subjects
+    : subjects.filter(s => s.id === Number(subjectFilter));
 
-  const updateLessonTopicDraft = (subject: Subject, topic: string) => {
-    const topicKey = getLessonTopicKey(subject);
+  const selectedDateLabel = DATE_OPTIONS.find(o => o.value === dateFilter)?.label ?? dateFilter;
 
-    setLessonTopicDrafts((currentDrafts) => ({
-      ...currentDrafts,
-      [topicKey]: topic,
-    }));
-  };
+  // --- ATTENDANCE ACTIONS ---
+  const getAttendanceStatus = (studentId: number, subjectId: number): AttendanceStatus =>
+    attendance[studentId]?.[subjectId] ?? 'present';
 
-  const saveLessonTopic = async (subject: Subject) => {
-    const topicKey = getLessonTopicKey(subject);
-    const savedTopic = getLessonTopicDraftValue(subject).trim();
+  const getAbsenceReason = (studentId: number, subjectId: number): string | undefined =>
+    absenceReasons[studentId]?.[subjectId];
 
+  const saveAttendanceToApi = useCallback(async (
+    studentId: number,
+    subjectId: number,
+    status: AttendanceStatus,
+    absenceReason?: string,
+  ) => {
+    if (!selectedClassId) return;
+    setSavingAttendance(true);
     try {
-      const savedLessonTopic = await lessonTopicStorage.save({
-        date: dateFilter,
-        className: classFilter,
-        subject,
-        topic: savedTopic,
+      await fetch(`${API_URL}/api/attendance`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          date: dateFilter,
+          studentId,
+          subjectId,
+          classId: selectedClassId,
+          status,
+          absenceReason: absenceReason ?? null,
+        }),
       });
-      const savedTopicFromDatabase = savedLessonTopic.topic;
-
-      setLessonTopics((currentTopics) => ({
-        ...currentTopics,
-        [topicKey]: savedTopicFromDatabase,
-      }));
-
-      setLessonTopicDrafts((currentDrafts) => ({
-        ...currentDrafts,
-        [topicKey]: savedTopicFromDatabase,
-      }));
-
-      setEditingLessonTopics((currentTopics) => ({
-        ...currentTopics,
-        [topicKey]: false,
-      }));
-    } catch (error) {
-      console.error('Failed to save lesson topic', error);
-      window.alert('Topic could not be saved.');
+    } catch (e) {
+      console.error('Failed to save attendance', e);
+    } finally {
+      setSavingAttendance(false);
     }
-  };
+  }, [selectedClassId, dateFilter]);
 
-  const editLessonTopic = (subject: Subject) => {
-    const topicKey = getLessonTopicKey(subject);
-
-    setLessonTopicDrafts((currentDrafts) => ({
-      ...currentDrafts,
-      [topicKey]: currentDrafts[topicKey] ?? lessonTopics[topicKey] ?? '',
+  const updateAttendanceStatus = (studentId: number, subjectId: number, status: AttendanceStatus, reason?: string) => {
+    setAttendance(prev => ({
+      ...prev,
+      [studentId]: { ...(prev[studentId] ?? {}), [subjectId]: status },
     }));
-
-    setEditingLessonTopics((currentTopics) => ({
-      ...currentTopics,
-      [topicKey]: true,
-    }));
-  };
-
-  const updateAttendanceStatus = (studentId: string, subject: Subject, status: AttendanceStatus) => {
-    setStudentsByDate((currentStudentsByDate) => {
-      const studentsForDate = currentStudentsByDate[dateFilter] ?? loadMockAttendanceForDate(dateFilter);
-
-      return {
-        ...currentStudentsByDate,
-        [dateFilter]: studentsForDate.map((student) =>
-          student.id === studentId
-            ? {
-                ...student,
-                attendance: { ...student.attendance, [subject]: status },
-              }
-            : student,
-        ),
-      };
-    });
-
     if (status === 'present') {
       const absenceKey = getAbsentKey(studentId, subject);
 
@@ -599,14 +525,16 @@ const AttendancePage = () => {
         delete remainingReasons[absenceKey];
         return remainingReasons;
       });
+    } else if (reason) {
+      setAbsenceReasons(prev => ({
+        ...prev,
+        [studentId]: { ...(prev[studentId] ?? {}), [subjectId]: reason },
+      }));
     }
+    saveAttendanceToApi(studentId, subjectId, status, reason);
   };
 
-  const handleAttendanceStatusClick = (
-    student: AttendanceStudent,
-    subject: Subject,
-    status: AttendanceStatus,
-  ) => {
+  const handleAttendanceClick = (studentId: number, studentName: string, subject: ApiSubject, status: AttendanceStatus) => {
     if (status === 'absent') {
       setPendingAbsent({
         studentId: student.id,
@@ -615,8 +543,7 @@ const AttendancePage = () => {
       });
       return;
     }
-
-    updateAttendanceStatus(student.id, subject, status);
+    updateAttendanceStatus(studentId, subject.id, 'present');
   };
 
   const confirmAbsent = (reason: string) => {
@@ -632,42 +559,61 @@ const AttendancePage = () => {
     setPendingAbsent(null);
   };
 
-  const handleAttendanceControlKeyDown = (
-    event: KeyboardEvent<HTMLDivElement>,
-    student: AttendanceStudent,
-    subject: Subject,
-    currentStatus: AttendanceStatus,
-    controlIndex: number,
-  ) => {
-    if (
-      event.key === 'ArrowRight' ||
-      event.key === 'ArrowLeft' ||
-      event.key === 'ArrowDown' ||
-      event.key === 'ArrowUp'
-    ) {
-      event.preventDefault();
+  // const handleAttendanceControlKeyDown = (
+  //   event: KeyboardEvent<HTMLDivElement>,
+  //   student: AttendanceStudent,
+  //   subject: Subject,
+  //   currentStatus: AttendanceStatus,
+  //   controlIndex: number,
+  // ) => {
+  //   if (
+  //     event.key === 'ArrowRight' ||
+  //     event.key === 'ArrowLeft' ||
+  //     event.key === 'ArrowDown' ||
+  //     event.key === 'ArrowUp'
+  //   ) {
+  //     event.preventDefault();
 
-      const direction =
-        event.key === 'ArrowRight'
-          ? 1
-          : event.key === 'ArrowLeft'
-            ? -1
-            : event.key === 'ArrowDown'
-              ? subjectsToShow.length
-              : -subjectsToShow.length;
-      const nextControlIndex = controlIndex + direction;
-      const controlCount = studentsToShow.length * subjectsToShow.length;
+  //     const direction =
+  //       event.key === 'ArrowRight'
+  //         ? 1
+  //         : event.key === 'ArrowLeft'
+  //           ? -1
+  //           : event.key === 'ArrowDown'
+  //             ? subjectsToShow.length
+  //             : -subjectsToShow.length;
+  //     const nextControlIndex = controlIndex + direction;
+  //     const controlCount = studentsToShow.length * subjectsToShow.length;
 
-      if (nextControlIndex >= 0 && nextControlIndex < controlCount) {
-        focusAttendanceControlAt(nextControlIndex);
-      }
+  //     if (nextControlIndex >= 0 && nextControlIndex < controlCount) {
+  //       focusAttendanceControlAt(nextControlIndex);
+  //     }
 
-      return;
-    }
+  //     return;
+  //   }
 
-    if (event.key === 'Enter' && event.currentTarget === event.target) {
-      event.preventDefault();
-      updateAttendanceStatus(student.id, subject, currentStatus === 'present' ? 'absent' : 'present');
+  //   if (event.key === 'Enter' && event.currentTarget === event.target) {
+  //     event.preventDefault();
+  //     updateAttendanceStatus(student.id, subject, currentStatus === 'present' ? 'absent' : 'present');
+  //   }
+  // };
+
+  // --- LESSON TOPIC ACTIONS ---
+  const saveLessonTopic = async (subjectId: number) => {
+    if (!selectedClassId) return;
+    const topic = (lessonTopicDrafts[subjectId] ?? '').trim();
+    try {
+      await fetch(`${API_URL}/api/lesson-topics`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ date: dateFilter, classId: selectedClassId, subjectId, topic }),
+      });
+      setLessonTopics(prev => ({ ...prev, [subjectId]: topic }));
+      setEditingTopics(prev => ({ ...prev, [subjectId]: false }));
+    } catch (e) {
+      console.error('Failed to save lesson topic', e);
+      alert('Topic could not be saved.');
     }
   };
 
@@ -1199,44 +1145,89 @@ const AttendancePage = () => {
 
                               return (
                                 <button
-                                  key={option}
                                   type="button"
-                                  tabIndex={-1}
-                                  onClick={() => handleAttendanceStatusClick(student, subject, option)}
-                                  className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded px-3 py-1 text-xs font-semibold transition ${getStatusButtonClassName(
-                                    option,
-                                    status,
-                                    option === 'absent' ? absenceReason : undefined,
-                                  )}`}
-                                  title={option === 'absent' ? absentTitle : undefined}
-                                  aria-label={`Mark ${student.name} as ${STATUS_LABELS[option]} for ${subject}`}
+                                  onClick={() => saveLessonTopic(subject.id)}
+                                  className="h-9 rounded-md bg-palette-fern px-3 text-xs font-black text-white transition hover:bg-palette-leaf"
                                 >
-                                  {isSelectedOption && optionMeta.showWarningIcon && (
-                                    <WarningIcon className={optionMeta.warningIconClassName} />
-                                  )}
-                                  <span>{isSelectedOption ? optionMeta.label : STATUS_LABELS[option]}</span>
+                                  Save
                                 </button>
-                              );
-                            })}
-                          </div>
-                        ) : (
-                          <span
-                            title={absentTitle}
-                            className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${statusMeta.className}`}
-                          >
-                            {statusMeta.showWarningIcon && (
-                              <WarningIcon className={statusMeta.warningIconClassName} />
+                              </div>
+                            ) : (
+                              <div className="flex min-h-9 items-center gap-2">
+                                <span className="min-w-0 flex-1 truncate text-xs font-medium text-palette-moss">
+                                  {savedTopic || 'No topic'}
+                                </span>
+                                <button
+                                  type="button"
+                                  onClick={() => setEditingTopics(prev => ({ ...prev, [subject.id]: true }))}
+                                  className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md text-palette-moss transition hover:bg-palette-sage/15 hover:text-palette-pine"
+                                >
+                                  Edit
+                                </button>
+                              </div>
                             )}
-                            <span>{statusMeta.label}</span>
+                          </div>
+                        )}
+                        {!canEditAttendance && savedTopic && (
+                          <span className="mt-1 block max-w-56 truncate text-xs font-medium text-palette-moss">
+                            {savedTopic}
                           </span>
                         )}
-                      </td>
+                      </th>
                     );
                   })}
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="divide-y divide-palette-lichen/35 text-palette-moss">
+                {studentsInClass.map(student => (
+                  <tr key={student.id} className="hover:bg-palette-sage/10">
+                    <td className="px-4 py-3 font-medium text-palette-pine">{student.name}</td>
+                    <td className="px-4 py-3">{selectedClass?.name}</td>
+                    {subjectsToShow.map(subject => {
+                      const status = getAttendanceStatus(student.id, subject.id);
+                      const absenceReason = getAbsenceReason(student.id, subject.id);
+                      const statusMeta = getStatusMeta(status, absenceReason);
+
+                      return (
+                        <td key={subject.id} className="px-4 py-3">
+                          {canEditAttendance ? (
+                            <div className="inline-flex rounded-md border border-palette-lichen/60 bg-palette-mist p-1">
+                              {(['present', 'absent'] as const).map(option => {
+                                const optionMeta = getStatusMeta(option, option === 'absent' ? absenceReason : undefined);
+                                const isSelected = option === status;
+                                const btnClass = isSelected
+                                  ? getStatusMeta(option, option === 'absent' ? absenceReason : undefined).className
+                                  : 'bg-palette-mist text-palette-moss hover:bg-palette-sage/15';
+
+                                return (
+                                  <button
+                                    key={option}
+                                    type="button"
+                                    onClick={() => handleAttendanceClick(student.id, student.name, subject, option)}
+                                    className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded px-3 py-1 text-xs font-semibold transition ${btnClass}`}
+                                  >
+                                    {isSelected && optionMeta.showWarningIcon && (
+                                      <WarningIcon className={optionMeta.warningIconClassName} />
+                                    )}
+                                    <span>{isSelected ? optionMeta.label : (option === 'present' ? 'Present' : 'Absent')}</span>
+                                  </button>
+                                );
+                              })}
+                            </div>
+                          ) : (
+                            <span className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${statusMeta.className}`}>
+                              {statusMeta.showWarningIcon && <WarningIcon className={statusMeta.warningIconClassName} />}
+                              <span>{statusMeta.label}</span>
+                            </span>
+                          )}
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          )}
         </div>
       </section>
 

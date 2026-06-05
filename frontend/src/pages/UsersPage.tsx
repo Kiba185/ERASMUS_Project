@@ -46,7 +46,6 @@ const UsersPage: React.FC = () => {
   const [subjects,    setSubjects]    = useState<MockSubject[]>([]);
   const [loading,     setLoading]     = useState(true);
   const [saving,      setSaving]      = useState(false);
-  const [savingLabel, setSavingLabel] = useState('Saving...');
   const [error,       setError]       = useState<string | null>(null);
 
   const [search,      setSearch]      = useState('');
@@ -231,7 +230,14 @@ const UsersPage: React.FC = () => {
             body: JSON.stringify({ subjectIds: editingUser.subjectIds }),
           });
         }
-
+        if (newId && editingUser.role === 'parent' && editingUser.childrenIds) {
+          await fetch(`${API_URL}/api/admin/users/${newId}/children`, {
+            method: 'PUT',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ childrenIds: editingUser.childrenIds }),
+          });
+        }
       } else {
         const res = await fetch(`${API_URL}/api/admin/users/${editingUser.id}`, {
           method: 'PUT',
@@ -274,6 +280,15 @@ const UsersPage: React.FC = () => {
             headers: { 'Content-Type': 'application/json' },
             body: JSON.stringify({ childrenIds: editingUser.childrenIds ?? [] }),
           });
+        }
+
+        if (editingUser.role === 'parent' && editingUser.childrenIds) {
+          const childRes = await fetch(`${API_URL}/api/admin/users/${editingUser.id}/children`, {
+            method: 'PUT', credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ childrenIds: editingUser.childrenIds }),
+          });
+          if (!childRes.ok) throw new Error('Failed to update children assignments');
         }
       }
 
@@ -346,8 +361,10 @@ const UsersPage: React.FC = () => {
 
   if (error) return (
     <div className="p-8 text-center space-y-4">
-      <p className="text-red-600 font-bold text-lg">{error}</p>
-      <button onClick={loadAll} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl hover:bg-palette-leaf transition">Retry</button>
+      <p className="text-red-600 font-bold">{error}</p>
+      <button onClick={fetchUsers} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl hover:bg-palette-leaf transition">
+        Retry
+      </button>
     </div>
   );
 

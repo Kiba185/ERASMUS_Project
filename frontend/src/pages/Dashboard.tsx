@@ -10,9 +10,13 @@ import MessagesWidget from '../components/widgets/MessagesWidget';
 
 
 const Dashboard: React.FC = () => {
-  const { user } = useAuth();
+  const { user, activeChildId } = useAuth();
 
   if (!user) return null;
+
+  const childName = user.role === 'parent' && activeChildId 
+      ? user.children?.find((c: any) => String(c.id) === String(activeChildId))?.firstName
+      : null;
 
   /////
 
@@ -26,6 +30,9 @@ const Dashboard: React.FC = () => {
         <h1 className="text-3xl md:text-4xl font-black text-palette-pine tracking-tight">
           Welcome back, {user.firstName}!
         </h1>
+        {childName && (
+            <p className="text-xl font-bold text-palette-fern mt-2">Viewing data for {childName}</p>
+        )}
         <p className="text-palette-moss mt-2 font-medium">Here is an overview of what's happening today.</p>
       </div>
 

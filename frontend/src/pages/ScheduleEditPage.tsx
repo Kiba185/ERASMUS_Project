@@ -112,6 +112,8 @@ const ScheduleEditPage: React.FC = () => {
   // Modal states
   const [isModalOpen,   setIsModalOpen]   = useState<boolean>(false);
   const [editingLesson, setEditingLesson] = useState<Partial<Lesson> | null>(null);
+  const [saving, setSaving] = useState(false);
+  const [savingLabel, setSavingLabel] = useState('Saving...');
 
   // Copy/paste schedule states
   const [copiedLessons, setCopiedLessons] = useState<Lesson[] | null>(null);
@@ -324,6 +326,9 @@ const ScheduleEditPage: React.FC = () => {
       : `${API_URL}/api/timetables/edit/${testAdminName}/${editingLesson.id}`;
     
     const method = isNewLesson ? 'POST' : 'PUT';
+
+    setSaving(true);
+    setSavingLabel('Saving...');
 
     try {
       const response = await fetch(url, {

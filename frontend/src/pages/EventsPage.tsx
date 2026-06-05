@@ -28,7 +28,7 @@ interface AudienceOption {
 }
 
 const EventsPage: React.FC = () => {
-  const { user: currentUser } = useAuth();
+  const { user: currentUser, activeChildId } = useAuth();
 
   const EVERYONE_AUDIENCE_OPTIONS: AudienceOption[] = [
     { value: '@everyone-students', label: '@everyone-students' },
@@ -86,7 +86,10 @@ const EventsPage: React.FC = () => {
   useEffect(() => {
     const loadEvents = async () => {
       try {
-        const response = await fetch(`${API_URL}/api/events`, {
+        const url = currentUser?.role === 'parent' && activeChildId 
+          ? `${API_URL}/api/events?studentId=${activeChildId}` 
+          : `${API_URL}/api/events`;
+        const response = await fetch(url, {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' }
         });
@@ -160,7 +163,7 @@ const EventsPage: React.FC = () => {
     loadClasses();
     loadStudents();
     loadEvents();
-  }, []);
+  }, [currentUser, activeChildId]);
 
   // --- AUTOMATICKÉ URČENÍ PRÁV PODLE PROFILU ---
   const userRole = currentUser?.role || 'student';

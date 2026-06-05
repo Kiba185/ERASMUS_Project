@@ -27,7 +27,7 @@ const Header = () => {
         <div className="relative flex items-center space-x-4">
           
           {/* Multi-Child Switcher for Parents */}
-          {user.role === 'parent' && user.children && user.children.length > 1 && (
+          {user.role === 'parent' && user.children && (
             <div className="flex items-center space-x-2 mr-2 border-r border-palette-mist pr-4">
               <span className="text-sm font-bold text-palette-moss hidden sm:inline-block">Viewing:</span>
               <select 
