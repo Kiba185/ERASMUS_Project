@@ -13,15 +13,33 @@ interface Subject {
   color: string;
 }
 
+interface Period {
+  id?: number;
+  periodNumber: number;
+  startTime: string;
+  endTime: string;
+}
+
 const SetupPage: React.FC = () => {
   const [rooms, setRooms] = useState<Room[]>([]);
   const [subjects, setSubjects] = useState<Subject[]>([]);
+  const [periods, setPeriods] = useState<Period[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   const [roomInput, setRoomInput] = useState('');
   const [roomError, setRoomError] = useState('');
   const [roomSaving, setRoomSaving] = useState(false);
+
+  // Periods wizard states
+  const [wizardStart, setWizardStart] = useState('08:00');
+  const [wizardDuration, setWizardDuration] = useState(45);
+  const [wizardBreak, setWizardBreak] = useState(10);
+  const [wizardLongBreak, setWizardLongBreak] = useState(20);
+  const [wizardLongBreakAfter, setWizardLongBreakAfter] = useState(2);
+  const [wizardCount, setWizardCount] = useState(6);
+  const [wizardIncludeZero, setWizardIncludeZero] = useState(false);
+  const [periodsSaving, setPeriodsSaving] = useState(false);
 
   const [subjectInput, setSubjectInput] = useState('');
   const [subjectAbbreviationInput, setSubjectAbbreviationInput] = useState('');
@@ -33,14 +51,18 @@ const SetupPage: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const [roomRes, subjectRes] = await Promise.all([
+      const [roomRes, subjectRes, periodRes] = await Promise.all([
         fetch(`${API_URL}/api/rooms`, { credentials: 'include' }),
         fetch(`${API_URL}/api/subjects`, { credentials: 'include' }),
+        fetch(`${API_URL}/api/periods`, { credentials: 'include' }),
       ]);
       if (!roomRes.ok) throw new Error(`Failed to load rooms (${roomRes.status})`);
       if (!subjectRes.ok) throw new Error(`Failed to load subjects (${subjectRes.status})`);
+      if (!periodRes.ok) throw new Error(`Failed to load periods (${periodRes.status})`);
       setRooms(await roomRes.json());
       setSubjects(await subjectRes.json());
+      const pData = await periodRes.json();
+      setPeriods(pData.data || []);
     } catch (e: any) {
       setError(e.message ?? 'Failed to load data');
     } finally {
@@ -147,6 +169,131 @@ const SetupPage: React.FC = () => {
     } catch (e: any) {
       alert(e.message ?? 'Failed to delete subject');
     }
+  };
+
+  // --- PERIODS CONFIGURATION ---
+
+  const handlePeriodChange = (index: number, field: 'startTime' | 'endTime', value: string) => {
+    setPeriods(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], [field]: value };
+      return updated;
+    });
+  };
+
+  const handlePeriodNumberChange = (index: number, value: string) => {
+    const num = parseInt(value);
+    if (isNaN(num)) return;
+    setPeriods(prev => {
+      const updated = [...prev];
+      updated[index] = { ...updated[index], periodNumber: num };
+      return updated;
+    });
+  };
+
+  const addPeriodSlot = () => {
+    setPeriods(prev => {
+      const nextNum = prev.length > 0 ? Math.max(...prev.map(p => p.periodNumber)) + 1 : 1;
+      const lastPeriod = prev[prev.length - 1];
+      let proposedStart = '08:00';
+      let proposedEnd = '08:45';
+      if (lastPeriod) {
+        // Add 10 mins break to last end time
+        const [h, m] = lastPeriod.endTime.split(':').map(Number);
+        const startMin = h * 60 + m + 10;
+        const endMin = startMin + 45;
+        
+        const sh = String(Math.floor(startMin / 60) % 24).padStart(2, '0');
+        const sm = String(startMin % 60).padStart(2, '0');
+        const eh = String(Math.floor(endMin / 60) % 24).padStart(2, '0');
+        const em = String(endMin % 60).padStart(2, '0');
+        
+        proposedStart = `${sh}:${sm}`;
+        proposedEnd = `${eh}:${em}`;
+      }
+      const newSlot: Period = {
+        periodNumber: nextNum,
+        startTime: proposedStart,
+        endTime: proposedEnd
+      };
+      return [...prev, newSlot].sort((a, b) => a.periodNumber - b.periodNumber);
+    });
+  };
+
+  const removePeriodSlot = (index: number) => {
+    setPeriods(prev => prev.filter((_, i) => i !== index));
+  };
+
+  const savePeriods = async () => {
+    setPeriodsSaving(true);
+    try {
+      const res = await fetch(`${API_URL}/api/periods`, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ periods }),
+      });
+      if (!res.ok) throw new Error(`Server returned status ${res.status}`);
+      const result = await res.json();
+      if (result.success) {
+        setPeriods(result.data);
+        alert("Periods configuration saved successfully!");
+      } else {
+        throw new Error(result.message || "Failed to save periods");
+      }
+    } catch (e: any) {
+      alert(e.message || "Failed to save periods settings.");
+    } finally {
+      setPeriodsSaving(false);
+    }
+  };
+
+  const generatePeriodsWizard = () => {
+    const result: Period[] = [];
+    const [startH, startM] = wizardStart.split(':').map(Number);
+    let currentMinutes = startH * 60 + startM;
+
+    const totalPeriods = wizardCount;
+    
+    // Optional zero period
+    if (wizardIncludeZero) {
+      const zeroStartMin = currentMinutes - wizardDuration - 10; // Zero period is 10 mins before period 1
+      const zeroEndMin = zeroStartMin + wizardDuration;
+      
+      const zsh = String(Math.floor(zeroStartMin / 60) % 24).padStart(2, '0');
+      const zsm = String(zeroStartMin % 60).padStart(2, '0');
+      const zeh = String(Math.floor(zeroEndMin / 60) % 24).padStart(2, '0');
+      const zem = String(zeroEndMin % 60).padStart(2, '0');
+      
+      result.push({
+        periodNumber: 0,
+        startTime: `${zsh}:${zsm}`,
+        endTime: `${zeh}:${zem}`
+      });
+    }
+
+    for (let i = 1; i <= totalPeriods; i++) {
+      const periodStart = currentMinutes;
+      const periodEnd = currentMinutes + wizardDuration;
+      
+      const sh = String(Math.floor(periodStart / 60) % 24).padStart(2, '0');
+      const sm = String(periodStart % 60).padStart(2, '0');
+      const eh = String(Math.floor(periodEnd / 60) % 24).padStart(2, '0');
+      const em = String(periodEnd % 60).padStart(2, '0');
+      
+      result.push({
+        periodNumber: i,
+        startTime: `${sh}:${sm}`,
+        endTime: `${eh}:${em}`
+      });
+
+      // Add break
+      const isLongBreak = i === wizardLongBreakAfter;
+      const currentBreak = isLongBreak ? wizardLongBreak : wizardBreak;
+      currentMinutes = periodEnd + currentBreak;
+    }
+
+    setPeriods(result.sort((a, b) => a.periodNumber - b.periodNumber));
   };
 
   // --- RENDER ---
@@ -328,6 +475,145 @@ const SetupPage: React.FC = () => {
               ))}
             </tbody>
           </table>
+        </div>
+      </section>
+
+      {/* PERIODS CONFIGURATION SETUP */}
+      <section className="rounded-lg border border-palette-lichen/45 bg-white p-5 shadow-soft space-y-6">
+        <div>
+          <h2 className="text-xl font-black text-palette-pine">School Periods Configuration</h2>
+          <p className="text-sm font-medium text-palette-moss mt-1">
+            Configure the default school period slots (0th, 1st, 2nd, 7th, 8th, etc.) with custom start and end times.
+          </p>
+        </div>
+
+        {/* Dynamic Wizard Calculator */}
+        <div className="bg-palette-mist/40 border border-palette-lichen/30 rounded-xl p-4 space-y-4">
+          <div className="flex items-center justify-between pb-2 border-b border-palette-lichen/20">
+            <h3 className="font-black text-sm text-palette-pine uppercase tracking-wider flex items-center gap-1.5">
+              <span className="material-symbols-outlined text-[18px]">auto_awesome</span> Smart Periods Generator
+            </h3>
+            <span className="text-[10px] bg-palette-sage/20 text-palette-pine px-2.5 py-0.5 rounded-full font-bold uppercase">Helper Wizard</span>
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 lg:grid-cols-7">
+            <label className="flex flex-col gap-1 text-xs font-black uppercase text-palette-moss">
+              First Class Start
+              <input type="time" value={wizardStart} onChange={(e) => setWizardStart(e.target.value)} className="h-10 border border-palette-lichen/40 rounded-lg px-2 text-sm outline-none focus:border-palette-leaf bg-white" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-black uppercase text-palette-moss">
+              Class Length (min)
+              <input type="number" min="1" max="180" value={wizardDuration} onChange={(e) => setWizardDuration(Number(e.target.value))} className="h-10 border border-palette-lichen/40 rounded-lg px-2 text-sm outline-none focus:border-palette-leaf bg-white" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-black uppercase text-palette-moss">
+              Standard Break (min)
+              <input type="number" min="0" max="120" value={wizardBreak} onChange={(e) => setWizardBreak(Number(e.target.value))} className="h-10 border border-palette-lichen/40 rounded-lg px-2 text-sm outline-none focus:border-palette-leaf bg-white" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-black uppercase text-palette-moss">
+              Long Break (min)
+              <input type="number" min="0" max="120" value={wizardLongBreak} onChange={(e) => setWizardLongBreak(Number(e.target.value))} className="h-10 border border-palette-lichen/40 rounded-lg px-2 text-sm outline-none focus:border-palette-leaf bg-white" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-black uppercase text-palette-moss">
+              After Period No.
+              <input type="number" min="1" max="20" value={wizardLongBreakAfter} onChange={(e) => setWizardLongBreakAfter(Number(e.target.value))} className="h-10 border border-palette-lichen/40 rounded-lg px-2 text-sm outline-none focus:border-palette-leaf bg-white" />
+            </label>
+            <label className="flex flex-col gap-1 text-xs font-black uppercase text-palette-moss">
+              Periods Count
+              <input type="number" min="1" max="24" value={wizardCount} onChange={(e) => setWizardCount(Number(e.target.value))} className="h-10 border border-palette-lichen/40 rounded-lg px-2 text-sm outline-none focus:border-palette-leaf bg-white" />
+            </label>
+            <label className="flex items-center gap-2 text-xs font-black uppercase text-palette-moss self-end h-10 select-none cursor-pointer">
+              <input type="checkbox" checked={wizardIncludeZero} onChange={(e) => setWizardIncludeZero(e.target.checked)} className="w-4 h-4 rounded text-palette-leaf border-palette-lichen focus:ring-palette-leaf" />
+              Include 0. Period
+            </label>
+          </div>
+
+          <button
+            type="button"
+            onClick={generatePeriodsWizard}
+            className="w-full h-10 bg-palette-pine text-white text-xs font-black uppercase tracking-wider rounded-lg hover:bg-palette-leaf transition shadow-sm"
+          >
+            Auto-Generate Period Times
+          </button>
+        </div>
+
+        {/* Periods Table Configuration Editor */}
+        <div className="overflow-x-auto rounded-lg border border-palette-lichen/45">
+          <table className="w-full min-w-[620px] border-collapse text-left text-sm">
+            <thead className="bg-palette-sage/20 text-xs font-black uppercase tracking-wider text-palette-moss">
+              <tr>
+                <th className="px-4 py-3 w-[150px]">Period Number</th>
+                <th className="px-4 py-3">Start Time</th>
+                <th className="px-4 py-3">End Time</th>
+                <th className="px-4 py-3 text-right">Actions</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-palette-lichen/35 bg-white">
+              {periods.length === 0 && (
+                <tr>
+                  <td colSpan={4} className="px-4 py-8 text-center text-palette-moss font-medium">
+                    No periods configured. Use the wizard above or click "Add Period Slot" to start.
+                  </td>
+                </tr>
+              )}
+              {periods.map((p, idx) => (
+                <tr key={idx} className="hover:bg-palette-mist/30 transition">
+                  <td className="px-4 py-2">
+                    <input
+                      type="number"
+                      value={p.periodNumber}
+                      onChange={(e) => handlePeriodNumberChange(idx, e.target.value)}
+                      className="w-20 h-9 border border-palette-lichen/45 rounded-lg px-2 font-bold text-palette-pine bg-palette-mist/20 focus:bg-white outline-none focus:border-palette-leaf text-center"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      type="time"
+                      value={p.startTime}
+                      onChange={(e) => handlePeriodChange(idx, 'startTime', e.target.value)}
+                      className="w-32 h-9 border border-palette-lichen/45 rounded-lg px-2 font-semibold text-palette-pine outline-none focus:border-palette-leaf"
+                    />
+                  </td>
+                  <td className="px-4 py-2">
+                    <input
+                      type="time"
+                      value={p.endTime}
+                      onChange={(e) => handlePeriodChange(idx, 'endTime', e.target.value)}
+                      className="w-32 h-9 border border-palette-lichen/45 rounded-lg px-2 font-semibold text-palette-pine outline-none focus:border-palette-leaf"
+                    />
+                  </td>
+                  <td className="px-4 py-2 text-right">
+                    <button
+                      type="button"
+                      onClick={() => removePeriodSlot(idx)}
+                      className="p-1.5 text-red-500 hover:text-red-700 rounded hover:bg-red-50 transition flex items-center justify-end w-full"
+                      title="Delete slot"
+                    >
+                      <span className="material-symbols-outlined text-[18px]">delete</span>
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+
+        <div className="flex flex-col sm:flex-row items-center gap-3 justify-end pt-2 border-t border-palette-lichen/20">
+          <button
+            type="button"
+            onClick={addPeriodSlot}
+            className="w-full sm:w-auto px-5 py-2.5 bg-palette-mist text-palette-pine hover:bg-palette-lichen/20 rounded-xl font-bold text-sm transition border border-palette-sage/30 flex items-center justify-center gap-1.5"
+          >
+            <span className="material-symbols-outlined text-[18px]">add</span> Add Period Slot
+          </button>
+          <button
+            type="button"
+            disabled={periodsSaving}
+            onClick={savePeriods}
+            className="w-full sm:w-auto px-6 py-2.5 bg-palette-fern text-white hover:bg-palette-leaf rounded-xl font-bold text-sm transition flex items-center justify-center gap-1.5 shadow-sm disabled:opacity-50"
+          >
+            <span className="material-symbols-outlined text-[18px]">save</span>
+            {periodsSaving ? "Saving Configuration..." : "Save Configuration"}
+          </button>
         </div>
       </section>
     </section>

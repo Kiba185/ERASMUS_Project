@@ -25,6 +25,71 @@ router.get("/api/setup-data", async (req, res) => {
 });
 
 // ---------------------------------------------------------
+// GET /api/periods - Získání seznamu vyučovacích hodin
+// ---------------------------------------------------------
+router.get("/api/periods", async (req, res) => {
+    try {
+        let periods = await prisma.period.findMany({
+            orderBy: { periodNumber: 'asc' }
+        });
+
+        if (periods.length === 0) {
+            const defaultPeriods = [
+                { periodNumber: 1, startTime: '08:00', endTime: '08:45' },
+                { periodNumber: 2, startTime: '08:55', endTime: '09:40' },
+                { periodNumber: 3, startTime: '10:00', endTime: '10:45' },
+                { periodNumber: 4, startTime: '10:55', endTime: '11:40' },
+                { periodNumber: 5, startTime: '11:50', endTime: '12:35' },
+                { periodNumber: 6, startTime: '12:45', endTime: '13:30' }
+            ];
+            await prisma.period.createMany({ data: defaultPeriods });
+            periods = await prisma.period.findMany({
+                orderBy: { periodNumber: 'asc' }
+            });
+        }
+
+        res.json({ success: true, data: periods });
+    } catch (error: any) {
+        console.error("Failed to load periods", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ---------------------------------------------------------
+// POST /api/periods - Uložení upravených vyučovacích hodin (Admin Only)
+// ---------------------------------------------------------
+router.post("/api/periods", async (req, res) => {
+    try {
+        const { periods } = req.body;
+        if (!Array.isArray(periods)) {
+            return res.status(400).json({ success: false, message: "Invalid payload format. Expected array." });
+        }
+
+        // Validate payload elements
+        const formattedPeriods = periods.map((p: any) => ({
+            periodNumber: Number(p.periodNumber),
+            startTime: String(p.startTime),
+            endTime: String(p.endTime)
+        }));
+
+        // Use transaction to clear and insert
+        await prisma.$transaction([
+            prisma.period.deleteMany(),
+            prisma.period.createMany({ data: formattedPeriods })
+        ]);
+
+        const updatedPeriods = await prisma.period.findMany({
+            orderBy: { periodNumber: 'asc' }
+        });
+
+        res.json({ success: true, data: updatedPeriods });
+    } catch (error: any) {
+        console.error("Failed to save periods", error);
+        res.status(500).json({ success: false, error: error.message });
+    }
+});
+
+// ---------------------------------------------------------
 // 1. CREATE (Vytvoření nové hodiny) - ADMIN ONLY
 // ---------------------------------------------------------
 router.post("/api/timetables/edit/:userId", async (req, res, next) => {
@@ -37,7 +102,7 @@ router.post("/api/timetables/edit/:userId", async (req, res, next) => {
     }
 
     try {
-        const { day, time, subject, teacher, className, room, weekType, group } = req.body;
+        const { day, time, subject, teacher, className, room, weekType, group, isPermanent, exceptionDate, status, templateId, periodNumber } = req.body;
 
         const [startTime, endTime] = time.split(' - ');
 
@@ -69,8 +134,12 @@ router.post("/api/timetables/edit/:userId", async (req, res, next) => {
                 week: weekType || "all",
                 startTime: startTime,
                 endTime: endTime,
-                periodNumber: 1, 
+                periodNumber: periodNumber !== undefined ? Number(periodNumber) : 1, 
                 group: group || "Whole Class",
+                isPermanent: isPermanent !== undefined ? isPermanent : true,
+                exceptionDate: exceptionDate || null,
+                status: status || "active",
+                templateId: templateId ? Number(templateId) : null,
                 subjectId: targetSubject.id,
                 teacherId: targetTeacher.id,
                 classId: targetClass.id,
@@ -97,7 +166,7 @@ router.put("/api/timetables/edit/:userId/:timetableId", async (req, res, next) =
     if (!adminUser || adminUser.role !== 'admin') return res.status(403).json({ success: false });
 
     try {
-        const { day, time, subject, teacher, className, room, weekType, group } = req.body;
+        const { day, time, subject, teacher, className, room, weekType, group, isPermanent, exceptionDate, status, templateId, periodNumber } = req.body;
         const [startTime, endTime] = time.split(' - ');
 
         // Znovu musíme najít IDčka podle textů
@@ -113,8 +182,16 @@ router.put("/api/timetables/edit/:userId/:timetableId", async (req, res, next) =
         const updatedTimetable = await prisma.timeTable.update({
             where: { id: Number(timetableId) },
             data: {
-                day, week: weekType, startTime, endTime, 
+                day, 
+                week: weekType, 
+                startTime, 
+                endTime, 
+                periodNumber: periodNumber !== undefined ? Number(periodNumber) : undefined,
                 group: group || "Whole Class",
+                isPermanent: isPermanent !== undefined ? isPermanent : undefined,
+                exceptionDate: exceptionDate !== undefined ? exceptionDate : undefined,
+                status: status || undefined,
+                templateId: templateId !== undefined ? (templateId ? Number(templateId) : null) : undefined,
                 subjectId: targetSubject.id,
                 teacherId: targetTeacher.id,
                 classId: targetClass.id,
