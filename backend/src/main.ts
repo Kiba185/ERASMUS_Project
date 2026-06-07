@@ -155,7 +155,7 @@ app.get('/api/initialize', async (req, res, next) => {
         console.log('Starting database initialization. Please wait...');
 
         // 1. Security & default password (Hash only once for performance!)
-        const defaultPassword = await bcrypt.hash('password123', 10);
+        const defaultPassword = await bcrypt.hash('123', 10);
 
         // 2. Create Periods, Rooms, and Subjects
         console.log('- Creating basic dictionaries (periods, rooms, subjects)...');
@@ -187,7 +187,7 @@ app.get('/api/initialize', async (req, res, next) => {
         });
 
         const teachers = [];
-        for (let i = 1; i <= 10; i++) {
+        for (let i = 1; i <= 3; i++) {
             const subject = subjects[i % subjects.length];
             const teacher = await prisma.user.create({
                 data: {
@@ -212,11 +212,11 @@ app.get('/api/initialize', async (req, res, next) => {
             });
         }
 
-        // 5. Students and Parents (3 classes x 30 students)
+        // 5. Students and Parents (3 classes x 5 students)
         const students = [];
         let studentCounter = 1;
         for (const c of classes) {
-            for (let i = 1; i <= 30; i++) {
+            for (let i = 1; i <= 5; i++) {
                 // Create parent
                 const parent = await prisma.user.create({
                     data: { role: 'parent', firstName: 'Parent', lastName: `${studentCounter}`, birthday: new Date('1980-01-01'), username: `parent${studentCounter}`, password: defaultPassword, email: `parent${studentCounter}@school.example.com`, phone: `777000${studentCounter.toString().padStart(3, '0')}`, adress: `Residence ${studentCounter}` }
@@ -412,7 +412,7 @@ app.get('/api/gradeColumns', async (req, res, next) => {
 
 app.post('/api/gradeColumns', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) { return; }
-    const { name, subjectId, weight, date } = req.body;
+    const { name, subjectId, classId, weight, date } = req.body;
     
     // Check if the user teaches this subject or is an admin
     const isAdmin = await requireAuth(req, res, next, 10);
@@ -424,7 +424,7 @@ app.post('/api/gradeColumns', async (req, res, next) => {
     }
 
     const newGradeColumn = await prisma.gradeColumn.create({
-        data: { name, subjectId: Number(subjectId), weight: Number(weight), date: new Date(date), TeacherId: req.session.userId! }
+        data: { name, subjectId: Number(subjectId), classId: Number(classId), weight: Number(weight), date: new Date(date), TeacherId: req.session.userId! }
     });
     res.status(201).json(newGradeColumn);
 });
@@ -447,7 +447,7 @@ app.put('/api/gradeColumns/:id', async (req, res, next) => {
     if (gradeColumn.TeacherId !== req.session.userId && await requireAuth(req, res, next, 10) !== true) {
         return res.status(403).json({ success: false, message: 'You can only update your own grade columns' });
     }
-    const { name, subjectId, weight, date } = req.body;
+    const { name, subjectId, classId, weight, date } = req.body;
 
     const isAdmin = await requireAuth(req, res, next, 10);
     if (!isAdmin) {
@@ -457,7 +457,7 @@ app.put('/api/gradeColumns/:id', async (req, res, next) => {
         if (!isTeachingSubject) return res.status(403).json({ success: false, message: 'You can only update grade columns to subjects you teach' });
     }
 
-    const updatedGradeColumn = await prisma.gradeColumn.update({ where: { id: gradeColumnId }, data: { name, subjectId, weight, date } });
+    const updatedGradeColumn = await prisma.gradeColumn.update({ where: { id: gradeColumnId }, data: { name, subjectId: Number(subjectId), classId: Number(classId), weight: Number(weight), date: new Date(date) } });
     res.json(updatedGradeColumn);
 });
 

@@ -109,6 +109,7 @@ const ScheduleEditPage: React.FC = () => {
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [isPermanentEditMode, setIsPermanentEditMode] = useState<boolean>(false);
+  const [isSwitchingView, setIsSwitchingView] = useState(false);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -518,20 +519,20 @@ const ScheduleEditPage: React.FC = () => {
               <label className="block text-xs font-bold text-palette-moss uppercase tracking-wider mb-2">Calendar Navigation</label>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setWeekOffset(w => w - 1)}
+                  onClick={() => { setIsSwitchingView(true); setTimeout(() => { setWeekOffset(w => w - 1); setIsSwitchingView(false); }, 300); }}
                   className="p-2 bg-gray-50 text-palette-pine border border-gray-200 rounded-xl hover:bg-gray-100 transition flex items-center"
                   title="Previous week"
                 >
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
                 <button
-                  onClick={() => setWeekOffset(0)}
+                  onClick={() => { setIsSwitchingView(true); setTimeout(() => { setWeekOffset(0); setIsSwitchingView(false); }, 300); }}
                   className={`px-4 py-2 border rounded-xl font-bold text-sm transition flex items-center gap-1.5 ${weekOffset === 0 ? 'bg-palette-fern text-white border-transparent shadow-inner' : 'bg-gray-50 text-palette-pine hover:bg-gray-100'}`}
                 >
                   <span className="material-symbols-outlined text-[18px]">today</span> Current Week
                 </button>
                 <button
-                  onClick={() => setWeekOffset(w => w + 1)}
+                  onClick={() => { setIsSwitchingView(true); setTimeout(() => { setWeekOffset(w => w + 1); setIsSwitchingView(false); }, 300); }}
                   className="p-2 bg-gray-50 text-palette-pine border border-gray-200 rounded-xl hover:bg-gray-100 transition flex items-center"
                   title="Next week"
                 >
@@ -577,7 +578,15 @@ const ScheduleEditPage: React.FC = () => {
       </div>
 
       {/* ─── Grid Timeline Table (Days as Rows, Slots as Columns) ─────────────── */}
-      <div className="overflow-x-auto rounded-2xl border border-palette-sage/30 shadow-soft bg-white">
+      <div className="relative overflow-x-auto rounded-2xl border border-palette-sage/30 shadow-soft bg-white">
+        {isSwitchingView && (
+          <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex items-center justify-center">
+             <div className="flex items-center gap-3 bg-white p-4 rounded-xl shadow-lg border border-palette-mist">
+               <div className="w-6 h-6 border-4 border-palette-fern border-t-transparent rounded-full animate-spin"></div>
+               <span className="font-bold text-palette-pine">Loading schedule...</span>
+             </div>
+          </div>
+        )}
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="bg-palette-mist/80 border-b border-palette-sage/30">
@@ -654,6 +663,9 @@ const ScheduleEditPage: React.FC = () => {
                               colorClasses = 'bg-gray-50 border-gray-300 text-gray-400 border-dashed opacity-50';
                             } else if (isTemporary && !isPermanentEditMode) {
                               colorClasses = 'bg-red-50/90 border-red-500 text-red-950 shadow-sm';
+                            } else if (!isTemporary && !isPermanentEditMode) {
+                              // Fade out the master template in Weekly Exceptions mode
+                              colorClasses += ' opacity-50';
                             }
 
                             return (

@@ -1,9 +1,10 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
-import AttendancePopUp from '../components/ui/AttendancePopUp';
 import { ALL_FILTER_VALUE } from '../components/ui/Filter';
 import { useAuth } from '../context/AuthContext';
 import API_URL from '../config/config';
+import BulkAttendanceModal from '../components/ui/BulkAttendanceModal';
+import AttendancePopUp from '../components/ui/AttendancePopUp';
 
 // ---------------------------------------------------------
 // DATA MODELS
@@ -222,7 +223,8 @@ const AttendancePage = () => {
   const [subjectFilterId, setSubjectFilterId] = useState<string>(ALL_FILTER_VALUE);
   
   // Absence popup state
-  const [pendingAbsence, setPendingAbsence] = useState<PendingAbsence | null>(null);
+  const [pendingAbsence, setPendingAbsence] = useState<{studentId: number, studentName: string, subject: Subject, periodNumber: number} | null>(null);
+  const [showBulkModal, setShowBulkModal] = useState(false);
   
   // Lesson Topics & Attendance State (for current class & date)
   const [attendanceRecords, setAttendanceRecords] = useState<AttendanceRecord[]>([]);
@@ -317,40 +319,41 @@ const AttendancePage = () => {
   }, [classFilterId]);
 
   // --- FETCH ATTENDANCE & TOPICS ---
-  useEffect(() => {
+  const fetchAttendance = async () => {
     if (classFilterId === 0 || !dateFilter) return;
 
-    const fetchRecords = async () => {
-      setIsDataLoading(true);
-      try {
-        const [attRes, topRes] = await Promise.all([
-          fetch(`${API_URL}/api/attendance/${classFilterId}/${dateFilter}`, { credentials: 'include' }),
-          fetch(`${API_URL}/api/lesson-topics/${classFilterId}/${dateFilter}`, { credentials: 'include' })
-        ]);
+    setIsDataLoading(true);
+    try {
+      const [attRes, topRes] = await Promise.all([
+        fetch(`${API_URL}/api/attendance/${classFilterId}/${dateFilter}`, { credentials: 'include' }),
+        fetch(`${API_URL}/api/lesson-topics/${classFilterId}/${dateFilter}`, { credentials: 'include' })
+      ]);
 
-        if (attRes.ok) {
-          const data = await attRes.json();
-          setAttendanceRecords(data.data || []);
-        }
-        if (topRes.ok) {
-          const topData = await topRes.json() as { data: LessonTopicRecord[] };
-          const topicsMap: Record<string, string> = {};
-          if (Array.isArray(topData.data)) {
-            topData.data.forEach((t) => {
-              topicsMap[t.periodNumber.toString()] = t.topic;
-            });
-          }
-          setLessonTopics(topicsMap);
-          setLessonTopicDrafts({});
-          setEditingLessonTopics({});
-        }
-      } catch (e) {
-        console.error(e);
-      } finally {
-        setIsDataLoading(false);
+      if (attRes.ok) {
+        const data = await attRes.json();
+        setAttendanceRecords(data.data || []);
       }
-    };
-    fetchRecords();
+      if (topRes.ok) {
+        const topData = await topRes.json() as { data: LessonTopicRecord[] };
+        const topicsMap: Record<string, string> = {};
+        if (Array.isArray(topData.data)) {
+          topData.data.forEach((t) => {
+            topicsMap[t.periodNumber.toString()] = t.topic;
+          });
+        }
+        setLessonTopics(topicsMap);
+        setLessonTopicDrafts({});
+        setEditingLessonTopics({});
+      }
+    } catch (e) {
+      console.error(e);
+    } finally {
+      setIsDataLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchAttendance();
   }, [classFilterId, dateFilter]);
 
   // --- QUICK ACTION MATCHING ---
@@ -431,26 +434,31 @@ const AttendancePage = () => {
     }
   };
 
-  const updateAttendanceStatus = async (studentId: number, subjectId: number, status: AttendanceStatus, absenceType: string | null = null, absenceReason: string | null = null) => {
-    const periodNumber = viewState === 'log_lesson' && selectedLesson?.subject.id === subjectId 
-        ? selectedLesson.periodNumber 
-        : 0;
+  const updateAttendanceStatus = async (
+    studentId: number, 
+    subjectId: number, 
+    status: AttendanceStatus, 
+    periodNumberParam?: number,
+    absenceType?: string | null, 
+    absenceReason?: string | null
+  ) => {
+    const periodNumber = periodNumberParam ?? (selectedLesson ? selectedLesson.periodNumber : 0);
 
     // Optimistic UI update
     setAttendanceRecords(prev => {
         const newRecords = [...prev];
-        const index = newRecords.findIndex(r => r.studentId === studentId && r.subjectId === subjectId);
+        const index = newRecords.findIndex(r => r.studentId === studentId && r.periodNumber === periodNumber);
         if (index >= 0) {
-            newRecords[index] = { ...newRecords[index], status, absenceType, absenceReason };
+            newRecords[index] = { ...newRecords[index], status, absenceType: absenceType ?? null, absenceReason: absenceReason ?? null };
         } else {
-            newRecords.push({ id: 0, studentId, subjectId, periodNumber, status, absenceType, absenceReason });
+            newRecords.push({ id: 0, studentId, subjectId, periodNumber, status, absenceType: absenceType ?? null, absenceReason: absenceReason ?? null });
         }
         return newRecords;
     });
 
     setIsSaving(true);
     try {
-      await fetch(`${API_URL}/api/attendance`, {
+      const response = await fetch(`${API_URL}/api/attendance`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -465,6 +473,20 @@ const AttendancePage = () => {
           absenceReason
         })
       });
+      
+      const data = await response.json();
+      if (data.success && data.data) {
+        setAttendanceRecords(prev => {
+          const newRecords = [...prev];
+          const idx = newRecords.findIndex(r => r.studentId === studentId && r.periodNumber === periodNumber);
+          if (idx >= 0) {
+            newRecords[idx] = data.data;
+          } else {
+            newRecords.push(data.data);
+          }
+          return newRecords;
+        });
+      }
     } catch (e) {
       console.error(e);
     } finally {
@@ -472,16 +494,20 @@ const AttendancePage = () => {
     }
   };
 
-  const handleAttendanceStatusClick = (student: StudentProfile, subject: Subject, status: AttendanceStatus) => {
-    if (status === 'absent') {
+  const handleAttendanceStatusClick = (student: StudentProfile, subject: Subject, periodNumber: number, status: AttendanceStatus) => {
+    const record = getRecord(student.id, periodNumber);
+    const currentStatus = record?.status || 'present';
+
+    if (status === 'absent' && currentStatus === 'absent') {
       setPendingAbsence({
         studentId: student.id,
         studentName: student.name || `${student.firstName} ${student.lastName}`,
         subject,
+        periodNumber,
       });
       return;
     }
-    void updateAttendanceStatus(student.id, subject.id, status);
+    void updateAttendanceStatus(student.id, subject.id, status, periodNumber);
   };
 
   const confirmAbsence = (reasonString: string) => {
@@ -495,6 +521,7 @@ const AttendancePage = () => {
       pendingAbsence.studentId, 
       pendingAbsence.subject.id, 
       'absent', 
+      pendingAbsence.periodNumber,
       possibleStatus || null,
       reason
     );
@@ -542,6 +569,7 @@ const AttendancePage = () => {
     event: KeyboardEvent<HTMLDivElement>,
     student: StudentProfile,
     subject: Subject,
+    periodNumber: number,
     currentStatus: AttendanceStatus,
     controlIndex: number,
   ) => {
@@ -560,7 +588,7 @@ const AttendancePage = () => {
     }
     if (event.key === 'Enter' && event.currentTarget === event.target) {
       event.preventDefault();
-      void updateAttendanceStatus(student.id, subject.id, currentStatus === 'present' ? 'absent' : 'present');
+      void updateAttendanceStatus(student.id, subject.id, currentStatus === 'present' ? 'absent' : 'present', periodNumber);
     }
   };
 
@@ -748,6 +776,19 @@ const AttendancePage = () => {
                 </div>
               </>
             )}
+
+            {viewState === 'class_absence' && (isAdmin || isTeacher) && (
+              <div className="flex items-end justify-end">
+                <button
+                  type="button"
+                  onClick={() => setShowBulkModal(true)}
+                  className="h-10 px-4 rounded-md bg-palette-pine text-white text-sm font-bold hover:bg-palette-leaf transition flex items-center gap-2"
+                >
+                  <span className="material-symbols-outlined text-[18px]">group_add</span>
+                  Bulk Mark Attendance
+                </button>
+              </div>
+            )}
           </div>
         </div>
 
@@ -829,7 +870,7 @@ const AttendancePage = () => {
                         <div 
                           ref={(el) => { attendanceControlRefs.current[`${student.id}-${lesson.periodNumber}`] = el; }}
                           tabIndex={canEditAttendance ? 0 : -1}
-                          onKeyDown={(e) => canEditAttendance && handleAttendanceControlKeyDown(e, student, lesson.subject, status, controlIndex)}
+                          onKeyDown={(e) => canEditAttendance && handleAttendanceControlKeyDown(e, student, lesson.subject, lesson.periodNumber, status, controlIndex)}
                           className={`flex items-center gap-2 rounded-xl p-1.5 focus:outline-none focus:ring-2 focus:ring-palette-fern focus:ring-offset-1 ${canEditAttendance ? 'hover:bg-palette-mist/50' : ''}`}
                         >
                           {canEditAttendance ? (
@@ -837,7 +878,7 @@ const AttendancePage = () => {
                               {(['present', 'absent'] as const).map((opt) => {
                                 const optMeta = getStatusMeta(opt, opt === 'absent' ? absenceType : null);
                                 return (
-                                  <button key={opt} type="button" tabIndex={-1} onClick={() => handleAttendanceStatusClick(student, lesson.subject, opt)} className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded px-3 py-1 text-xs font-semibold ${getStatusButtonClassName(opt, status, opt === 'absent' ? absenceType : null)}`}>
+                                  <button key={opt} type="button" tabIndex={-1} onClick={() => handleAttendanceStatusClick(student, lesson.subject, lesson.periodNumber, opt)} className={`inline-flex min-w-24 items-center justify-center gap-1.5 rounded px-3 py-1 text-xs font-semibold ${getStatusButtonClassName(opt, status, opt === 'absent' ? absenceType : null)}`}>
                                     {opt === status && optMeta.showWarningIcon && <WarningIcon className={optMeta.warningIconClassName} />}
                                     <span>{opt === status ? optMeta.label : STATUS_LABELS[opt]}</span>
                                   </button>
@@ -866,6 +907,17 @@ const AttendancePage = () => {
           </table>
         </div>
       </section>
+
+      {showBulkModal && (
+        <BulkAttendanceModal
+          isOpen={showBulkModal}
+          onClose={() => setShowBulkModal(false)}
+          students={studentsToShow}
+          onSuccess={() => {
+            fetchAttendance();
+          }}
+        />
+      )}
 
       <AttendancePopUp
         isOpen={pendingAbsence !== null}

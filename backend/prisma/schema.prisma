@@ -95,6 +95,7 @@ model GradeColumn {
   name      String
   weight    Int
   date      DateTime
+  classId   Int      @default(1)
 }
 
 model Grade {
@@ -141,8 +142,12 @@ model AbsenceNote {
   id           Int        @id @default(autoincrement())
   studentId    Int
   student      User       @relation("StudentAbsenceNotes", fields: [studentId], references: [id])
-  attendanceId Int        @unique
-  attendance   Attendance @relation(fields: [attendanceId], references: [id])
+  attendanceId Int?       @unique
+  attendance   Attendance? @relation(fields: [attendanceId], references: [id])
+  startDate    DateTime?
+  endDate      DateTime?
+  startPeriod  Int?
+  endPeriod    Int?
   reason       String
   status       String     @default("sent")
   createdAt    DateTime   @default(now())
