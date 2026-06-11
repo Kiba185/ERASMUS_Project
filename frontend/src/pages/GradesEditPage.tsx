@@ -6,14 +6,16 @@ import { createPortal } from 'react-dom';
 type Student = { id: string; name: string; classes: string[] };
 type Assignment = { id: string; subjectId: number; name: string; weight: number; date: string, classId: string };
 type Grade = { id: string; gColumnId: string; userId: string; grade: string };
+import { useAuth } from '../context/AuthContext';
 
 const GradesEditPage: React.FC = () => {
+  const { user } = useAuth();
   // 1. DATABASE
 
   const [students, setStudents] = useState<Student[]>([]);
   const [assignments, setAssignments] = useState<Assignment[]>([]);
   const [grades, setGrades] = useState<Grade[]>([]);
-  const [classes, setClasses] = useState<string[]>([]);
+  const [classes, setClasses] = useState<{id: number, name: string}[]>([]);
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
@@ -61,6 +63,7 @@ const GradesEditPage: React.FC = () => {
         const mapped: Assignment[] = data.map((a: any) => ({
           id: String(a.id),
           subjectId: a.subjectId,
+          classId: String(a.classId),
           name: a.name,       // was commented out as "title"
           weight: a.weight,
           date: a.date
@@ -132,7 +135,7 @@ const GradesEditPage: React.FC = () => {
 
         const data = await response.json();
         const classNames = data.map((c: any) => c.name);
-        setClasses(classNames);
+        setClasses(data); // Store objects {id, name} to map class name to classId
 
         if (classNames.length > 0) setSelectedClass(classNames[0]); // default to first
       } catch (error) {
@@ -142,17 +145,48 @@ const GradesEditPage: React.FC = () => {
 
     const fetchAll = async () => {
       setIsLoading(true);
-      await Promise.all([
-        loadSubjects(),
-        loadStudents(),
-        loadAssignments(),
-        loadGrades(),
-        loadClasses()
-      ]);
-      setIsLoading(false);
+      try {
+        // Fetch all basic data
+        await Promise.all([
+          loadSubjects(),
+          loadStudents(),
+          loadAssignments(),
+          loadGrades(),
+          loadClasses()
+        ]);
+        
+        // If not admin, restrict classes and subjects based on timetable
+        if (user?.role !== 'admin') {
+          const timetableRes = await fetch(`${API_URL}/api/teacher-timetable`, {
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' }
+          });
+          if (timetableRes.ok) {
+            const timetable = await timetableRes.json();
+            const allowedClassIds = new Set(timetable.map((t: any) => t.class.id));
+            const allowedSubjectIds = new Set(timetable.map((t: any) => t.subject.id));
+            
+            setClasses(prev => {
+              const filtered = prev.filter(c => allowedClassIds.has(c.id));
+              if (filtered.length > 0) setSelectedClass(filtered[0].name);
+              return filtered;
+            });
+            
+            setSubjects(prev => {
+              const filtered = prev.filter(s => allowedSubjectIds.has(s.id));
+              if (filtered.length > 0) setSelectedSubjectId(filtered[0].id);
+              return filtered;
+            });
+          }
+        }
+      } catch(e) {
+        console.error(e);
+      } finally {
+        setIsLoading(false);
+      }
     };
     fetchAll();
-  }, []);
+  }, [user]);
 
   // 2. FILTER STATES
   const [selectedClass, setSelectedClass] = useState<string>('');
@@ -173,7 +207,8 @@ const GradesEditPage: React.FC = () => {
   const [selectedSubjectId, setSelectedSubjectId] = useState<number>(0);
 
   const currentStudents = students.filter(s => s.classes.includes(selectedClass));
-  const currentAssignments = assignments.filter(a => a.subjectId === selectedSubjectId);
+  const currentClassId = classes.find(c => c.name === selectedClass)?.id;
+  const currentAssignments = assignments.filter(a => a.subjectId === selectedSubjectId && a.classId === String(currentClassId));
 
 
   // --- ADD COLUMN LOGIC ---
@@ -188,6 +223,7 @@ const GradesEditPage: React.FC = () => {
       body: JSON.stringify({
         name: newColTitle,
         subjectId: selectedSubjectId,
+        classId: currentClassId,
         weight: newColWeight,
         date: newColDate
       })
@@ -250,18 +286,19 @@ const GradesEditPage: React.FC = () => {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          name: editTitle,
-          subjectId: selectedSubjectId,
-          weight: Number(editWeight),
-          date: editDate
-        })
+        name: editTitle,
+        subjectId: editingAssignment.subjectId,
+        classId: editingAssignment.classId,
+        weight: editWeight,
+        date: editDate
+      })
       });
 
       if (!res.ok) throw new Error('Failed to update');
 
-      // Only remove from UI if backend succeeded
-      setAssignments(prev => prev.filter(a => a.id !== assignmentId));
-      setGrades(prev => prev.filter(g => g.gColumnId !== assignmentId));
+      setAssignments(prev =>
+        prev.map(a => a.id === assignmentId ? { ...a, name: editTitle, weight: Number(editWeight), date: editDate } : a)
+      );
     } catch (error) {
       console.error('Update failed:', error);
       alert('Failed to update column.');
@@ -432,9 +469,12 @@ const GradesEditPage: React.FC = () => {
 
 
   if (isLoading) return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-      <div className="w-12 h-12 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
-      <p className="text-palette-moss font-bold animate-pulse">Loading grades data...</p>
+    <div className="p-8 flex items-center justify-center gap-3 text-palette-pine font-bold text-lg">
+      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      </svg>
+      Loading grades editor...
     </div>
   );
 
@@ -452,12 +492,14 @@ const GradesEditPage: React.FC = () => {
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Class</label>
             <select
-              value={selectedClass}
-              onChange={(e) => setSelectedClass(e.target.value)}
-              className="p-2.5 bg-gray-50 border border-gray-300 rounded-lg text-gray-800 font-bold focus:ring-2 focus:ring-green-500 outline-none"
-            >
-              {classes.map(c => <option key={c} value={c}>{c}</option>)}
-            </select>
+            value={selectedClass}
+            onChange={(e) => setSelectedClass(e.target.value)}
+            className="w-full md:w-auto h-11 px-4 rounded-xl border border-palette-sage/30 bg-white text-sm font-semibold text-palette-pine focus:outline-none focus:ring-2 focus:ring-palette-fern focus:border-transparent transition-all shadow-sm"
+          >
+            {classes.map(c => (
+              <option key={c.name} value={c.name}>{c.name}</option>
+            ))}
+          </select>
           </div>
           <div>
             <label className="block text-xs font-semibold text-gray-500 uppercase tracking-wider mb-1">Subject</label>

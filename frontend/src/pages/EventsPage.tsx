@@ -187,7 +187,7 @@ const EventsPage: React.FC = () => {
   //   { id: 'e3', title: 'Regular Parent-Teacher Association Meeting', startDate: '2026-05-14', endDate: '2026-05-14', time: '17:00', isAllDay: false, type: 'meeting', description: 'Main school auditorium.' },
   //   { id: 'e4', title: 'State Holiday - Liberation Day', startDate: '2026-05-01', endDate: '2026-05-03', time: '', isAllDay: true, type: 'holiday', description: 'School completely closed.' },
 
-  const [navDate, setNavDate] = useState<Date>(new Date(2026, 4, 1));
+  const [navDate, setNavDate] = useState<Date>(new Date());
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [modalView, setModalView] = useState<'details' | 'create' | 'edit'>('details');
   const [selectedDateStr, setSelectedDateStr] = useState('');

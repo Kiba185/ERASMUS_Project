@@ -16,6 +16,7 @@ interface Student {
 interface ApiClass {
   id: number;
   name: string;
+  classTeacherId?: number | null;
   students: { id: number; name: string; role?: string }[];
   groups?: Group[];
 }
@@ -45,6 +46,7 @@ const ClassesPage: React.FC = () => {
   const [classes, setClasses] = useState<UIClass[]>([]);
   const [allUsers, setAllUsers] = useState<{ id: number; name: string; role: string }[]>([]);
   const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Modal State
@@ -59,7 +61,6 @@ const ClassesPage: React.FC = () => {
   const [selectedStudentIds, setSelectedStudentIds] = useState<number[]>([]);
   const [selectedHeadTeacherId, setSelectedHeadTeacherId] = useState<number | null>(null);
   const [className, setClassName] = useState('');
-  const [saving, setSaving] = useState(false);
   const [groups, setGroups] = useState<Group[]>([]);
   const [newGroupName, setNewGroupName] = useState('');
   const [editingGroupId, setEditingGroupId] = useState<number | null>(null);
@@ -102,28 +103,17 @@ const ClassesPage: React.FC = () => {
       setAllUsers(users);
 
       // Map API classes → UI classes
-      // Head teacher = the one member whose role is "teacher"
       const uiClasses: UIClass[] = classData.map((c) => {
-        const memberIds = c.students.map((s) => s.id);
-        const headTeacher = c.students.find((s) => {
-          const found = users.find((u) => u.id === s.id);
-          return found?.role === 'teacher';
-        });
         return {
           id: c.id,
           name: c.name,
-          headTeacherId: headTeacher?.id ?? null,
-          studentIds: c.students
-            .filter((s) => {
-              const found = users.find((u) => u.id === s.id);
-              return found?.role !== 'teacher';
-            })
-            .map((s) => s.id),
-
+          headTeacherId: c.classTeacherId ?? null,
+          studentIds: c.students.map((s) => s.id),
           groups: c.groups || []
         };
       });
 
+      uiClasses.sort((a, b) => a.name.localeCompare(b.name));
       setClasses(uiClasses);
     } catch (e: any) {
       setError(e.message ?? 'Unknown error');
@@ -154,6 +144,18 @@ const ClassesPage: React.FC = () => {
     );
   }, [students, assignedStudentIds, editingClass]);
 
+  const assignedTeacherIds = useMemo(() => {
+    return classes.flatMap((c) =>
+      editingClass && c.id === editingClass.id ? [] : (c.headTeacherId ? [c.headTeacherId] : [])
+    );
+  }, [classes, editingClass]);
+
+  const availableTeachers = useMemo(() => {
+    return teachers.filter(
+      (t) => !assignedTeacherIds.includes(t.id) || (editingClass?.headTeacherId === t.id)
+    );
+  }, [teachers, assignedTeacherIds, editingClass]);
+
   const openAddModal = () => {
     setIsNewClass(true);
     setEditingClass(null);
@@ -175,13 +177,9 @@ const ClassesPage: React.FC = () => {
     setIsModalOpen(true);
   };
 
-  // Build the studentIds array to send: students + optionally the head teacher
+  // Build the payload to send: students + the head teacher
   const buildPayload = () => {
-    const ids = [...selectedStudentIds];
-    if (selectedHeadTeacherId && !ids.includes(selectedHeadTeacherId)) {
-      ids.push(selectedHeadTeacherId);
-    }
-    return { name: className, studentIds: ids };
+    return { name: className, studentIds: selectedStudentIds, classTeacherId: selectedHeadTeacherId };
   };
 
   const handleSave = async (e: React.FormEvent) => {
@@ -199,14 +197,21 @@ const ClassesPage: React.FC = () => {
         )
       );
       try {
-        await fetch(`${API_URL}/api/classes/${editingClass.id}`, {
+        const response = await fetch(`${API_URL}/api/classes/${editingClass.id}`, {
           method: 'PUT',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(buildPayload()),
           credentials: 'include'
         });
+        if (!response.ok) {
+          const errData = await response.json();
+          alert('Failed to update class: ' + (errData.error || errData.message || 'Unknown error'));
+          return;
+        }
       } catch (err) {
         console.error(err);
+        alert('Network error while saving class.');
+        return;
       } finally {
         setIsSaving(false);
       }
@@ -218,6 +223,11 @@ const ClassesPage: React.FC = () => {
           body: JSON.stringify(buildPayload()),
           credentials: 'include'
         });
+        if (!response.ok) {
+          const errData = await response.json();
+          alert('Failed to create class: ' + (errData.error || errData.message || 'Unknown error'));
+          return;
+        }
         const data = await response.json();
         setClasses([...classes, {
           id: data.id,
@@ -228,6 +238,8 @@ const ClassesPage: React.FC = () => {
         }]);
       } catch (err) {
         console.error(err);
+        alert('Network error while saving class.');
+        return;
       } finally {
         setIsSaving(false);
       }
@@ -271,9 +283,12 @@ const ClassesPage: React.FC = () => {
   };
 
   if (isLoading) return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-      <div className="w-12 h-12 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
-      <p className="text-palette-moss font-bold animate-pulse">Loading classes...</p>
+    <div className="p-8 flex items-center justify-center gap-3 text-palette-pine font-bold text-lg">
+      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      </svg>
+      Loading classes...
     </div>
   );
 
@@ -289,10 +304,7 @@ const ClassesPage: React.FC = () => {
   return (
     <div className="p-4 md:p-8 max-w-7xl mx-auto space-y-8">
 
-      // Make this above all other elements with a portal, so it covers the entire screen
-      
-      
-      {saving && createPortal(
+      {isSaving && createPortal(
         <div className="fixed inset-0 bg-palette-pine/40 backdrop-blur-sm flex items-center justify-center z-[1000]">
           <div className="bg-white rounded-2xl shadow-2xl p-8 flex flex-col items-center gap-4">
             <div className="w-10 h-10 border-4 border-palette-fern border-t-transparent rounded-full animate-spin"></div>
@@ -443,7 +455,7 @@ const ClassesPage: React.FC = () => {
                           className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-lg focus:bg-white focus:ring-2 focus:ring-palette-meadow outline-none transition font-medium text-palette-pine"
                         >
                           <option value="">-- No Head Teacher --</option>
-                          {teachers.map((t) => (
+                          {availableTeachers.map((t) => (
                             <option key={t.id} value={t.id}>
                               {t.name}
                             </option>
@@ -667,8 +679,8 @@ const ClassesPage: React.FC = () => {
                     {!isNewClass && (
                       <button
                         type="button"
-                        onClick={handleDelete}
-                        disabled={saving}
+                        onClick={() => editingClass && handleDelete(editingClass.id)}
+                        disabled={isSaving}
                         className="px-5 py-2.5 bg-red-50 text-red-600 border border-red-200 font-bold rounded-xl hover:bg-red-100 transition disabled:opacity-50"
                       >
                         Delete Class
@@ -676,20 +688,21 @@ const ClassesPage: React.FC = () => {
                     )}
                   </div>
                   <div className="flex gap-3">
-                    <button
-                      type="button"
-                      onClick={() => setIsModalOpen(false)}
-                      className="px-5 py-2.5 bg-white border border-gray-300 text-gray-700 font-bold rounded-xl hover:bg-gray-100 transition"
-                    >
+                      <button
+                        type="button"
+                        onClick={() => setIsModalOpen(false)}
+                        disabled={isSaving}
+                        className="px-6 py-2.5 rounded-xl font-bold text-palette-moss hover:bg-gray-100 transition"
+                      >
                       Cancel
                     </button>
-                    <button
-                      type="submit"
-                      disabled={saving}
-                      className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl shadow-soft hover:bg-palette-leaf hover:-translate-y-0.5 transition-all disabled:opacity-50"
-                    >
-                      {saving ? 'Saving...' : 'Save Class'}
-                    </button>
+                      <button
+                        type="submit"
+                        disabled={isSaving}
+                        className="px-6 py-2.5 rounded-xl font-bold text-white bg-palette-fern hover:bg-palette-leaf shadow-soft transition disabled:opacity-50 flex items-center gap-2"
+                      >
+                        {isSaving ? 'Saving...' : 'Save Class'}
+                      </button>
                   </div>
                 </div>
               </form>

@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import API_URL from '../config/config.tsx';
+import React, { useState, useEffect } from 'react';
 import { useAuth } from '../context/AuthContext';
 
 // --- TYPES ---
@@ -32,19 +33,54 @@ const SchoolInfoPage: React.FC = () => {
     website: 'https://www.gjak.cz',
   });
 
+  // --- FETCH DATA ---
+  useEffect(() => {
+    const fetchInfo = async () => {
+      try {
+        const res = await fetch(`${API_URL}/api/school-info`, { credentials: 'include' });
+        if (res.ok) {
+          const data = await res.json();
+          setSchoolData({
+            schoolName: data.schoolName || '',
+            registrationId: data.registrationId || '',
+            principal: data.principal || '',
+            street: data.street || '',
+            city: data.city || '',
+            zipCode: data.zipCode || '',
+            email: data.email || '',
+            phone: data.phone || '',
+            website: data.website || '',
+          });
+        }
+      } catch (e) {
+        console.error('Failed to load school info', e);
+      }
+    };
+    fetchInfo();
+  }, []);
+
   // --- HANDLERS ---
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const { name, value } = e.target;
     setSchoolData((prev) => ({ ...prev, [name]: value }));
   };
 
-  const handleSave = () => {
+  const handleSave = async () => {
     setIsSaving(true);
-    // API call to save data would go here
-    setTimeout(() => {
-      setIsSaving(false);
+    try {
+      const res = await fetch(`${API_URL}/api/school-info`, {
+        method: 'PUT',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(schoolData)
+      });
+      if (!res.ok) throw new Error('Failed to save');
       alert('School information has been successfully saved.');
-    }, 800);
+    } catch (e) {
+      alert('Error saving school information.');
+    } finally {
+      setIsSaving(false);
+    }
   };
 
   return (
