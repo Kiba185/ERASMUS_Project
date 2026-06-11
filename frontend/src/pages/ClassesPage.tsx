@@ -667,7 +667,7 @@ const ClassesPage: React.FC = () => {
                     {!isNewClass && (
                       <button
                         type="button"
-                        onClick={handleDelete}
+                        onClick={() => editingClass && handleDelete(editingClass.id)}
                         disabled={saving}
                         className="px-5 py-2.5 bg-red-50 text-red-600 border border-red-200 font-bold rounded-xl hover:bg-red-100 transition disabled:opacity-50"
                       >
