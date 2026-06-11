@@ -9,51 +9,57 @@ const GradesPage: React.FC = () => {
     //DOMINIK JE CERNY
     const { user, activeChildId } = useAuth();
     const [grades, setGrades] = useState<Grade[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    const loadGrades = async () => {
+        try {
+            const url = user?.role === 'parent' && activeChildId
+                ? `${API_URL}/api/mygrades?studentId=${activeChildId}`
+                : `${API_URL}/api/mygrades`;
+            const response = await fetch(url, {
+                credentials: 'include',
+                headers: {
+                    'Content-Type': 'application/json',
+                }
+            });
+            if (!response.ok) {
+                throw new Error(`Failed to load students: ${response.statusText}`);
+            }
+
+            const toDisplayGrade = (val: number): string => {
+                val = parseFloat(val.toString()); // ensure it's a number
+                if (val === 1.5) return '1-';
+                if (val === 2.5) return '2-';
+                if (val === 3.5) return '3-';
+                if (val === 4.5) return '4-';
+                return String(Math.round(val)); // 1, 2, 3, 4, 5
+            };
+
+            const data = await response.json();
+            const mapped: Grade[] = data.map((g: any) => ({
+                id: String(g.id),
+                gColumnId: String(g.gColumnId),
+                userId: String(g.userId),
+                grade: toDisplayGrade(g.grade), // 👈 convert 3.5 → "3-" on load
+                subjectName: g.subjectName,
+                subjectId: g.subjectId,
+                date: g.date,
+                gColumnName: g.gColumnName,
+                weight: g.weight
+            }));
+            setGrades(mapped);
+        } catch (error) {
+            setError('Failed to load grades. Please try again later.');
+            console.error(error);
+        }
+    };
 
     useEffect(() => {
-        const loadGrades = async () => {
-            try {
-                const url = user?.role === 'parent' && activeChildId
-                    ? `${API_URL}/api/mygrades?studentId=${activeChildId}`
-                    : `${API_URL}/api/mygrades`;
-                const response = await fetch(url, {
-                    credentials: 'include',
-                    headers: {
-                        'Content-Type': 'application/json',
-                    }
-                });
-                if (!response.ok) {
-                    throw new Error(`Failed to load students: ${response.statusText}`);
-                }
-
-                const toDisplayGrade = (val: number): string => {
-                    val = parseFloat(val.toString()); // ensure it's a number
-                    if (val === 1.5) return '1-';
-                    if (val === 2.5) return '2-';
-                    if (val === 3.5) return '3-';
-                    if (val === 4.5) return '4-';
-                    return String(Math.round(val)); // 1, 2, 3, 4, 5
-                };
-
-                const data = await response.json();
-                const mapped: Grade[] = data.map((g: any) => ({
-                    id: String(g.id),
-                    gColumnId: String(g.gColumnId),
-                    userId: String(g.userId),
-                    grade: toDisplayGrade(g.grade), // 👈 convert 3.5 → "3-" on load
-                    subjectName: g.subjectName,
-                    subjectId: g.subjectId,
-                    date: g.date,
-                    gColumnName: g.gColumnName,
-                    weight: g.weight
-                }));
-                setGrades(mapped);
-            } catch (error) {
-                console.error(error);
-            }
-        };
-
-        loadGrades();
+        setLoading(true);
+        loadGrades().finally(() => {
+            setLoading(false);
+        });
     }, [user, activeChildId]);
 
     // 2. REAKTOVÉ STAVY A LOGIKA FILTROVÁNÍ
@@ -87,6 +93,24 @@ const GradesPage: React.FC = () => {
         return acc + numericGrade * weight;
     }, 0) / filteredGrades.reduce((acc, grade) => acc + (grade.weight || 1), 0);
 
+    if (loading) return (
+        <div className="p-8 flex items-center justify-center gap-3 text-palette-pine font-bold text-lg">
+            <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
+                <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+                <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+            </svg>
+            Loading grades...
+        </div>
+    );
+
+    if (error) return (
+        <div className="p-8 text-center space-y-4">
+            <p className="text-red-600 font-bold">{error}</p>
+            <button onClick={loadGrades} className="px-5 py-2.5 bg-palette-fern text-white font-bold rounded-xl hover:bg-palette-leaf transition">
+                Retry
+            </button>
+        </div>
+    );
 
     return (
         <div className="p-8">

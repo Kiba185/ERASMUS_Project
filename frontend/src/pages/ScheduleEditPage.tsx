@@ -109,6 +109,7 @@ const ScheduleEditPage: React.FC = () => {
   const [weekOffset, setWeekOffset] = useState<number>(0);
   const [lessons, setLessons] = useState<Lesson[]>([]);
   const [isPermanentEditMode, setIsPermanentEditMode] = useState<boolean>(false);
+  const [isSwitchingView, setIsSwitchingView] = useState(false);
 
   // Modal states
   const [isModalOpen, setIsModalOpen] = useState<boolean>(false);
@@ -240,17 +241,20 @@ const ScheduleEditPage: React.FC = () => {
       e.exceptionDate && currentWeekDates.includes(e.exceptionDate)
     );
 
-    // 3. Remove permanent template items that are explicitly overridden or cancelled this week
-    const filteredPermanents = permanentLessons.filter(p => {
+    // 3. Keep all permanent items, but mark those that are overridden
+    const processedPermanents = permanentLessons.map(p => {
       const dayIndex = days.indexOf(p.day);
       const associatedCalendarDate = currentWeekDates[dayIndex];
       const hasOverrideThisWeek = currentWeekExceptions.some(
         e => e.templateId === p.id && e.exceptionDate === associatedCalendarDate
       );
-      return !hasOverrideThisWeek;
+      if (hasOverrideThisWeek) {
+        return { ...p, _isOverridden: true };
+      }
+      return p;
     });
 
-    return [...filteredPermanents, ...currentWeekExceptions];
+    return [...processedPermanents, ...currentWeekExceptions];
   };
 
   // ── Handlers ───────────────────────────────────────────────────────────────
@@ -452,9 +456,12 @@ const ScheduleEditPage: React.FC = () => {
   );
 
   if (loading) return (
-    <div className="flex flex-col items-center justify-center min-h-[60vh] gap-4">
-      <div className="w-12 h-12 border-4 border-palette-fern border-t-transparent rounded-full animate-spin" />
-      <p className="text-palette-moss font-bold animate-pulse">Loading schedule editor...</p>
+    <div className="p-8 flex items-center justify-center gap-3 text-palette-pine font-bold text-lg">
+      <svg className="w-6 h-6 animate-spin text-palette-fern" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z" />
+      </svg>
+      Loading schedule editor...
     </div>
   );
 
@@ -512,20 +519,20 @@ const ScheduleEditPage: React.FC = () => {
               <label className="block text-xs font-bold text-palette-moss uppercase tracking-wider mb-2">Calendar Navigation</label>
               <div className="flex items-center gap-2">
                 <button
-                  onClick={() => setWeekOffset(w => w - 1)}
+                  onClick={() => { setIsSwitchingView(true); setTimeout(() => { setWeekOffset(w => w - 1); setIsSwitchingView(false); }, 300); }}
                   className="p-2 bg-gray-50 text-palette-pine border border-gray-200 rounded-xl hover:bg-gray-100 transition flex items-center"
                   title="Previous week"
                 >
                   <span className="material-symbols-outlined">chevron_left</span>
                 </button>
                 <button
-                  onClick={() => setWeekOffset(0)}
+                  onClick={() => { setIsSwitchingView(true); setTimeout(() => { setWeekOffset(0); setIsSwitchingView(false); }, 300); }}
                   className={`px-4 py-2 border rounded-xl font-bold text-sm transition flex items-center gap-1.5 ${weekOffset === 0 ? 'bg-palette-fern text-white border-transparent shadow-inner' : 'bg-gray-50 text-palette-pine hover:bg-gray-100'}`}
                 >
                   <span className="material-symbols-outlined text-[18px]">today</span> Current Week
                 </button>
                 <button
-                  onClick={() => setWeekOffset(w => w + 1)}
+                  onClick={() => { setIsSwitchingView(true); setTimeout(() => { setWeekOffset(w => w + 1); setIsSwitchingView(false); }, 300); }}
                   className="p-2 bg-gray-50 text-palette-pine border border-gray-200 rounded-xl hover:bg-gray-100 transition flex items-center"
                   title="Next week"
                 >
@@ -571,7 +578,15 @@ const ScheduleEditPage: React.FC = () => {
       </div>
 
       {/* ─── Grid Timeline Table (Days as Rows, Slots as Columns) ─────────────── */}
-      <div className="overflow-x-auto rounded-2xl border border-palette-sage/30 shadow-soft bg-white">
+      <div className="relative overflow-x-auto rounded-2xl border border-palette-sage/30 shadow-soft bg-white">
+        {isSwitchingView && (
+          <div className="absolute inset-0 bg-white/60 backdrop-blur-sm z-10 flex items-center justify-center">
+             <div className="flex items-center gap-3 bg-white p-4 rounded-xl shadow-lg border border-palette-mist">
+               <div className="w-6 h-6 border-4 border-palette-fern border-t-transparent rounded-full animate-spin"></div>
+               <span className="font-bold text-palette-pine">Loading schedule...</span>
+             </div>
+          </div>
+        )}
         <table className="w-full border-collapse text-left">
           <thead>
             <tr className="bg-palette-mist/80 border-b border-palette-sage/30">
@@ -637,10 +652,21 @@ const ScheduleEditPage: React.FC = () => {
                     return (
                       <td key={p.periodNumber} className="p-3 border-r border-palette-sage/20 last:border-r-0 align-middle">
                         <div className="space-y-2">
-                          {slotLessons.map((lesson) => {
+                          {slotLessons.map((lesson: any) => {
                             const isCancelled = lesson.status === 'cancelled';
                             const isSubstituted = lesson.status === 'substituted';
-                            const colorClasses = getSubjectColorClasses(lesson.subject);
+                            const isOverridden = lesson._isOverridden;
+                            const isTemporary = !lesson.isPermanent;
+                            let colorClasses = getSubjectColorClasses(lesson.subject);
+                            
+                            if (isOverridden) {
+                              colorClasses = 'bg-gray-50 border-gray-300 text-gray-400 border-dashed opacity-50';
+                            } else if (isTemporary && !isPermanentEditMode) {
+                              colorClasses = 'bg-red-50/90 border-red-500 text-red-950 shadow-sm';
+                            } else if (!isTemporary && !isPermanentEditMode) {
+                              // Fade out the master template in Weekly Exceptions mode
+                              colorClasses += ' opacity-50';
+                            }
 
                             return (
                               <div
@@ -648,11 +674,18 @@ const ScheduleEditPage: React.FC = () => {
                                 onClick={(e) => { e.stopPropagation(); handleLessonClick(lesson); }}
                                 className={`rounded-xl border-l-4 p-3.5 shadow-sm cursor-pointer transition-all duration-200 
                                   hover:shadow-md hover:-translate-y-0.5 flex flex-col justify-between ${colorClasses}
-                                  ${isCancelled ? 'bg-red-50/60 border-red-500 text-red-950/60 opacity-60' : ''}
-                                  ${isSubstituted ? 'bg-orange-50/80 border-orange-500 text-orange-950' : ''}
-                                  min-h-[115px]
+                                  ${isCancelled && !isOverridden ? 'bg-red-50/60 border-red-500 text-red-950/60 opacity-60' : ''}
+                                  ${isSubstituted && !isOverridden ? 'bg-orange-50/80 border-orange-500 text-orange-950' : ''}
+                                  min-h-[115px] relative
                                 `}
                               >
+                                {isTemporary && !isPermanentEditMode && (
+                                  <div className="absolute top-1 right-1">
+                                    <span className="material-symbols-outlined text-[14px] text-red-500" title="Temporary Override">
+                                      change_circle
+                                    </span>
+                                  </div>
+                                )}
                                 <div>
                                   <div className="flex justify-between items-center gap-1.5">
                                     <h3 className={`font-extrabold text-sm line-clamp-1 leading-snug ${isCancelled ? 'line-through text-gray-400' : ''}`}>

@@ -14,6 +14,27 @@ model Todo {
   createdAt   DateTime @default(now())
 }
 
+model SchoolInfo {
+  id             Int    @id @default(1) // Singleton pattern
+  schoolName     String @default("John Amos Comenius Grammar School")
+  registrationId String @default("12345678")
+  principal      String @default("John Doe, M.A.")
+  street         String @default("School Street 123")
+  city           String @default("Prague 1")
+  zipCode        String @default("110 00")
+  email          String @default("office@gjak.cz")
+  phone          String @default("+420 123 456 789")
+  website        String @default("https://www.gjak.cz")
+}
+
+model Semester {
+  id        Int      @id @default(autoincrement())
+  name      String
+  startDate DateTime
+  endDate   DateTime
+  isActive  Boolean  @default(false)
+}
+
 model User {
   id        Int      @id @default(autoincrement())
   role      String
@@ -74,6 +95,7 @@ model GradeColumn {
   name      String
   weight    Int
   date      DateTime
+  classId   Int      @default(1)
 }
 
 model Grade {
@@ -120,8 +142,12 @@ model AbsenceNote {
   id           Int        @id @default(autoincrement())
   studentId    Int
   student      User       @relation("StudentAbsenceNotes", fields: [studentId], references: [id])
-  attendanceId Int        @unique
-  attendance   Attendance @relation(fields: [attendanceId], references: [id])
+  attendanceId Int?       @unique
+  attendance   Attendance? @relation(fields: [attendanceId], references: [id])
+  startDate    DateTime?
+  endDate      DateTime?
+  startPeriod  Int?
+  endPeriod    Int?
   reason       String
   status       String     @default("sent")
   createdAt    DateTime   @default(now())
