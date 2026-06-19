@@ -17,6 +17,7 @@ declare module 'express-session' {
 }
 
 const app = express();
+app.set('trust proxy', 1);
 const PORT = process.env.PORT || 3000;
 
 const privileges = {
@@ -29,10 +30,12 @@ const privileges = {
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
+        const allowedOrigin = process.env.CORS_ORIGIN?.replace(/\/$/, "");
         if (
             origin.startsWith('http://localhost') ||
             origin.endsWith('.onrender.com') ||
-            origin === process.env.CORS_ORIGIN
+            origin.endsWith('.vercel.app') ||
+            origin === allowedOrigin
         ) {
             return callback(null, true);
         }
@@ -901,6 +904,6 @@ app.delete('/api/semesters/:id', async (req, res, next) => {
     }
 });
 
-app.listen(PORT, () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
