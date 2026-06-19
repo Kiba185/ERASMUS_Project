@@ -2,6 +2,7 @@ import API_URL from '../config/config.tsx';
 import React, { useState, useEffect, useMemo } from 'react';
 import { useAuth } from '../context/AuthContext';
 import { createPortal } from 'react-dom';
+import { getISOWeekDetails, getMondayOfOffsetWeek } from '../utils/dateUtils';
 
 // ─── Interfaces ─────────────────────────────────────────────────────────────
 
@@ -55,28 +56,6 @@ const getSubjectColorClasses = (subjectName: string): string => {
   if (s.includes('comp') || s.includes('info')) return 'border-teal-500 bg-teal-50/70 text-teal-950 hover:bg-teal-100/70';
   if (s.includes('music') || s.includes('sing')) return 'border-violet-500 bg-violet-50/70 text-violet-950 hover:bg-violet-100/70';
   return 'border-palette-sage bg-palette-mist/80 text-palette-pine hover:bg-palette-mist';
-};
-
-// Date math helpers
-const getISOWeekDetails = (date: Date) => {
-  const target = new Date(date.valueOf());
-  const dayNr = (date.getDay() + 6) % 7;
-  target.setDate(target.getDate() - dayNr + 3);
-  const firstThursday = target.valueOf();
-  target.setMonth(0, 1);
-  if (target.getDay() !== 4) {
-    target.setMonth(0, 1 + ((4 - target.getDay() + 7) % 7));
-  }
-  const weekNumber = 1 + Math.ceil((firstThursday - target.valueOf()) / 604800000);
-  return { weekNumber, isEven: weekNumber % 2 === 0 };
-};
-
-const getMondayOfOffsetWeek = (weekOffset: number): Date => {
-  const today = new Date();
-  const currentDay = today.getDay();
-  const distanceToMonday = currentDay === 0 ? -6 : 1 - currentDay;
-  const targetMonday = new Date(today.setDate(today.getDate() + distanceToMonday + weekOffset * 7));
-  return targetMonday;
 };
 
 const getWeekDatesStrings = (weekOffset: number): string[] => {
@@ -362,6 +341,8 @@ const ScheduleEditPage: React.FC = () => {
     } catch (error: any) {
       console.error("Save error:", error);
       alert(error.message || "Failed to save lesson data.");
+    } finally {
+      setSaving(false);
     }
   };
 

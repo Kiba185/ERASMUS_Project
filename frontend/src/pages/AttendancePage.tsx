@@ -5,6 +5,7 @@ import { useAuth } from '../context/AuthContext';
 import API_URL from '../config/config';
 import BulkAttendanceModal from '../components/ui/BulkAttendanceModal';
 import AttendancePopUp from '../components/ui/AttendancePopUp';
+import { getSystemDate, formatDateValue, getISOWeekDetails, isWeekMatch } from '../utils/dateUtils';
 
 // ---------------------------------------------------------
 // DATA MODELS
@@ -31,10 +32,17 @@ interface StudentProfile {
   lastName?: string;
 }
 
+interface GroupData {
+  id: number;
+  name: string;
+  studentIds: number[];
+}
+
 interface ClassData {
   id: number;
   name: string;
   students: StudentProfile[];
+  groups?: GroupData[];
 }
 
 interface TeacherLesson {
@@ -47,6 +55,12 @@ interface TeacherLesson {
   class: { id: number; name: string };
   room: { id: number; name: string };
   period?: Period;
+  group: string;
+  isPermanent: boolean;
+  week: string;
+  exceptionDate?: string | null;
+  status?: string;
+  templateId?: number | null;
 }
 
 interface AttendanceRecord {
@@ -103,15 +117,14 @@ const ABSENCE_STATUS_CLASS_NAMES: Record<keyof typeof ABSENCE_STATUS_LABELS, str
   'Excused absence': 'bg-blue-100 text-blue-700',
 };
 
-const formatDateValue = (date: Date) => date.toISOString().slice(0, 10);
-const TODAY_DATE_VALUE = formatDateValue(new Date());
+const TODAY_DATE_VALUE = formatDateValue(getSystemDate());
 
 const getDateForDayOfWeek = (dayName: string) => {
   const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
   const targetIndex = days.indexOf(dayName);
   if (targetIndex === -1) return TODAY_DATE_VALUE;
   
-  const now = new Date();
+  const now = getSystemDate();
   const currentDayIndex = now.getDay();
   const distance = targetIndex - currentDayIndex;
   
@@ -204,6 +217,7 @@ const AttendancePage = () => {
     periodNumber: number;
     startTime: string;
     endTime: string;
+    group: string;
   } | null>(null);
 
   // Global State (Fetched)
@@ -359,7 +373,7 @@ const AttendancePage = () => {
   // --- QUICK ACTION MATCHING ---
   const activeLesson = useMemo(() => {
     if (!isTeacher) return null;
-    let now = new Date();
+    const now = getSystemDate();
 
     const currentDayIndex = now.getDay();
     if (currentDayIndex === 0 || currentDayIndex === 6) return null;
@@ -376,16 +390,47 @@ const AttendancePage = () => {
 
     if (!activePeriod) return null;
 
-    const matchedLesson = lessonsToShow.find(
-      (l) => l.day === currentDayName && l.periodNumber === activePeriod.periodNumber
+    // 1. Check for temporary exceptions active today
+    const todayStr = formatDateValue(now);
+    const activeException = lessonsToShow.find(
+      (l) => !l.isPermanent && l.exceptionDate === todayStr && l.periodNumber === activePeriod.periodNumber
     );
 
-    if (matchedLesson) {
+    if (activeException) {
+      if (activeException.status === 'cancelled') return null;
       return {
-        ...matchedLesson,
+        ...activeException,
         period: activePeriod,
       };
     }
+
+    // 2. Check for permanent lessons matching day and parity
+    const { isEven } = getISOWeekDetails(now);
+    const todayWeekParity = isEven ? 'even' : 'odd';
+
+    const activePermanent = lessonsToShow.find(
+      (l) => l.isPermanent &&
+             l.day === currentDayName &&
+             l.periodNumber === activePeriod.periodNumber &&
+             isWeekMatch(l.week, todayWeekParity)
+     );
+
+    if (activePermanent) {
+      // Check if this permanent lesson is cancelled today
+      const isCancelled = lessonsToShow.some(
+        (l) => !l.isPermanent &&
+               l.templateId === activePermanent.id &&
+               l.exceptionDate === todayStr &&
+               l.status === 'cancelled'
+      );
+      if (isCancelled) return null;
+
+      return {
+        ...activePermanent,
+        period: activePeriod,
+      };
+    }
+
     return null;
   }, [isTeacher, lessonsToShow, periodsToShow]);
 
@@ -398,6 +443,7 @@ const AttendancePage = () => {
       periodNumber: lesson.periodNumber,
       startTime: lesson.startTime || lesson.period?.startTime || '',
       endTime: lesson.endTime || lesson.period?.endTime || '',
+      group: lesson.group || 'Whole Class',
     });
     setDateFilter(getDateForDayOfWeek(lesson.day));
     setClassFilterId(lesson.class.id);
@@ -533,8 +579,22 @@ const AttendancePage = () => {
   const canEditAttendance = isAdmin || isTeacher;
   const canEditTopic = viewState === 'log_lesson' || isAdmin;
 
-  const currentClassData = classesList.find(c => c.id === classFilterId);
-  const studentsToShow = currentClassData?.students || [];
+  const studentsToShow = useMemo(() => {
+    const currentClassData = classesList.find(c => c.id === classFilterId);
+    if (!currentClassData) return [];
+    
+    // If we are logging a specific lesson and group is not "Whole Class", filter by group membership
+    if (viewState === 'log_lesson' && selectedLesson && selectedLesson.group !== 'Whole Class') {
+      const groupName = selectedLesson.group;
+      const matchedGroup = currentClassData.groups?.find(
+        g => g.name.toLowerCase() === groupName.toLowerCase()
+      );
+      if (matchedGroup) {
+        return currentClassData.students.filter(s => matchedGroup.studentIds.includes(s.id));
+      }
+    }
+    return currentClassData.students;
+  }, [classesList, classFilterId, viewState, selectedLesson]);
 
   const activeSubjectFilterId = useMemo(() => {
     return subjectFilterId !== ALL_FILTER_VALUE && classSubjects.some(s => s.id.toString() === subjectFilterId)
@@ -640,19 +700,17 @@ const AttendancePage = () => {
           </div>
         )}
 
-        <div className="grid gap-6 md:grid-cols-2">
-          <div className={`flex flex-col p-6 rounded-2xl border bg-white shadow-soft transition ${isClassTeacher ? 'border-palette-sage/30 hover:shadow-md hover:scale-[1.01]' : 'border-palette-sage/10 opacity-60'}`}>
-            <div className="flex items-center gap-3 mb-4"><span className="material-symbols-outlined text-3xl text-palette-fern bg-palette-mist p-2.5 rounded-xl">groups</span><h3 className="text-xl font-extrabold text-palette-pine">Class Absence</h3></div>
-            <p className="text-palette-moss font-semibold text-sm mb-4">Full overview and editing of attendance for the entire class. Available for class teachers and administrators.</p>
-            {isTeacher && assignedClass && <div className="mb-4 text-xs font-bold text-palette-pine bg-palette-mist p-2 rounded">Class teacher of: {assignedClass.name}</div>}
-            <div className="mt-auto pt-4 border-t border-palette-sage/10">
-              {isClassTeacher ? (
+        <div className={`grid gap-6 ${isClassTeacher ? 'md:grid-cols-2' : 'max-w-md mx-auto'}`}>
+          {isClassTeacher && (
+            <div className="flex flex-col p-6 rounded-2xl border border-palette-sage/30 bg-white shadow-soft transition hover:shadow-md hover:scale-[1.01]">
+              <div className="flex items-center gap-3 mb-4"><span className="material-symbols-outlined text-3xl text-palette-fern bg-palette-mist p-2.5 rounded-xl">groups</span><h3 className="text-xl font-extrabold text-palette-pine">Class Absence</h3></div>
+              <p className="text-palette-moss font-semibold text-sm mb-4">Full overview and editing of attendance for the entire class. Available for class teachers and administrators.</p>
+              {isTeacher && assignedClass && <div className="mb-4 text-xs font-bold text-palette-pine bg-palette-mist p-2 rounded">Class teacher of: {assignedClass.name}</div>}
+              <div className="mt-auto pt-4 border-t border-palette-sage/10">
                 <button onClick={() => { if (assignedClass && !isAdmin) setClassFilterId(assignedClass.id); setViewState('class_absence'); }} className="w-full flex items-center justify-center gap-2 rounded-xl bg-palette-fern py-3 font-extrabold text-white transition hover:bg-palette-leaf">Open Class Absence <span className="material-symbols-outlined text-sm">arrow_forward</span></button>
-              ) : (
-                <div className="text-xs text-red-700 bg-red-50 p-3 rounded-lg flex items-start gap-1.5 font-bold"><span className="material-symbols-outlined text-sm shrink-0">info</span>Access restricted to class teachers and administrators.</div>
-              )}
+              </div>
             </div>
-          </div>
+          )}
 
           <div className="flex flex-col p-6 rounded-2xl border border-palette-sage/30 bg-white shadow-soft transition hover:shadow-md hover:scale-[1.01]">
             <div className="flex items-center gap-3 mb-4"><span className="material-symbols-outlined text-3xl text-palette-fern bg-palette-mist p-2.5 rounded-xl">edit_calendar</span><h3 className="text-xl font-extrabold text-palette-pine">Log Lesson</h3></div>
@@ -699,8 +757,9 @@ const AttendancePage = () => {
                           {cellLessons.map(lesson => (
                             <button key={lesson.id} onClick={() => handleSelectLessonToLog(lesson)} className="w-full text-left rounded-xl border-l-4 border-palette-leaf bg-palette-mist/80 p-3 shadow-xs hover:shadow-md transition">
                               <h3 className="font-extrabold text-palette-pine text-sm">{lesson.subject?.name || 'Unknown'}</h3>
-                              <div className="mt-2 text-[10px] bg-white/40 p-1.5 rounded">
+                              <div className="mt-2 text-[10px] bg-white/40 p-1.5 rounded space-y-0.5">
                                 <p>Class: {lesson.class?.name || 'Unknown'}</p>
+                                {lesson.group && lesson.group !== 'Whole Class' && <p className="text-palette-leaf font-bold">Group: {lesson.group}</p>}
                                 <p>Room: {lesson.room?.name || 'Unknown'}</p>
                               </div>
                             </button>
@@ -736,7 +795,7 @@ const AttendancePage = () => {
 
       <div>
         <button onClick={() => setViewState(isFocusedLog ? 'teacher_schedule' : 'menu')} className="inline-flex items-center gap-1.5 text-palette-moss hover:text-palette-pine font-black text-sm mb-2"><span className="material-symbols-outlined text-base">arrow_back</span>{isFocusedLog ? 'Back to timetable' : 'Back to menu'}</button>
-        <h1 className="text-3xl font-bold text-palette-pine">{isFocusedLog ? `Log Lesson: ${selectedLesson?.subject.name}` : 'Attendance & Class Log'}</h1>
+        <h1 className="text-3xl font-bold text-palette-pine">{isFocusedLog ? `Log Lesson: ${selectedLesson?.subject.name} (${selectedLesson?.group || 'Whole Class'})` : 'Attendance & Class Log'}</h1>
       </div>
 
       <section className="rounded-lg border border-palette-lichen/45 bg-palette-mist shadow-soft">

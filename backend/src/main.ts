@@ -574,12 +574,28 @@ app.delete('/api/grades/:studentId/:gradeColumnId', async (req, res, next) => {
 
 app.get('/api/classes', async (req, res, next) => {
     if (await requireAuth(req, res, next, 5) !== true) { return; }
-    const classToUserRelagtions = await prisma.class.findMany({ include: { students: true } });
-    const classToUser = classToUserRelagtions.map(c => ({
+    const classToUserRelations = await prisma.class.findMany({ 
+        include: { 
+            students: true, 
+            groups: {
+                include: {
+                    students: {
+                        select: { id: true }
+                    }
+                }
+            }
+        } 
+    });
+    const classToUser = classToUserRelations.map(c => ({
         id: c.id,
         name: c.name,
         classTeacherId: c.classTeacherId,
-        students: c.students.filter(s => s.role === 'student').map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}`, role: s.role }))
+        students: c.students.filter(s => s.role === 'student').map(s => ({ id: s.id, name: `${s.firstName} ${s.lastName}`, role: s.role })),
+        groups: c.groups.map(g => ({
+            id: g.id,
+            name: g.name,
+            studentIds: g.students.map(s => s.id)
+        }))
     }));
     res.json(classToUser);
 });

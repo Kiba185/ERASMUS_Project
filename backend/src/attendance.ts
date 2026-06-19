@@ -131,7 +131,7 @@ router.get('/api/teacher-timetable', async (req, res, next) => {
   if (await requireAuth(req, res, next, 5) !== true) return;
   try {
     const lessons = await prisma.timeTable.findMany({
-      where: { teacherId: req.session.userId!, isPermanent: true },
+      where: { teacherId: req.session.userId! },
       include: {
         subject: { select: { id: true, name: true } },
         class:   { select: { id: true, name: true } },
