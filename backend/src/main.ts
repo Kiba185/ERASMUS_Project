@@ -903,6 +903,6 @@ app.delete('/api/semesters/:id', async (req, res, next) => {
     }
 });
 
-app.listen(PORT, () => {
+app.listen(Number(PORT), '0.0.0.0', () => {
     console.log(`Server running on http://localhost:${PORT}`);
 });
