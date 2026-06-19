@@ -2,6 +2,7 @@ import API_URL from '../../config/config.tsx';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getSystemDate } from '../../utils/dateUtils';
 
 type Event = {
   id: number;
@@ -38,7 +39,7 @@ const EventsWidget: React.FC = () => {
         const data: Event[] = await res.json();
 
         // Only upcoming (today or future), sorted soonest first
-        const now = new Date();
+        const now = getSystemDate();
         now.setHours(0, 0, 0, 0);
         const upcoming = data
           .filter(e => new Date(e.startDate) >= now)

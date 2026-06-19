@@ -2,6 +2,7 @@ import API_URL from '../../config/config.tsx';
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../context/AuthContext';
+import { getSystemDate } from '../../utils/dateUtils';
 
 type Lesson = {
   id: number;
@@ -28,7 +29,7 @@ const ClassesWidget: React.FC = () => {
                     const data = await res.json();
                     
                     const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
-                    const todayName = days[new Date().getDay()];
+                    const todayName = days[getSystemDate().getDay()];
                     
                     const todaysLessons = data
                         .filter((l: any) => l.day === todayName)
