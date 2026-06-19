@@ -47,10 +47,10 @@ const MessagesPage: React.FC = () => {
     loading && setLoading(true);
     try {
       const [inboxRes, sentRes, recipientsRes, classesRes] = await Promise.all([
-        fetch('http://localhost:3000/api/messages/inbox', { credentials: 'include' }),
-        fetch('http://localhost:3000/api/messages/sent', { credentials: 'include' }),
-        fetch('http://localhost:3000/api/messages/recipients', { credentials: 'include' }),
-        fetch('http://localhost:3000/api/messages/classes', { credentials: 'include' }),
+        fetch(`${API_URL}/api/messages/inbox`, { credentials: 'include' }),
+        fetch(`${API_URL}/api/messages/sent`, { credentials: 'include' }),
+        fetch(`${API_URL}/api/messages/recipients`, { credentials: 'include' }),
+        fetch(`${API_URL}/api/messages/classes`, { credentials: 'include' }),
 
       ]);
       const inbox = await inboxRes.json();
@@ -198,7 +198,7 @@ const MessagesPage: React.FC = () => {
 
     setSending(true);
     try {
-      const res = await fetch('http://localhost:3000/api/messages', {
+      const res = await fetch(`${API_URL}/api/messages`, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },

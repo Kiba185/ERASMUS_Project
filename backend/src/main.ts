@@ -790,12 +790,31 @@ app.get('/api/messages/sent', async (req, res, next) => {
 
 app.post('/api/messages', async (req, res, next) => {
     if (await requireAuth(req, res, next, 1) !== true) { return; }
-    const { recipientId, body } = req.body;
-    if (!recipientId || !body) return res.status(400).json({ success: false, message: 'recipientId and body are required' });
-    const message = await prisma.message.create({
-        data: { senderId: req.session.userId!, recipientId: Number(recipientId), body }
-    });
-    res.status(201).json(message);
+    const { recipientId, recipientIds, body } = req.body;
+    if (!body) return res.status(400).json({ success: false, message: 'body is required' });
+
+    try {
+        if (recipientIds && Array.isArray(recipientIds)) {
+            // Hromadná zpráva pro více příjemců
+            const messagesData = recipientIds.map((id: number) => ({
+                senderId: req.session.userId!,
+                recipientId: Number(id),
+                body
+            }));
+            await prisma.message.createMany({ data: messagesData });
+            return res.status(201).json({ success: true, message: 'Messages sent successfully' });
+        } else if (recipientId) {
+            // Jedna zpráva pro jednoho příjemce
+            const message = await prisma.message.create({
+                data: { senderId: req.session.userId!, recipientId: Number(recipientId), body }
+            });
+            return res.status(201).json(message);
+        } else {
+            return res.status(400).json({ success: false, message: 'recipientId or recipientIds is required' });
+        }
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.get('/api/messages/recipients', async (req, res, next) => {
@@ -805,6 +824,28 @@ app.get('/api/messages/recipients', async (req, res, next) => {
         select: { id: true, firstName: true, lastName: true, role: true }
     });
     res.json(users);
+});
+
+app.get('/api/messages/classes', async (req, res, next) => {
+    if (await requireAuth(req, res, next, 1) !== true) { return; }
+    try {
+        const currentUser = req.session.userId ? await prisma.user.findUnique({ where: { id: req.session.userId } }) : null;
+        const currentPrivilege = privileges[(currentUser?.role ?? '') as keyof typeof privileges] ?? 0;
+
+        // Pouze učitelé a admini (level >= 5) mohou posílat zprávy celým třídám
+        if (currentPrivilege >= 5) {
+            const classes = await prisma.class.findMany({ include: { students: true } });
+            const formatted = classes.map(c => ({
+                id: c.id,
+                name: c.name,
+                students: c.students.map(s => ({ id: s.id }))
+            }));
+            return res.json(formatted);
+        }
+        res.json([]);
+    } catch (e: any) {
+        res.status(500).json({ error: e.message });
+    }
 });
 
 app.get('/api/setup/messages', async (req, res) => {
