@@ -29,10 +29,12 @@ const privileges = {
 app.use(cors({
     origin: (origin, callback) => {
         if (!origin) return callback(null, true);
+        const allowedOrigin = process.env.CORS_ORIGIN?.replace(/\/$/, "");
         if (
             origin.startsWith('http://localhost') ||
             origin.endsWith('.onrender.com') ||
-            origin === process.env.CORS_ORIGIN
+            origin.endsWith('.vercel.app') ||
+            origin === allowedOrigin
         ) {
             return callback(null, true);
         }
